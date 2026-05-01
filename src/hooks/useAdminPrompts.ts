@@ -78,6 +78,27 @@ export function useAdminPromptRuns(promptId: string | null, limit = 20) {
   })
 }
 
+/**
+ * Compteur leger (HEAD count) du nombre de runs pour un prompt donne.
+ * Utilise pour afficher "History (N)" sans charger les outputs.
+ */
+export function useAdminPromptRunsCount(promptId: string | null) {
+  return useQuery<number>({
+    queryKey: ['admin_prompt_runs_count', promptId],
+    enabled: !!promptId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      if (!promptId) return 0
+      const { count, error } = await supabase
+        .from('admin_prompt_runs')
+        .select('id', { count: 'exact', head: true })
+        .eq('prompt_id', promptId)
+      if (error) throw error
+      return count ?? 0
+    },
+  })
+}
+
 export function useUpsertAdminPrompt() {
   const qc = useQueryClient()
   return useMutation<AdminPrompt, Error, AdminPromptUpsertInput>({
