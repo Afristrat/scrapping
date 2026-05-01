@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { SignalSource } from '@/lib/source-meta'
 
@@ -32,6 +33,7 @@ export interface SignalRow {
   reasoning: string | null
   model_used: string | null
   cost: number | null
+  scored_at: string | null
 }
 
 interface RawSignal {
@@ -48,6 +50,7 @@ interface RawSignal {
     reasoning: string | null
     model_used: string
     cost: number
+    scored_at: string
   }>
 }
 
@@ -55,7 +58,9 @@ export function useSignals(filters: SignalFilters) {
   return useQuery<SignalRow[]>({
     queryKey: ['signals', filters],
     queryFn: async () => {
-      let q = supabase.from('signals').select('*, scores(score, reasoning, model_used, cost)')
+      let q = supabase
+        .from('signals')
+        .select('*, scores(score, reasoning, model_used, cost, scored_at)')
 
       if (filters.sources.length > 0) {
         q = q.in('source', filters.sources)
@@ -86,6 +91,7 @@ export function useSignals(filters: SignalFilters) {
         reasoning: s.scores[0]?.reasoning ?? null,
         model_used: s.scores[0]?.model_used ?? null,
         cost: s.scores[0]?.cost ?? null,
+        scored_at: s.scores[0]?.scored_at ?? null,
       }))
 
       // Tri par score DESC primaire, date DESC secondaire (sortBy='score', défaut)
@@ -109,6 +115,55 @@ export function useSignals(filters: SignalFilters) {
       })
 
       return rows
+    },
+  })
+}
+
+/**
+ * Supprime un signal par son id. La table `scores` étant configurée en
+ * `ON DELETE CASCADE`, les scores associés sont purgés automatiquement.
+ * RLS garantit qu'un user ne peut supprimer que ses propres signaux.
+ */
+export function useDeleteSignal() {
+  const qc = useQueryClient()
+  return useMutation<string, Error, string>({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('signals').delete().eq('id', id)
+      if (error) throw new Error(error.message)
+      return id
+    },
+    onSuccess: () => {
+      toast.success('Signal supprimé')
+      void qc.invalidateQueries({ queryKey: ['signals'] })
+    },
+    onError: (err) => {
+      toast.error('Échec de la suppression', { description: err.message.slice(0, 200) })
+    },
+  })
+}
+
+/**
+ * Supprime plusieurs signaux en une seule requête via `.in('id', ids)`.
+ * Cascade gérée par la FK `scores.signal_id ON DELETE CASCADE`.
+ */
+export function useDeleteSignalsBulk() {
+  const qc = useQueryClient()
+  return useMutation<string[], Error, string[]>({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 0) return []
+      const { error } = await supabase.from('signals').delete().in('id', ids)
+      if (error) throw new Error(error.message)
+      return ids
+    },
+    onSuccess: (ids) => {
+      const n = ids.length
+      toast.success(n > 1 ? `${n} signaux supprimés` : `${n} signal supprimé`)
+      void qc.invalidateQueries({ queryKey: ['signals'] })
+    },
+    onError: (err) => {
+      toast.error('Échec de la suppression groupée', {
+        description: err.message.slice(0, 200),
+      })
     },
   })
 }
