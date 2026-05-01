@@ -11,6 +11,11 @@ CREATE TABLE topics (
   first_seen_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_seen_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   total_signal_count INTEGER NOT NULL DEFAULT 0,
+  -- Welford online algorithm state (sum-of-squared-deviations form):
+  -- baseline_mean = running mean (μ)
+  -- baseline_m2   = Σ(xᵢ − μ)²  ── NOT the std dev. Computed std at read time:
+  --                                std = sqrt(baseline_m2 / (baseline_n - 1))
+  -- baseline_n    = number of observations
   baseline_mean      DOUBLE PRECISION NOT NULL DEFAULT 0,
   baseline_m2        DOUBLE PRECISION NOT NULL DEFAULT 0,
   baseline_n         INTEGER NOT NULL DEFAULT 0,
@@ -44,6 +49,7 @@ ALTER TABLE topic_runs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "own_topic_runs_select" ON topic_runs FOR SELECT TO authenticated USING (user_id = auth.uid());
 CREATE POLICY "own_topic_runs_insert" ON topic_runs FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
 CREATE POLICY "own_topic_runs_update" ON topic_runs FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+CREATE POLICY "own_topic_runs_delete" ON topic_runs FOR DELETE TO authenticated USING (user_id = auth.uid());
 
 CREATE INDEX idx_topic_runs_topic_at ON topic_runs(topic_id, run_at DESC);
 CREATE INDEX idx_topic_runs_user_at ON topic_runs(user_id, run_at DESC);
@@ -78,6 +84,6 @@ CREATE POLICY "own_pending_insert" ON pending_minio_writes FOR INSERT TO authent
 CREATE POLICY "own_pending_update" ON pending_minio_writes FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 CREATE POLICY "own_pending_delete" ON pending_minio_writes FOR DELETE TO authenticated USING (user_id = auth.uid());
 
-CREATE INDEX idx_pending_user ON pending_minio_writes(user_id, created_at);
+CREATE INDEX idx_pending_active ON pending_minio_writes(user_id, created_at) WHERE attempts < 5;
 
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS topic_seeds TEXT[] NOT NULL DEFAULT '{}';
