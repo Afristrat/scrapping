@@ -1,0 +1,24 @@
+{
+  "project": "zlatan-scrap",
+  "version": "0.2.0",
+  "objective": "Eliminate technical and supervision debt — refactor BYOK to single dispatch, drop legacy, fix lint, add CI, implement digest properly",
+  "context": {
+    "branch": "feat/topic-tracking-minio",
+    "supabase_project_ref": "crplceoptyeslqyfcqvj",
+    "coolify_app_uuid": "jhg5pwiyul9r992k8qg2lkx6",
+    "deployed_url": "https://scrap.ai-mpower.com"
+  },
+  "stories": [
+    { "id": "S-A",          "title": "Refactor: dispatch-llm edge function unique",        "passes": true, "commit": "41fdb8c", "wave": 1 },
+    { "id": "S-B",          "title": "Migration: llm_providers DB table",                  "passes": true, "commit": "4eaeb92", "wave": 1 },
+    { "id": "S-Lint",       "title": "Fix: 3 lint errors préexistants",                    "passes": true, "commit": "67842e9", "wave": 1 },
+    { "id": "S-Husky",      "title": "Fix: Husky skip si pas de .git",                     "passes": true, "commit": "9e312a8", "wave": 1 },
+    { "id": "S-Split",      "title": "Optim: Vite code-splitting (1.2MB → 5 chunks)",      "passes": true, "commit": "ecff577", "wave": 1 },
+    { "id": "S-CI",         "title": "Ops: GitHub Actions CI workflow",                    "passes": true, "commit": "11111fe", "wave": 1 },
+    { "id": "S-CascadeFix", "title": "Fix: cascade lit form state via watch",             "passes": true, "commit": "7a1c89f", "wave": 1.5 },
+    { "id": "S-DeadCode",   "title": "Cleanup: purge constantes mortes (no-op après S-A)", "passes": true, "commit": null,      "wave": 2 },
+    { "id": "S-DropLegacy", "title": "Cleanup: drop legacy model_* columns",              "passes": true, "commit": "e1099b1", "wave": 2 },
+    { "id": "S-Digest",     "title": "Feature: digest edge fn + UI complète",              "passes": true, "commit": "082cf38", "wave": 2 }
+  ],
+  "completed_at": "2026-05-01T16:50:00Z"
+}
