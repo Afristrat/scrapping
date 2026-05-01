@@ -149,9 +149,199 @@
         "Logger composed_chain: [{ kind, source: 'cached'|'cascade', run_id, age_hours }] dans logs.payload",
         "Frontend: checkbox ‘Composer la chaîne’ dans Run dialog + warning coût N×"
       ]
+    },
+    {
+      "id": "S-MoatHunter",
+      "title": "Brief stratégique moat-hunter v2 (analogies inter-industries + analyse conjointe pricing)",
+      "passes": true,
+      "commit": null,
+      "wave": 5,
+      "completed_at": "2026-05-02T00:30:00Z",
+      "metadata": {
+        "files_created": ["docs/strategy/2026-05-02-moats-and-value-capture.md"],
+        "deliverables": [
+          "Job universel (niveau 3) défini",
+          "15 analogies inter-industries scorées (Top 5 features moat à 13-14/15)",
+          "6 segments business avec WTP (VC 599-999€, Avocats 399-699€, Newsletter 499-799€, Brand 499-799€, CTO 149-249€, Solo 49-99€)",
+          "Analyse conjointe v2 : 8 attributs × 4 niveaux × 6 segments = utility coefficients",
+          "12 SKUs (6 segments × 2 modes Maison/BYOK) avec marges brutes 64-99%",
+          "MRR cible an 1 = 132 k€/mois = 1,58 M€ ARR"
+        ]
+      }
+    },
+    {
+      "id": "S-DashDelete",
+      "title": "Dashboard: bouton supprimer inline + checkbox + bulk delete",
+      "passes": true,
+      "commit": null,
+      "wave": 5,
+      "completed_at": "2026-05-02T00:35:00Z",
+      "metadata": {
+        "files_created": [
+          "src/components/ui/checkbox.tsx",
+          "src/components/ui/alert-dialog.tsx",
+          "src/components/features/SignalTable.test.tsx"
+        ],
+        "files_modified": [
+          "src/hooks/useSignals.ts",
+          "src/components/features/SignalTable.tsx",
+          "src/pages/Dashboard.tsx"
+        ],
+        "validation": {
+          "typecheck": "0 errors",
+          "lint": "0 new warnings",
+          "vitest": "48/48 (4 nouveaux tests)",
+          "build": "ok"
+        },
+        "design_notes": [
+          "Sticky bar `sticky top-0 z-10` au-dessus de la table, apparaît si selection > 0",
+          "useState<Set<string>> + useMemo dérivé pour purger auto les ids absents",
+          "AlertDialog shadcn (vs confirm() natif) pour cohérence UX",
+          "RLS gère la sécurité (cascade scores via FK ON DELETE CASCADE)"
+        ]
+      }
+    },
+    {
+      "id": "S-ScoreZero",
+      "title": "Fix bug score=0 + bouton Re-scorer inline + bulk + tooltip explicative + flash UX",
+      "passes": true,
+      "commit": null,
+      "wave": 5,
+      "completed_at": "2026-05-02T00:35:00Z",
+      "metadata": {
+        "files_created": [
+          "supabase/functions/_shared/parse-score.ts",
+          "supabase/functions/llm-score-batch/parse-score.test.ts",
+          "src/components/features/ScoreCell.tsx",
+          "src/components/ui/hover-card.tsx",
+          "src/hooks/useRescoreSignals.ts"
+        ],
+        "files_modified": [
+          "supabase/functions/llm-score-batch/index.ts",
+          "src/hooks/useSignals.ts",
+          "src/components/features/SignalTable.tsx",
+          "src/pages/Dashboard.tsx"
+        ],
+        "validation": {
+          "deno_test": "28/28 (parse-score)",
+          "typecheck": "0 errors",
+          "lint": "0 new warnings",
+          "vitest": "48/48",
+          "build": "ok"
+        },
+        "root_cause": [
+          "JSON.parse(raw) silent catch → parsed = {} sur output non-JSON pur",
+          "Number(s.score) || 0 transforme NaN en 0 silencieux",
+          "Placeholder { score: 0, reasoning: '(LLM batch missed)' } écrit en DB pour signaux absents → faux positifs"
+        ],
+        "fix": [
+          "Nouveau parser parseScoringResponse avec strip markdown fence, extractFirstJsonObject bracket-aware",
+          "coerceScore retourne null (pas 0) sur NaN/Infinity/n/a",
+          "ScoreParseError levé si parsing impossible → log llm-score-batch:parse_fail avec preview 2k chars",
+          "Aucune row score=0 placeholder écrite : signaux missed restent unscored, récupérables via unscored_signals RPC"
+        ],
+        "ux": [
+          "ScoreCell : couleurs slate/orange/blue/emerald selon score",
+          "HoverCard avec score + raison + modèle + rubric + distance temporelle FR",
+          "Bouton ↻ inline visible si score 0/null + spinner pendant mutation",
+          "Flash bg-emerald-100 1.5s au succès (pattern React 19 store-previous-prop)",
+          "Bulk : bouton Dashboard chunking 30 ids"
+        ]
+      }
+    },
+    {
+      "id": "S-Landing",
+      "title": "Routing: / publique (Home marketing) + /dashboard auth-protected",
+      "passes": true,
+      "commit": null,
+      "wave": 5,
+      "completed_at": "2026-05-02T00:35:00Z",
+      "metadata": {
+        "files_created": ["src/pages/Home.tsx", "src/components/layout/MarketingLayout.tsx"],
+        "files_modified": [
+          "src/routes.tsx",
+          "src/components/auth/ProtectedRoute.tsx",
+          "src/pages/Login.tsx",
+          "src/pages/Signup.tsx",
+          "src/components/layout/Sidebar.tsx",
+          "src/components/layout/AppLayout.test.tsx",
+          "src/stores/auth.ts"
+        ],
+        "validation": {
+          "typecheck": "0 errors",
+          "lint": "0 new warnings",
+          "vitest": "48/48 (AppLayout.test adapté)",
+          "build": "ok"
+        },
+        "routing": {
+          "/": "Home (public, MarketingLayout)",
+          "/login": "Login (public, sanitizeNext open-redirect protection)",
+          "/signup": "Signup (public)",
+          "/dashboard": "Dashboard (ProtectedRoute → /login?next=)",
+          "logout": "redirect /"
+        }
+      }
+    },
+    {
+      "id": "S-LandingContent",
+      "title": "Contenu Home marketing v2 (pricing analyse conjointe Maison vs BYOK + 6 personas)",
+      "passes": true,
+      "commit": null,
+      "wave": 5,
+      "completed_at": "2026-05-02T00:50:00Z",
+      "metadata": {
+        "files_created": [
+          "src/components/features/landing/Hero.tsx",
+          "src/components/features/landing/ProblemSection.tsx",
+          "src/components/features/landing/SolutionSteps.tsx",
+          "src/components/features/landing/MoatsSection.tsx",
+          "src/components/features/landing/PersonasSection.tsx",
+          "src/components/features/landing/PricingTable.tsx",
+          "src/components/features/landing/FAQSection.tsx"
+        ],
+        "files_modified": ["src/pages/Home.tsx", "src/components/layout/MarketingLayout.tsx"],
+        "validation": {
+          "typecheck": "0 errors",
+          "lint": "0 new warnings",
+          "vitest": "48/48",
+          "build": "ok (712ms)"
+        },
+        "design_notes": [
+          "PricingTable avec toggle Tabs Maison/BYOK + slider seats Pro 5-25 dégressif (-15% Maison, -10% BYOK)",
+          "Format euros via Intl.NumberFormat('fr-FR')",
+          "Tier Pro mis en avant : badge Recommandé + ring + shadow emerald",
+          "6 personas avec ligne tarif Maison/BYOK séparée (couleurs emerald vs blue)",
+          "FAQ via <details><summary> natifs (pas Accordion shadcn pour rester léger)",
+          "Total Home.tsx : 51 lignes orchestrateur (sections modulaires landing/*)"
+        ]
+      }
     }
   ],
-  "completed_at": "2026-05-01T17:35:00Z",
+  "completed_at": "2026-05-02T00:50:00Z",
   "wave_4_opened_at": "2026-05-01T17:00:00Z",
-  "wave_4_completed_at": "2026-05-01T17:35:00Z"
+  "wave_4_completed_at": "2026-05-01T17:35:00Z",
+  "wave_5_opened_at": "2026-05-01T18:00:00Z",
+  "wave_5_completed_at": "2026-05-02T00:50:00Z",
+  "wave_6_planned": {
+    "title": "Multi-tenant org-level avec billing + 12 SKUs Stripe + configurateur par segment",
+    "scope": [
+      "Schéma : organizations, organization_members (role, joined_at), subscriptions, subscription_seats, invitations",
+      "RLS rewrite : signals/scores/settings/digests/topics/admin_prompts → org_id IN (SELECT org_id FROM organization_members WHERE user_id = auth.uid())",
+      "Migration backfill : 1 org par user existant + memberships role=owner",
+      "Stripe Billing avec metered usage (Apify + LLM Maison consommation par tenant)",
+      "12 SKUs Stripe : 6 segments × Maison/BYOK (VC, Avocats, Newsletter, Brand, CTO, Solo)",
+      "Configurateur tenant : segment + seats + LLM mode → Stripe Checkout custom",
+      "Self-serve provisioning BYOK : UI clés Apify + LLM, validation, fallback Maison",
+      "Audit log + Compliance pack (add-on Avocats)",
+      "Tenant isolé (Postgres schema séparé OU projet Supabase dédié) — option add-on",
+      "Self-host Docker : packaging + doc + support contract — bundle Enterprise",
+      "Tableau de bord admin : COG par tenant, marge brute live, alertes outliers",
+      "UI sélecteur d'org (header), page /settings/team, invitations email magic link",
+      "Page /pricing publique avec configurateur"
+    ],
+    "stories_estimate": 22,
+    "rationale": "Refonte structurelle massive validée par l'analyse conjointe v2 : sans multi-tenant + 12 SKUs, plafond ARPU = 49€ (Solo). Avec : MRR cible 132k€/mois = 1.58M€ ARR an 1.",
+    "ralph_loop_ready": true,
+    "ready_to_dispatch": "Attendre GO explicite utilisateur avant dispatch"
+  }
 }

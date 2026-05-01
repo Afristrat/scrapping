@@ -71,6 +71,28 @@
 - Aucun bug détecté dans `template.ts`
 - **Pattern à reproduire pour futures edge fns** : tests Deno isolés dans `<func>/<module>.test.ts` à côté du module testé, imports `jsr:@std/assert@1`, exec via `--node-modules-dir=auto`. Side-effect : crée `node_modules/.deno/` (cache Deno). Nettoyer après pour éviter conflit `@types/react` lors d'un `tsc -b` ; `bun install` restaure ensuite.
 
+### 2026-05-02T00:50:00Z — Wave 5 fermée (5 stories ✓)
+
+PRD ouverte 2026-05-01T18:00 par brief utilisateur ambitieux : delete inline/bulk Dashboard + fix bug score=0 + restructuration routing pour landing publique + skill moat-hunter + analyse business avocat du diable.
+
+**Pivot mid-wave** : utilisateur a contesté la grille pricing initiale (« Solo 19€ laisse de l'argent sur la table »). Stop de S-LandingContent v1, rédaction d'un addendum analyse conjointe (8 attributs × 4 niveaux × 6 segments = utility coefficients) avec 12 SKUs (6 segments × Maison/BYOK). Redispatch de S-LandingContent v2.
+
+**Logique pricing v2 actée** : BYOK > Maison en prix (signal de marché, pas COG). Solo = funnel SEO uniquement (utility 280/800, LTV < CAC). MRR cible an 1 = 132 k€/mois.
+
+**Stories** :
+
+- S-MoatHunter (skill + analyse business) : `docs/strategy/2026-05-02-moats-and-value-capture.md` (~600 lignes, top 5 moats scorés, analyse conjointe v2)
+- S-DashDelete : SignalTable (delete inline + checkbox + bulk + AlertDialog), useSignals hooks, primitives shadcn (checkbox + alert-dialog), 4 tests Vitest. Sticky bar `top-0 z-10`.
+- S-ScoreZero : root cause = JSON.parse silent catch + Number()||0 + placeholder DB. Fix = parser bracket-aware coerceScore retourne null + log parse_fail + skip-write si missed. ScoreCell HoverCard avec reasoning/modèle/rubric/distance temporelle FR. Bouton ↻ inline + bulk + flash bg-emerald 1.5s. 28 tests Deno.
+- S-Landing : `/` Home publique (MarketingLayout), `/dashboard` ProtectedRoute (sanitizeNext open-redirect protection). Logout → `/`. Login redirect via `?next=`.
+- S-LandingContent v2 : 7 composants `landing/*` modulaires. PricingTable avec toggle Maison/BYOK + slider seats Pro 5-25 dégressif (-15% / -10%). 6 personas. FAQ <details>. 51 l. Home orchestrateur.
+
+**Validation globale Wave 5** : Deno test 28/28 (parse-score) · Typecheck 0 err · Lint 0 new warning (Settings.tsx:65 préexistant) · Vitest 48/48 · Build 712 ms.
+
+**Pattern réutilisable** : pour les bug fixes critiques avec UX riche (S-ScoreZero), découpler le moteur (parse-score.ts isolé + tests) de l'intégration (index.ts) — permet à l'agent backend et l'agent UX de bosser en parallèle. Lors de re-écritures concurrentes, vérifier post-merge que le câblage est effectif (`grep` du nouveau import dans le caller — c'était écrasé silencieusement ici).
+
+**Piège résolu (Wave 5)** : 3 agents concurrents sur `SignalTable.tsx` ont fait du « patching collaboratif » mais l'un d'eux a écrasé les modifs `index.ts` de S-ScoreZero sans les re-merger. Vérification post-validation OBLIGATOIRE : grep du module nouveau dans son consommateur. Le câblage a dû être refait manuellement.
+
 ### 2026-05-01T17:35:00Z — S-AdminCompose ✓ (`56d45f8`)
 
 - Agent général-purpose, background, sans worktree (scope : `index.ts` + `compose.ts` + `useAdminPrompts.ts` + `AdminPromptsConfig.tsx`)
