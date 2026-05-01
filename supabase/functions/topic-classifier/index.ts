@@ -101,7 +101,152 @@ Deno.serve(async (req) => {
     }
   }
 
-  return json({ ok: true, classified: classifications.length, signals: signals.length }, 202)
+  // ---- Agréger par topic
+  const topicMap = new Map<string, {
+    signalIds: string[]
+    sources: Record<string, { count: number; total_score: number }>
+    topSignal: { title: string; score: number; source: string } | null
+    topicId?: string
+    topicName?: string
+    isSeed?: boolean
+    firstSeenAt?: string
+  }>()
+
+  // Récupérer les scores des signaux pour calculer avg + top
+  const { data: scoresData } = await supabase
+    .from('scores')
+    .select('signal_id, score')
+    .in('signal_id', signals.map((s) => s.id))
+    .eq('user_id', user.id)
+  const scoreById = new Map<string, number>(
+    (scoresData ?? []).map((s: { signal_id: string; score: number }) => [s.signal_id, s.score]),
+  )
+
+  for (const c of classifications) {
+    const sig = signals.find((s) => s.id === c.signal_id)
+    if (!sig) continue
+    const score = scoreById.get(sig.id) ?? 0
+
+    for (const topicName of c.topics) {
+      const slug = slugify(topicName)
+      if (!slug) continue
+
+      let bucket = topicMap.get(slug)
+      if (!bucket) {
+        bucket = { signalIds: [], sources: {}, topSignal: null }
+        topicMap.set(slug, bucket)
+      }
+      bucket.signalIds.push(sig.id)
+      const src = bucket.sources[sig.source] ?? { count: 0, total_score: 0 }
+      src.count += 1
+      src.total_score += score
+      bucket.sources[sig.source] = src
+
+      if (!bucket.topSignal || score > bucket.topSignal.score) {
+        bucket.topSignal = { title: sig.title ?? '(no title)', score, source: sig.source }
+      }
+    }
+  }
+
+  // ---- Persist Postgres avec retry 3x backoff
+  let persistedTopics = 0
+  for (const [slug, bucket] of topicMap) {
+    const isSeed = seeds.some((s) => slugify(s) === slug)
+    const topicName =
+      seeds.find((s) => slugify(s) === slug) ??
+      classifications.flatMap((c) => c.topics).find((t) => slugify(t) === slug) ??
+      slug
+
+    try {
+      await retryWithBackoff(async () => {
+        const { data: existing } = await supabase
+          .from('topics')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('slug', slug)
+          .maybeSingle()
+
+        let topicId: string
+        let baseline = { mean: 0, m2: 0, n: 0 }
+        if (existing) {
+          topicId = existing.id
+          baseline = {
+            mean: existing.baseline_mean,
+            m2: existing.baseline_m2,
+            n: existing.baseline_n,
+          }
+        } else {
+          const { data: inserted, error: insErr } = await supabase
+            .from('topics')
+            .insert({
+              user_id: user.id, name: topicName, slug,
+              is_seed: isSeed, is_emerging: !isSeed,
+            })
+            .select('id')
+            .single()
+          if (insErr || !inserted) throw new Error(`topic_insert_failed: ${insErr?.message}`)
+          topicId = inserted.id
+        }
+
+        const newBaseline = welfordUpdate(baseline, bucket.signalIds.length)
+        const trend = computeTrend(bucket.signalIds.length, newBaseline)
+
+        const sourcesJson: Record<string, { count: number; avg_score: number }> = {}
+        for (const [src, agg] of Object.entries(bucket.sources)) {
+          sourcesJson[src] = {
+            count: agg.count,
+            avg_score: agg.count > 0 ? agg.total_score / agg.count : 0,
+          }
+        }
+
+        const { error: runErr } = await supabase
+          .from('topic_runs')
+          .insert({
+            topic_id: topicId, user_id: user.id, run_at: body.run_at,
+            signal_count: bucket.signalIds.length,
+            sources: sourcesJson,
+            top_signal_title: bucket.topSignal?.title ?? null,
+            top_signal_score: bucket.topSignal?.score ?? null,
+          })
+        if (runErr) throw new Error(`topic_run_insert_failed: ${runErr.message}`)
+
+        await supabase
+          .from('topics')
+          .update({
+            baseline_mean: newBaseline.mean,
+            baseline_m2: newBaseline.m2,
+            baseline_n: newBaseline.n,
+            trend, last_seen_at: body.run_at,
+            total_signal_count: (existing?.total_signal_count ?? 0) + bucket.signalIds.length,
+          })
+          .eq('id', topicId)
+
+        if (bucket.signalIds.length > 0) {
+          await supabase.from('topic_signals').insert(
+            bucket.signalIds.map((sid) => ({
+              topic_id: topicId, signal_id: sid, user_id: user.id,
+            })),
+          )
+        }
+
+        bucket.topicId = topicId
+        bucket.topicName = topicName
+        bucket.isSeed = isSeed
+        bucket.firstSeenAt = existing?.first_seen_at ?? body.run_at
+      }, { maxAttempts: 3, baseDelayMs: 1000 })
+      persistedTopics++
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      await supabase.from('logs').insert({
+        user_id: user.id,
+        action: 'topic-classifier:error',
+        status: 'error',
+        payload: { phase: 'postgres_persist', slug, error: msg },
+      })
+    }
+  }
+
+  return json({ ok: true, classified: classifications.length, topics_persisted: persistedTopics }, 202)
 })
 
 async function classifyBatch(
