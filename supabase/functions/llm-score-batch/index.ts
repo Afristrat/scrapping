@@ -2,6 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import OpenAI from 'npm:openai@4'
 import { getUserApiKey } from '../_shared/api-keys.ts'
 import { formatError, summarizeError } from '../_shared/errors.ts'
+import { getProviderConfig, type ProviderId } from '../_shared/providers.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -39,16 +40,7 @@ Deno.serve(async (req) => {
   } = await supabase.auth.getUser()
   if (!user) return json({ error: 'invalid_token' }, 401)
 
-  const apiKey = await getUserApiKey(supabase, user.id, 'openrouter')
-  if (!apiKey)
-    return json(
-      {
-        error: 'missing_openrouter_key',
-        detail:
-          'Configure une cle dans Parametres -> Cles API ou definis OPENROUTER_API_KEY en secret edge function.',
-      },
-      500,
-    )
+  // Provider+model resolution happens after we load settings (below).
 
   let body: RequestBody
   try {
@@ -89,6 +81,25 @@ Deno.serve(async (req) => {
   const signals = signalsRes.data
   const settings = settingsRes.data
 
+  const taskCfg = (
+    (settings as { model_config?: Record<string, { provider: string; model: string } | null> })
+      .model_config ?? {}
+  )['scoring']
+  const providerId: ProviderId = (taskCfg?.provider as ProviderId | undefined) ?? 'openrouter'
+  const legacyModel = (settings as { model_scoring?: string | null }).model_scoring ?? null
+  const dispatchModel: string =
+    taskCfg?.model || legacyModel || 'openrouter/auto'
+  const providerCfg = getProviderConfig(providerId)
+  if (!providerCfg) return json({ error: 'unknown_provider', provider: providerId }, 500)
+
+  const apiKey = await getUserApiKey(supabase, user.id, providerId)
+  if (!apiKey && providerCfg.modelsRequiresAuth) {
+    return json(
+      { error: 'missing_api_key', provider: providerId },
+      500,
+    )
+  }
+
   let scoringPrompt = settings.prompt_scoring ?? ''
   let criteriaBlock = ''
   if (settings.active_rubric_id) {
@@ -118,9 +129,10 @@ Deno.serve(async (req) => {
   const prompt = `${scoringPrompt}${criteriaBlock}\nTu vas scorer ${signals.length} signaux d'un coup. Pour CHAQUE signal, donne un score de 0 a 100 et une justification d'1 phrase courte.\n\nReponds en JSON strict (et UNIQUEMENT en JSON) :\n{"scores":[{"id":"<uuid du signal>","score":<0-100>,"reasoning":"<1 phrase>"},...]}\n\nSignaux a scorer :\n\n${itemsBlock}`
 
   const client = new OpenAI({
-    baseURL: OPENROUTER_BASE,
-    apiKey,
+    baseURL: providerCfg.baseURL,
+    apiKey: apiKey ?? 'not-required',
     defaultHeaders: {
+      ...(providerCfg.extraHeaders ?? {}),
       'HTTP-Referer': 'https://theresa-scrap.local',
       'X-Title': 'theresa-scrap-batch',
     },
@@ -129,7 +141,7 @@ Deno.serve(async (req) => {
   let completion
   try {
     completion = await client.chat.completions.create({
-      model: settings.model_scoring,
+      model: dispatchModel,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       max_tokens: Math.min(400 * signals.length, 8000),
@@ -143,7 +155,7 @@ Deno.serve(async (req) => {
       payload: {
         stage: 'openrouter_call',
         count: signals.length,
-        model: settings.model_scoring,
+        model: dispatchModel,
         prompt_chars: prompt.length,
         ...formatted,
         summary: summarizeError(err),
@@ -170,7 +182,7 @@ Deno.serve(async (req) => {
   const promptTokens = usage?.prompt_tokens ?? 0
   const completionTokens = usage?.completion_tokens ?? 0
   const totalCost =
-    usage?.cost ?? estimateCost(settings.model_scoring, promptTokens, completionTokens)
+    usage?.cost ?? estimateCost(dispatchModel, promptTokens, completionTokens)
   const costPerSignal = signals.length > 0 ? totalCost / signals.length : 0
 
   const validById = new Map<string, { score: number; reasoning: string }>()
@@ -188,7 +200,7 @@ Deno.serve(async (req) => {
       user_id: user.id,
       score: v.score,
       reasoning: v.reasoning,
-      model_used: settings.model_scoring,
+      model_used: dispatchModel,
       cost: costPerSignal,
     }
   })
@@ -215,7 +227,7 @@ Deno.serve(async (req) => {
   await supabase.from('llm_costs').insert({
     user_id: user.id,
     task: 'scoring',
-    model: settings.model_scoring,
+    model: dispatchModel,
     prompt_tokens: promptTokens,
     completion_tokens: completionTokens,
     cost: totalCost,
@@ -232,7 +244,7 @@ Deno.serve(async (req) => {
       cost: totalCost,
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
-      model: settings.model_scoring,
+      model: dispatchModel,
     },
   })
 

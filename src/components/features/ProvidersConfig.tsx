@@ -95,6 +95,8 @@ function ProviderEditor({ provider, existingKey, overridable }: EditorProps) {
     if (!rawKey.trim() && !overridable) return
     await upsert.mutateAsync({ provider, rawKey: rawKey.trim() || existingKey?.masked_key || '' })
     setRawKey('')
+    // Auto-refresh models so the cascade selectors are populated immediately
+    refresh.mutate({ provider, baseUrl: overridable && baseUrl ? baseUrl : undefined })
   }
 
   const handleRefresh = () => {

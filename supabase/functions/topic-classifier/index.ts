@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import OpenAI from 'npm:openai@4'
 import { getUserApiKey } from '../_shared/api-keys.ts'
+import { getProviderConfig, type ProviderId } from '../_shared/providers.ts'
 import { retryWithBackoff } from '../_shared/retry.ts'
 import { welfordUpdate, computeTrend } from '../_shared/welford.ts'
 import {
@@ -74,14 +75,28 @@ Deno.serve(async (req) => {
 
   if (!signals || signals.length === 0) return json({ ok: true, classified: 0 }, 202)
 
-  // ---- Clé OpenRouter (user > env fallback)
-  const apiKey = await getUserApiKey(supabase, user.id, 'openrouter')
-  if (!apiKey) return json({ error: 'missing_openrouter_key' }, 500)
+  // ---- Resolve provider + model from BYOK model_config.scraping (preferred) or fallback
+  const taskCfg = (settings.topic_seeds !== undefined
+    ? ((settings as { model_config?: Record<string, { provider: string; model: string } | null> }).model_config ?? {})
+    : {})['scraping']
+  const providerId: ProviderId = (taskCfg?.provider as ProviderId | undefined) ?? 'openrouter'
+  const dispatchModel: string = taskCfg?.model || MODEL
+  const providerCfg = getProviderConfig(providerId)
+  if (!providerCfg) return json({ error: 'unknown_provider', provider: providerId }, 500)
+
+  const apiKey = await getUserApiKey(supabase, user.id, providerId)
+  if (!apiKey && providerCfg.modelsRequiresAuth) {
+    return json({ error: 'missing_api_key', provider: providerId }, 500)
+  }
 
   const client = new OpenAI({
-    baseURL: OPENROUTER_BASE,
-    apiKey,
-    defaultHeaders: { 'HTTP-Referer': 'https://zlatan-scrap.local', 'X-Title': 'zlatan-scrap' },
+    baseURL: providerCfg.baseURL,
+    apiKey: apiKey ?? 'not-required',
+    defaultHeaders: {
+      ...(providerCfg.extraHeaders ?? {}),
+      'HTTP-Referer': 'https://zlatan-scrap.local',
+      'X-Title': 'zlatan-scrap',
+    },
   })
 
   // ---- Classifier par batch avec concurrence limitée
@@ -93,7 +108,7 @@ Deno.serve(async (req) => {
     const promises: Promise<Classification[]>[] = []
     for (let j = 0; j < slice.length; j += BATCH_SIZE) {
       const batch = slice.slice(j, j + BATCH_SIZE)
-      promises.push(classifyBatch(client, batch, knownList))
+      promises.push(classifyBatch(client, batch, knownList, dispatchModel))
     }
     const results = await Promise.allSettled(promises)
     for (const r of results) {
@@ -375,6 +390,7 @@ async function classifyBatch(
   client: OpenAI,
   signals: Array<{ id: string; source: string; title: string | null; raw_payload: unknown }>,
   knownTopics: string[],
+  model: string,
 ): Promise<Array<{ signal_id: string; topics: string[] }>> {
   // Sanitize: strip control chars + collapse whitespace + truncate per field
   const sanitize = (s: string): string =>
@@ -402,7 +418,7 @@ Réponds en JSON strict :
 
   const completion = await retryWithBackoff(
     () => client.chat.completions.create({
-      model: MODEL,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Signaux à classifier :\n${list}` },
