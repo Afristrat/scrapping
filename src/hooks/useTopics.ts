@@ -57,7 +57,7 @@ export function useTopics(opts?: { runsLimit?: number }) {
       if (rErr) throw rErr
 
       const runsByTopic = new Map<string, TopicRunRow[]>()
-      for (const r of (runs ?? []) as TopicRunRow[]) {
+      for (const r of (runs ?? []) as unknown as TopicRunRow[]) {
         const list = runsByTopic.get(r.topic_id) ?? []
         if (list.length < runsLimit) list.push(r)
         runsByTopic.set(r.topic_id, list)
