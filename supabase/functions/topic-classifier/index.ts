@@ -251,7 +251,124 @@ Deno.serve(async (req) => {
     }
   }
 
-  return json({ ok: true, classified: classifications.length, topics_persisted: persistedTopics }, 202)
+  // ---- Phase MinIO : best-effort, queue si échec
+  const minioCfg = getMinioConfig()
+  let minioAppended = 0
+  let minioQueued = 0
+
+  if (minioCfg) {
+    const minioClient = createMinioClient(minioCfg)
+
+    // Flush la queue en attente d'abord
+    const { data: pending } = await supabase
+      .from('pending_minio_writes')
+      .select('*, topics!inner(name, slug, is_seed, first_seen_at)')
+      .eq('user_id', user.id)
+      .lt('attempts', 5)
+      .order('created_at', { ascending: true })
+      .limit(20)
+
+    for (const p of (pending ?? []) as Array<{
+      id: string
+      topic_id: string
+      run_at: string
+      content: string
+      attempts: number
+      topics: { name: string; slug: string; is_seed: boolean; first_seen_at: string }
+    }>) {
+      try {
+        await appendTopicEntry({
+          client: minioClient, bucket: minioCfg.bucket,
+          userId: user.id,
+          slug: p.topics.slug, topicName: p.topics.name,
+          isSeed: p.topics.is_seed, entry: p.content,
+          firstSeenAt: p.topics.first_seen_at,
+        })
+        await supabase.from('pending_minio_writes').delete().eq('id', p.id)
+      } catch {
+        await supabase
+          .from('pending_minio_writes')
+          .update({ attempts: p.attempts + 1 })
+          .eq('id', p.id)
+      }
+    }
+
+    // Append les entrées de ce run pour chaque topic persisté
+    for (const [slug, bucket] of topicMap) {
+      if (!bucket.topicId) continue
+
+      const sourcesJson: Record<string, { count: number; avg_score: number }> = {}
+      for (const [src, agg] of Object.entries(bucket.sources)) {
+        sourcesJson[src] = {
+          count: agg.count,
+          avg_score: agg.count > 0 ? agg.total_score / agg.count : 0,
+        }
+      }
+
+      const entry = formatEntry({
+        runAt: body.run_at,
+        signalCount: bucket.signalIds.length,
+        sources: sourcesJson,
+        topSignalTitle: bucket.topSignal?.title ?? null,
+        topSignalScore: bucket.topSignal?.score ?? null,
+        topSignalSource: bucket.topSignal?.source ?? null,
+      })
+
+      try {
+        await appendTopicEntry({
+          client: minioClient, bucket: minioCfg.bucket,
+          userId: user.id, slug,
+          topicName: bucket.topicName ?? slug,
+          isSeed: bucket.isSeed ?? false,
+          entry,
+          firstSeenAt: bucket.firstSeenAt ?? body.run_at,
+        })
+        await supabase
+          .from('topic_runs')
+          .update({ minio_appended: true })
+          .eq('topic_id', bucket.topicId)
+          .eq('run_at', body.run_at)
+        minioAppended++
+      } catch (err) {
+        await supabase.from('pending_minio_writes').insert({
+          topic_id: bucket.topicId,
+          user_id: user.id,
+          run_at: body.run_at,
+          content: entry,
+        })
+        await supabase.from('logs').insert({
+          user_id: user.id,
+          action: 'topic-classifier:error',
+          status: 'error',
+          payload: {
+            phase: 'minio_append', slug,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        })
+        minioQueued++
+      }
+    }
+  }
+
+  await supabase.from('logs').insert({
+    user_id: user.id,
+    action: 'topic-classifier:run',
+    status: 'ok',
+    payload: {
+      classified: classifications.length,
+      topics_persisted: persistedTopics,
+      minio_appended: minioAppended,
+      minio_queued: minioQueued,
+    },
+  })
+
+  return json({
+    ok: true,
+    classified: classifications.length,
+    topics_persisted: persistedTopics,
+    minio_appended: minioAppended,
+    minio_queued: minioQueued,
+  }, 202)
 })
 
 async function classifyBatch(
