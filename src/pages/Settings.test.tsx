@@ -14,6 +14,7 @@ const MOCK_SETTINGS: SettingsType = {
   reddit_subs: ['MachineLearning', 'LocalLLaMA'],
   arxiv_categories: ['cs.AI'],
   x_queries: ['#LLM'],
+  topic_seeds: [],
   branding: {
     name: 'Mon Dashboard',
     primary: '#3b82f6',
