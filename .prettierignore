@@ -1,0 +1,8 @@
+node_modules
+dist
+.turbo
+coverage
+supabase/.temp
+supabase/.branches
+*.lock
+bun.lock
