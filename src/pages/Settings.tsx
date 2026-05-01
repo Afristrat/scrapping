@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ApiKeyForm } from '@/components/features/ApiKeyForm'
 import { ApifyConfigForm } from '@/components/features/ApifyConfigForm'
+import { ProvidersConfig } from '@/components/features/ProvidersConfig'
 import { BrandingForm } from '@/components/features/BrandingForm'
 import { ModelSelectField } from '@/components/features/ModelSelectField'
 import { RubricsManager } from '@/components/features/RubricsManager'
@@ -69,7 +70,6 @@ export default function Settings() {
     updateMutation.mutate(values)
   }
 
-  const openrouterKey = apiKeys?.find((k) => k.provider === 'openrouter')
   const apifyKey = apiKeys?.find((k) => k.provider === 'apify')
 
   return (
@@ -183,8 +183,22 @@ export default function Settings() {
 
           {/* Onglet 4 : Cles API */}
           <TabsContent value="api-keys" className="space-y-4 pt-4">
-            <ApiKeyForm provider="openrouter" existingKey={openrouterKey} label="OpenRouter" />
-            <ApiKeyForm provider="apify" existingKey={apifyKey} label="Apify" />
+            <Card>
+              <CardHeader>
+                <CardTitle>Providers LLM (BYOK)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ProvidersConfig />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Apify (scraping)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ApiKeyForm provider="apify" existingKey={apifyKey} label="Apify" />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Onglet 5 : Branding & Budget */}
