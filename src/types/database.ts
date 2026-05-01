@@ -112,6 +112,42 @@ export type Database = {
           },
         ]
       }
+      provider_models: {
+        Row: {
+          capabilities: Json
+          context_window: number | null
+          display_name: string | null
+          fetched_at: string
+          model_id: string
+          pricing_input_per_1m: number | null
+          pricing_output_per_1m: number | null
+          provider: string
+          user_id: string
+        }
+        Insert: {
+          capabilities?: Json
+          context_window?: number | null
+          display_name?: string | null
+          fetched_at?: string
+          model_id: string
+          pricing_input_per_1m?: number | null
+          pricing_output_per_1m?: number | null
+          provider: string
+          user_id: string
+        }
+        Update: {
+          capabilities?: Json
+          context_window?: number | null
+          display_name?: string | null
+          fetched_at?: string
+          model_id?: string
+          pricing_input_per_1m?: number | null
+          pricing_output_per_1m?: number | null
+          provider?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       scores: {
         Row: {
           cost: number
@@ -194,6 +230,7 @@ export type Database = {
           branding: Json
           daily_budget_usd: number
           language: string
+          model_config: Json
           model_digest: string
           model_monitoring: string
           model_scoring: string
@@ -214,6 +251,7 @@ export type Database = {
           branding?: Json
           daily_budget_usd?: number
           language?: string
+          model_config?: Json
           model_digest?: string
           model_monitoring?: string
           model_scoring?: string
@@ -234,6 +272,7 @@ export type Database = {
           branding?: Json
           daily_budget_usd?: number
           language?: string
+          model_config?: Json
           model_digest?: string
           model_monitoring?: string
           model_scoring?: string
@@ -420,31 +459,40 @@ export type Database = {
       }
       user_api_keys: {
         Row: {
+          base_url: string | null
           created_at: string
           encrypted_key: string
           id: string
+          last_validated_at: string | null
           masked_key: string
           provider: string
           updated_at: string
           user_id: string
+          validation_status: string | null
         }
         Insert: {
+          base_url?: string | null
           created_at?: string
           encrypted_key: string
           id?: string
+          last_validated_at?: string | null
           masked_key: string
           provider: string
           updated_at?: string
           user_id: string
+          validation_status?: string | null
         }
         Update: {
+          base_url?: string | null
           created_at?: string
           encrypted_key?: string
           id?: string
+          last_validated_at?: string | null
           masked_key?: string
           provider?: string
           updated_at?: string
           user_id?: string
+          validation_status?: string | null
         }
         Relationships: []
       }
