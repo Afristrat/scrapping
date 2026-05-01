@@ -5,13 +5,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useApiKeys, useUpsertApiKey, useDeleteApiKey } from '@/hooks/useApiKeys'
 import { useProviderModels, useRefreshModels } from '@/hooks/useProviderModels'
-import { LLM_PROVIDERS, type LLMProviderId } from '@/lib/providers'
-import type { UserApiKey } from '@/lib/schemas/api-key-schema'
+import { useLLMProviders } from '@/hooks/useLLMProviders'
+import type { LLMProviderId } from '@/lib/providers'
+import type { ApiKeyProvider, UserApiKey } from '@/lib/schemas/api-key-schema'
 import { cn } from '@/lib/utils'
 
 export function ProvidersConfig() {
   const { data: keys } = useApiKeys()
   const { data: models } = useProviderModels()
+  const { data: providers = [] } = useLLMProviders()
   const [open, setOpen] = useState<LLMProviderId | null>(null)
 
   const keyByProvider = useMemo(() => {
@@ -28,7 +30,7 @@ export function ProvidersConfig() {
 
   return (
     <div className="space-y-2">
-      {LLM_PROVIDERS.map((p) => {
+      {providers.map((p) => {
         const key = keyByProvider.get(p.id)
         const isOpen = open === p.id
         const count = modelsCountByProvider.get(p.id) ?? 0
@@ -93,7 +95,12 @@ function ProviderEditor({ provider, existingKey, overridable }: EditorProps) {
 
   const handleSave = async () => {
     if (!rawKey.trim() && !overridable) return
-    await upsert.mutateAsync({ provider, rawKey: rawKey.trim() || existingKey?.masked_key || '' })
+    // The DB-driven provider list is `string`, but useUpsertApiKey takes the
+    // strict ApiKeyProvider union (kept narrow for runtime safety).
+    await upsert.mutateAsync({
+      provider: provider as ApiKeyProvider,
+      rawKey: rawKey.trim() || existingKey?.masked_key || '',
+    })
     setRawKey('')
     // Auto-refresh models so the cascade selectors are populated immediately
     refresh.mutate({ provider, baseUrl: overridable && baseUrl ? baseUrl : undefined })

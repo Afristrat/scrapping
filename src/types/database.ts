@@ -47,6 +47,54 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_providers: {
+        Row: {
+          auth_scheme: string
+          base_url_overridable: boolean
+          created_at: string
+          default_base_url: string
+          display_order: number
+          enabled: boolean
+          extra_headers: Json
+          hint: string | null
+          id: string
+          label: string
+          models_endpoint: string
+          models_requires_auth: boolean
+          updated_at: string
+        }
+        Insert: {
+          auth_scheme: string
+          base_url_overridable?: boolean
+          created_at?: string
+          default_base_url: string
+          display_order?: number
+          enabled?: boolean
+          extra_headers?: Json
+          hint?: string | null
+          id: string
+          label: string
+          models_endpoint?: string
+          models_requires_auth?: boolean
+          updated_at?: string
+        }
+        Update: {
+          auth_scheme?: string
+          base_url_overridable?: boolean
+          created_at?: string
+          default_base_url?: string
+          display_order?: number
+          enabled?: boolean
+          extra_headers?: Json
+          hint?: string | null
+          id?: string
+          label?: string
+          models_endpoint?: string
+          models_requires_auth?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       logs: {
         Row: {
           action: string

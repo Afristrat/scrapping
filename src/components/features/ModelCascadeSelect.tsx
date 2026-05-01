@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useProviderModels } from '@/hooks/useProviderModels'
 import { useApiKeys } from '@/hooks/useApiKeys'
-import { LLM_PROVIDERS, type LLMProviderId } from '@/lib/providers'
+import { useLLMProviders } from '@/hooks/useLLMProviders'
+import type { LLMProviderId } from '@/lib/providers'
 
 export interface ModelChoice {
   provider: LLMProviderId
@@ -19,14 +20,15 @@ interface Props {
 export function ModelCascadeSelect({ value, onChange, allowClear = false }: Props) {
   const { data: keys } = useApiKeys()
   const { data: models } = useProviderModels()
+  const { data: providers = [] } = useLLMProviders()
 
   const availableProviders = useMemo(() => {
-    const withKey = new Set((keys ?? []).map((k) => k.provider))
-    const withModels = new Set((models ?? []).map((m) => m.provider))
-    return LLM_PROVIDERS.filter(
+    const withKey = new Set<string>((keys ?? []).map((k) => k.provider))
+    const withModels = new Set<string>((models ?? []).map((m) => m.provider))
+    return providers.filter(
       (p) => withKey.has(p.id) || withModels.has(p.id) || p.id === 'ollama',
     )
-  }, [keys, models])
+  }, [keys, models, providers])
 
   const modelsForProvider = useMemo(() => {
     if (!value) return []

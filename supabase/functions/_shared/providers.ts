@@ -1,150 +1,66 @@
-// Provider configs for BYOK multi-LLM support.
-// Most providers expose an OpenAI-compatible API at the listed baseURL,
-// allowing reuse of the OpenAI SDK client.
+import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
-export type ProviderId =
-  | 'openrouter'
-  | 'moonshot'
-  | 'anthropic'
-  | 'openai'
-  | 'google'
-  | 'mistral'
-  | 'groq'
-  | 'together'
-  | 'deepseek'
-  | 'ollama'
+export type AuthScheme = 'bearer' | 'x-api-key' | 'none'
 
 export interface ProviderConfig {
-  id: ProviderId
+  id: string
   label: string
   baseURL: string
-  authScheme: 'bearer' | 'x-api-key' | 'none'
+  authScheme: AuthScheme
   modelsEndpoint: string
-  /** Provider-specific extra headers needed alongside auth. */
-  extraHeaders?: Record<string, string>
-  /** True when the provider's /models endpoint requires user-specific auth. */
-  modelsRequiresAuth: boolean
-  /** True when the user must supply a base URL (e.g. self-hosted Ollama). */
+  extraHeaders: Record<string, string>
   baseURLOverridable: boolean
+  modelsRequiresAuth: boolean
 }
 
-export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
-  openrouter: {
-    id: 'openrouter',
-    label: 'OpenRouter',
-    baseURL: 'https://openrouter.ai/api/v1',
-    authScheme: 'bearer',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  moonshot: {
-    id: 'moonshot',
-    label: 'Moonshot (Kimi)',
-    baseURL: 'https://api.moonshot.ai/v1',
-    authScheme: 'bearer',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  anthropic: {
-    id: 'anthropic',
-    label: 'Anthropic (Claude)',
-    baseURL: 'https://api.anthropic.com/v1',
-    authScheme: 'x-api-key',
-    modelsEndpoint: '/models',
-    extraHeaders: { 'anthropic-version': '2023-06-01' },
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  openai: {
-    id: 'openai',
-    label: 'OpenAI',
-    baseURL: 'https://api.openai.com/v1',
-    authScheme: 'bearer',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  google: {
-    id: 'google',
-    label: 'Google (Gemini)',
-    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    authScheme: 'bearer',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  mistral: {
-    id: 'mistral',
-    label: 'Mistral',
-    baseURL: 'https://api.mistral.ai/v1',
-    authScheme: 'bearer',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  groq: {
-    id: 'groq',
-    label: 'Groq',
-    baseURL: 'https://api.groq.com/openai/v1',
-    authScheme: 'bearer',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  together: {
-    id: 'together',
-    label: 'Together AI',
-    baseURL: 'https://api.together.xyz/v1',
-    authScheme: 'bearer',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  deepseek: {
-    id: 'deepseek',
-    label: 'DeepSeek',
-    baseURL: 'https://api.deepseek.com/v1',
-    authScheme: 'bearer',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: true,
-    baseURLOverridable: false,
-  },
-  ollama: {
-    id: 'ollama',
-    label: 'Ollama (self-hosted)',
-    baseURL: 'http://localhost:11434/v1',
-    authScheme: 'none',
-    modelsEndpoint: '/models',
-    modelsRequiresAuth: false,
-    baseURLOverridable: true,
-  },
-}
+// Cache : DB read 1x toutes les 5 min par instance Edge
+let cache: { at: number; data: Map<string, ProviderConfig> } | null = null
+const CACHE_TTL_MS = 5 * 60 * 1000
 
-export function getProviderConfig(provider: string): ProviderConfig | null {
-  return (PROVIDERS as Record<string, ProviderConfig>)[provider] ?? null
-}
+async function loadProviders(supabase: SupabaseClient): Promise<Map<string, ProviderConfig>> {
+  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.data
 
-export function buildAuthHeaders(
-  provider: ProviderConfig,
-  apiKey: string | null,
-): Record<string, string> {
-  const headers: Record<string, string> = { ...(provider.extraHeaders ?? {}) }
-  if (provider.authScheme === 'bearer' && apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`
-  } else if (provider.authScheme === 'x-api-key' && apiKey) {
-    headers['x-api-key'] = apiKey
+  const { data, error } = await supabase.from('llm_providers').select('*').eq('enabled', true)
+  if (error) throw new Error(`load_llm_providers_failed: ${error.message}`)
+
+  const map = new Map<string, ProviderConfig>()
+  for (const row of (data ?? []) as Array<{
+    id: string; label: string; default_base_url: string; auth_scheme: AuthScheme;
+    models_endpoint: string; extra_headers: Record<string, string>;
+    base_url_overridable: boolean; models_requires_auth: boolean;
+  }>) {
+    map.set(row.id, {
+      id: row.id,
+      label: row.label,
+      baseURL: row.default_base_url,
+      authScheme: row.auth_scheme,
+      modelsEndpoint: row.models_endpoint,
+      extraHeaders: row.extra_headers ?? {},
+      baseURLOverridable: row.base_url_overridable,
+      modelsRequiresAuth: row.models_requires_auth,
+    })
   }
+  cache = { at: Date.now(), data: map }
+  return map
+}
+
+export async function getProviderConfig(supabase: SupabaseClient, id: string): Promise<ProviderConfig | null> {
+  const map = await loadProviders(supabase)
+  return map.get(id) ?? null
+}
+
+export async function getAllProviders(supabase: SupabaseClient): Promise<ProviderConfig[]> {
+  const map = await loadProviders(supabase)
+  return Array.from(map.values())
+}
+
+export function buildAuthHeaders(provider: ProviderConfig, apiKey: string | null): Record<string, string> {
+  const headers: Record<string, string> = { ...provider.extraHeaders }
+  if (provider.authScheme === 'bearer' && apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+  else if (provider.authScheme === 'x-api-key' && apiKey) headers['x-api-key'] = apiKey
   return headers
 }
 
-/**
- * Normalize the /models response to a uniform shape across providers.
- * Most OpenAI-compat endpoints return { data: [{ id, ... }, ...] }.
- * Anthropic returns { data: [{ id, display_name, type, ... }] }.
- * Google returns { data: [{ id, ... }] } via the OpenAI-compat endpoint.
- */
 export interface NormalizedModel {
   id: string
   displayName: string | null
@@ -154,47 +70,22 @@ export interface NormalizedModel {
   capabilities: string[]
 }
 
-export function normalizeModelsResponse(
-  provider: ProviderId,
-  raw: unknown,
-): NormalizedModel[] {
+export function normalizeModelsResponse(provider: string, raw: unknown): NormalizedModel[] {
   const data = (raw as { data?: unknown[] })?.data
   if (!Array.isArray(data)) return []
-
-  return data
-    .map((m) => {
-      const obj = m as Record<string, unknown>
-      const id = (obj.id ?? obj.name) as string | undefined
-      if (!id) return null
-
-      // OpenRouter exposes pricing on each model in $/token (string).
-      // We convert to $/1M tokens.
-      let pricingIn: number | null = null
-      let pricingOut: number | null = null
-      if (provider === 'openrouter' && obj.pricing) {
-        const p = obj.pricing as { prompt?: string; completion?: string }
-        pricingIn = p.prompt ? Number(p.prompt) * 1_000_000 : null
-        pricingOut = p.completion ? Number(p.completion) * 1_000_000 : null
-      }
-
-      const ctx =
-        (obj.context_length as number | undefined) ??
-        (obj.context_window as number | undefined) ??
-        null
-
-      const displayName =
-        (obj.name as string | undefined) ??
-        (obj.display_name as string | undefined) ??
-        null
-
-      return {
-        id,
-        displayName,
-        contextWindow: ctx,
-        pricingInputPer1M: pricingIn,
-        pricingOutputPer1M: pricingOut,
-        capabilities: [],
-      } satisfies NormalizedModel
-    })
-    .filter((m): m is NormalizedModel => m !== null)
+  return data.map((m) => {
+    const obj = m as Record<string, unknown>
+    const id = (obj.id ?? obj.name) as string | undefined
+    if (!id) return null
+    let pricingIn: number | null = null
+    let pricingOut: number | null = null
+    if (provider === 'openrouter' && obj.pricing) {
+      const p = obj.pricing as { prompt?: string; completion?: string }
+      pricingIn = p.prompt ? Number(p.prompt) * 1_000_000 : null
+      pricingOut = p.completion ? Number(p.completion) * 1_000_000 : null
+    }
+    const ctx = (obj.context_length as number | undefined) ?? (obj.context_window as number | undefined) ?? null
+    const displayName = (obj.name as string | undefined) ?? (obj.display_name as string | undefined) ?? null
+    return { id, displayName, contextWindow: ctx, pricingInputPer1M: pricingIn, pricingOutputPer1M: pricingOut, capabilities: [] } satisfies NormalizedModel
+  }).filter((m): m is NormalizedModel => m !== null)
 }

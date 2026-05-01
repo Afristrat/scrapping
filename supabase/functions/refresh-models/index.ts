@@ -4,7 +4,6 @@ import {
   buildAuthHeaders,
   getProviderConfig,
   normalizeModelsResponse,
-  type ProviderId,
 } from '../_shared/providers.ts'
 
 const CORS = {
@@ -14,7 +13,7 @@ const CORS = {
 }
 
 interface RequestBody {
-  provider: ProviderId
+  provider: string
   base_url?: string
 }
 
@@ -40,7 +39,7 @@ Deno.serve(async (req) => {
   }
   if (!body.provider) return json({ error: 'provider_required' }, 400)
 
-  const cfg = getProviderConfig(body.provider)
+  const cfg = await getProviderConfig(supabase, body.provider)
   if (!cfg) return json({ error: 'unknown_provider', provider: body.provider }, 400)
 
   const apiKey = await getUserApiKey(supabase, user.id, body.provider)
