@@ -4,6 +4,7 @@ import { PurgeButton } from '@/components/features/PurgeButton'
 import { RunPipelineButton } from '@/components/features/RunPipelineButton'
 import { SignalModal } from '@/components/features/SignalModal'
 import { SignalTable } from '@/components/features/SignalTable'
+import { TopicsWidget } from '@/components/features/TopicsWidget'
 import { useRealtimeSignals } from '@/hooks/useRealtimeSignals'
 import { useSignals, type SignalFilters, type SignalRow } from '@/hooks/useSignals'
 
@@ -35,6 +36,8 @@ export default function Dashboard() {
           <RunPipelineButton />
         </div>
       </div>
+
+      <TopicsWidget />
 
       <Filters value={filters} onChange={setFilters} />
 
