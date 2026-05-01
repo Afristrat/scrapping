@@ -36,6 +36,66 @@ export interface GenerateDigestResponse {
   generated_at: string
 }
 
+/**
+ * Erreur métier enrichie remontée par l'edge function `digest` quand la
+ * génération échoue de façon « attendue » (ex : aucun signal au-dessus du
+ * seuil). On préserve les stats du corpus pour permettre à l'UI de proposer
+ * une action corrective (baisser le seuil, élargir la fenêtre, etc.).
+ */
+export class DigestError extends Error {
+  readonly code: string
+  readonly message: string
+  readonly detail?: string
+  readonly maxScoreInWindow: number | null
+  readonly scoredSignalsInWindow: number | null
+  readonly scoredSignalsTotal: number | null
+  readonly minScore: number | null
+  readonly windowHours: number | null
+
+  constructor(args: {
+    code: string
+    message: string
+    detail?: string
+    maxScoreInWindow?: number | null
+    scoredSignalsInWindow?: number | null
+    scoredSignalsTotal?: number | null
+    minScore?: number | null
+    windowHours?: number | null
+  }) {
+    super(args.message)
+    this.name = 'DigestError'
+    this.code = args.code
+    this.message = args.message
+    this.detail = args.detail
+    this.maxScoreInWindow = args.maxScoreInWindow ?? null
+    this.scoredSignalsInWindow = args.scoredSignalsInWindow ?? null
+    this.scoredSignalsTotal = args.scoredSignalsTotal ?? null
+    this.minScore = args.minScore ?? null
+    this.windowHours = args.windowHours ?? null
+  }
+}
+
+interface DigestErrorPayload {
+  ok: false
+  error?: string
+  detail?: string
+  message?: string
+  max_score_in_window?: number | null
+  scored_signals_in_window?: number | null
+  scored_signals_total?: number | null
+  min_score?: number | null
+  window_hours?: number | null
+}
+
+function isErrorPayload(value: unknown): value is DigestErrorPayload {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'ok' in value &&
+    (value as { ok: unknown }).ok === false
+  )
+}
+
 const HISTORY_LIMIT = 10
 
 /**
@@ -86,17 +146,31 @@ export function useGenerateDigest(): ReturnType<
         },
         body: JSON.stringify(body),
       })
-      const json = (await resp.json()) as
-        | GenerateDigestResponse
-        | { ok: false; error?: string; detail?: string }
-      if (!resp.ok || json.ok === false) {
-        const msg =
-          'error' in json && typeof json.error === 'string' ? json.error : 'digest_failed'
-        const detail =
-          'detail' in json && typeof json.detail === 'string' ? `: ${json.detail}` : ''
-        throw new Error(`${msg}${detail}`)
+      const json = (await resp.json()) as unknown
+      if (!resp.ok || (isErrorPayload(json) && json.ok === false)) {
+        const payload = isErrorPayload(json) ? json : ({} as DigestErrorPayload)
+        const code =
+          typeof payload.error === 'string' && payload.error.length > 0
+            ? payload.error
+            : 'digest_failed'
+        const message =
+          typeof payload.message === 'string' && payload.message.length > 0
+            ? payload.message
+            : typeof payload.detail === 'string' && payload.detail.length > 0
+              ? `${code}: ${payload.detail}`
+              : code
+        throw new DigestError({
+          code,
+          message,
+          detail: typeof payload.detail === 'string' ? payload.detail : undefined,
+          maxScoreInWindow: payload.max_score_in_window ?? null,
+          scoredSignalsInWindow: payload.scored_signals_in_window ?? null,
+          scoredSignalsTotal: payload.scored_signals_total ?? null,
+          minScore: payload.min_score ?? null,
+          windowHours: payload.window_hours ?? null,
+        })
       }
-      return json
+      return json as GenerateDigestResponse
     },
     onSuccess: (digest) => {
       toast.success(

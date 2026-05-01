@@ -120,31 +120,51 @@ Deno.serve(async (req: Request) => {
   // ---- 2. Fetch top scored signals on the window
   const sinceIso = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString()
 
-  const scoresRes = await supabase
+  // Fetch ALL user scores once. We need them both for the filtered top set and
+  // to compute the corpus' max_score in the window when 0 signals match.
+  const allScoresRes = await supabase
     .from('scores')
     .select('signal_id, score, reasoning')
     .eq('user_id', user.id)
-    .gte('score', minScore)
     .order('score', { ascending: false })
-    .limit(SIGNAL_LIMIT * 3)
 
-  if (scoresRes.error) {
-    return json({ ok: false, error: 'scores_fetch_failed', detail: scoresRes.error.message }, 500)
-  }
-  const scores = (scoresRes.data ?? []) as ScoreRow[]
-  if (scores.length === 0) {
+  if (allScoresRes.error) {
     return json(
-      { ok: false, error: 'no_signals', detail: 'no_scored_signals_above_threshold' },
+      { ok: false, error: 'scores_fetch_failed', detail: allScoresRes.error.message },
+      500,
+    )
+  }
+
+  const allScores = (allScoresRes.data ?? []) as ScoreRow[]
+
+  if (allScores.length === 0) {
+    return json(
+      {
+        ok: false,
+        error: 'no_signals',
+        detail: 'no_scored_signals',
+        message:
+          'Aucun signal scoré pour ce compte. Lance « Run Pipeline » pour scraper et scorer des signaux.',
+        scored_signals_in_window: 0,
+        scored_signals_total: 0,
+        max_score_in_window: null,
+        min_score: minScore,
+        window_hours: windowHours,
+      },
       404,
     )
   }
 
-  const signalIds = scores.map((s) => s.signal_id)
+  // Fetch the matching signals (ids) so we can apply the window filter using
+  // signal_date when available, then compute window stats.
+  const allSignalIds = allScores.map((s) => s.signal_id)
 
+  // Supabase has a hard cap on `.in()` array size; we slice defensively.
+  const FETCH_CAP = 1000
   const signalsRes = await supabase
     .from('signals')
     .select('id, title, url, source, scraped_at, signal_date')
-    .in('id', signalIds)
+    .in('id', allSignalIds.slice(0, FETCH_CAP))
 
   if (signalsRes.error) {
     return json(
@@ -157,19 +177,19 @@ Deno.serve(async (req: Request) => {
     ((signalsRes.data ?? []) as SignalRow[]).map((s) => [s.id, s]),
   )
 
-  const scoresByIdMap = new Map<string, ScoreRow>(scores.map((s) => [s.signal_id, s]))
+  const scoresByIdMap = new Map<string, ScoreRow>(allScores.map((s) => [s.signal_id, s]))
 
   // Filter on the time window using signal_date if available, fallback scraped_at.
   // We do this client-side because signal_date can be NULL.
   const sinceMs = Date.parse(sinceIso)
-  const ranked: SignalForPrompt[] = []
+  const inWindow: SignalForPrompt[] = []
   for (const sig of signalsById.values()) {
     const dateIso = sig.signal_date ?? sig.scraped_at
     const t = Date.parse(dateIso)
     if (!Number.isFinite(t) || t < sinceMs) continue
     const sc = scoresByIdMap.get(sig.id)
     if (!sc) continue
-    ranked.push({
+    inWindow.push({
       id: sig.id,
       title: truncate(sanitize(sig.title ?? '(no title)'), MAX_TITLE_LEN),
       url: sig.url ?? '',
@@ -180,12 +200,41 @@ Deno.serve(async (req: Request) => {
     })
   }
 
+  const maxScoreInWindow = inWindow.reduce(
+    (max, s) => (s.score > max ? s.score : max),
+    -1,
+  )
+
+  const ranked = inWindow.filter((s) => s.score >= minScore)
   ranked.sort((a, b) => b.score - a.score)
   const top = ranked.slice(0, SIGNAL_LIMIT)
 
   if (top.length === 0) {
+    const scoredInWindow = inWindow.length
+    const maxScore = scoredInWindow > 0 ? maxScoreInWindow : null
+
+    let message: string
+    if (scoredInWindow === 0) {
+      message = `Aucun signal scoré sur les ${windowHours} dernières heures. Élargis la fenêtre, ou lance « Run Pipeline » pour scraper et scorer plus de signaux.`
+    } else if (maxScore !== null) {
+      message = `Aucun signal au-dessus du seuil ${minScore} sur les ${windowHours} dernières heures. Plus haut score disponible : ${maxScore}/100. Soit baisse le seuil, soit lance « Run Pipeline » pour scorer plus.`
+    } else {
+      message = `Aucun signal au-dessus du seuil ${minScore}. Baisse le seuil ou élargis la fenêtre.`
+    }
+
     return json(
-      { ok: false, error: 'no_signals', detail: 'no_signals_in_window' },
+      {
+        ok: false,
+        error: 'no_signals',
+        detail:
+          scoredInWindow === 0 ? 'no_signals_in_window' : 'no_scored_signals_above_threshold',
+        message,
+        scored_signals_in_window: scoredInWindow,
+        scored_signals_total: allScores.length,
+        max_score_in_window: maxScore,
+        min_score: minScore,
+        window_hours: windowHours,
+      },
       404,
     )
   }

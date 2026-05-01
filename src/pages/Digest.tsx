@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Sparkles, RefreshCw, Trash2 } from 'lucide-react'
+import { Sparkles, RefreshCw, Trash2, AlertTriangle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 import { Button } from '@/components/ui/button'
@@ -18,14 +18,18 @@ import {
   useDigests,
   useGenerateDigest,
   useDeleteDigest,
+  DigestError,
   type DigestRow,
 } from '@/hooks/useDigest'
 
 const WINDOW_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 24, label: '24 h' },
+  { value: 72, label: '72 h' },
   { value: 24 * 7, label: '7 j' },
   { value: 24 * 30, label: '30 j' },
 ]
+
+const RETRY_FALLBACK_SCORE = 30
 
 export default function Digest(): React.ReactElement {
   const [windowHours, setWindowHours] = useState<number>(24)
@@ -51,15 +55,38 @@ export default function Digest(): React.ReactElement {
 
   const minScore = minScoreRange[0] ?? 60
 
-  const handleGenerate = (): void => {
-    generate.mutate(
-      { window_hours: windowHours, min_score: minScore },
-      {
-        onSuccess: (resp) => {
-          setSelectedId(resp.digest_id)
-        },
+  const submitGeneration = (params: { window_hours: number; min_score: number }): void => {
+    generate.mutate(params, {
+      onSuccess: (resp) => {
+        setSelectedId(resp.digest_id)
       },
-    )
+    })
+  }
+
+  const handleGenerate = (): void => {
+    submitGeneration({ window_hours: windowHours, min_score: minScore })
+  }
+
+  const digestError = generate.error instanceof DigestError ? generate.error : null
+  // On ne propose le retry que si on a constaté que le seuil bloque
+  // (au moins 1 signal scoré dans la fenêtre, mais aucun au-dessus du seuil).
+  const canRetryWithLowerScore =
+    digestError !== null &&
+    digestError.code === 'no_signals' &&
+    typeof digestError.maxScoreInWindow === 'number' &&
+    digestError.maxScoreInWindow >= 0 &&
+    minScore > RETRY_FALLBACK_SCORE
+  const retryScore =
+    digestError !== null && typeof digestError.maxScoreInWindow === 'number'
+      ? Math.max(
+          0,
+          Math.min(RETRY_FALLBACK_SCORE, digestError.maxScoreInWindow),
+        )
+      : RETRY_FALLBACK_SCORE
+
+  const handleRetryWithLowerScore = (): void => {
+    setMinScoreRange([retryScore])
+    submitGeneration({ window_hours: windowHours, min_score: retryScore })
   }
 
   const handleDelete = (id: string): void => {
@@ -141,6 +168,49 @@ export default function Digest(): React.ReactElement {
           </Button>
         </CardContent>
       </Card>
+
+      {digestError ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-start sm:justify-between"
+        >
+          <div className="flex gap-3">
+            <AlertTriangle
+              className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600"
+              aria-hidden="true"
+            />
+            <div className="space-y-1">
+              <p className="font-medium">Aucun brief généré</p>
+              <p className="leading-relaxed">{digestError.message}</p>
+              {typeof digestError.scoredSignalsTotal === 'number' &&
+              digestError.scoredSignalsTotal >= 0 ? (
+                <p className="text-xs text-amber-800/80">
+                  {digestError.scoredSignalsTotal} signaux scorés au total
+                  {typeof digestError.scoredSignalsInWindow === 'number'
+                    ? ` · ${digestError.scoredSignalsInWindow} dans la fenêtre`
+                    : ''}
+                  {typeof digestError.maxScoreInWindow === 'number' &&
+                  digestError.maxScoreInWindow >= 0
+                    ? ` · max ${digestError.maxScoreInWindow}/100`
+                    : ''}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          {canRetryWithLowerScore ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRetryWithLowerScore}
+              disabled={generate.isPending}
+              className="self-start whitespace-nowrap"
+            >
+              Re-essayer avec seuil {retryScore}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
         <aside className="space-y-2">
