@@ -1,6 +1,6 @@
 # Handoff - theresa-scrap
 
-> Dernier handoff : `docs/handoffs/2026-05-01-session-ralph-complete.md` (récap complet de la session Ralph + Wave 4)
+> Dernier handoff : `docs/handoffs/2026-05-01-session-ralph-complete.md` (Wave 1-4) + `docs/strategy/2026-05-02-moats-and-value-capture.md` (Wave 5 — moat-hunter + analyse conjointe pricing v2 + Wave 6 PRD planifié 22 stories)
 
 ## Résumé express
 
