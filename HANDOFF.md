@@ -1,6 +1,6 @@
 # Handoff - theresa-scrap
 
-> Dernier handoff : `docs/handoffs/2026-04-30-bug-fixes-and-verbose-logging.md`
+> Dernier handoff : `docs/handoffs/2026-05-01-session-ralph-complete.md` (récap complet de la session Ralph + Wave 4)
 
 ## Résumé express
 
