@@ -63,6 +63,7 @@ export default function Settings() {
 
   const sourcePriority = watch('source_priority')
   const apifyConfig = watch('apify_config')
+  const watchedModelConfig = watch('model_config')
 
   const onSubmit = (values: SettingsFormValues) => {
     updateMutation.mutate(values)
@@ -96,14 +97,14 @@ export default function Settings() {
                   depuis l'onglet "Clés API" via "Refresh models" pour chaque provider configuré.
                 </p>
                 {(['scoring', 'scraping', 'monitoring', 'digest'] as const).map((task) => {
-                  const cur = (settings?.model_config ?? {})[task] ?? null
+                  const cur = (watchedModelConfig ?? {})[task] ?? null
                   return (
                     <div key={task} className="space-y-1">
                       <p className="text-xs font-medium capitalize">{task}</p>
                       <ModelCascadeSelect
                         value={(cur as ModelChoice | null) ?? null}
                         onChange={(next) => {
-                          const current = settings?.model_config ?? {}
+                          const current = watchedModelConfig ?? {}
                           setValue(
                             'model_config',
                             { ...current, [task]: next ?? undefined },
