@@ -24,7 +24,10 @@ Content-Type: application/json
     "window_hours": 168,           // optionnel
     "min_score": 50,               // optionnel
     "max_count": 50                // optionnel, default 30, max 200
-  }
+  },
+  "compose_chain": false,          // optionnel, default false (cf. section Cascade)
+  "max_age_hours": 6,              // optionnel, default 6, range 1-72
+  "max_depth": 3                   // optionnel, default 3, hard max 5
 }
 ```
 
@@ -38,10 +41,17 @@ Content-Type: application/json
   "model_used": "anthropic/claude-haiku-4.5",
   "provider_used": "openrouter",
   "cost": 0.00081,
+  "total_cost": 0.00121,
+  "composed_chain": [
+    { "kind": "reddit", "source": "cascade", "run_id": "...", "age_hours": null, "cost": 0.0004 },
+    { "kind": "arxiv", "source": "cached", "run_id": "...", "age_hours": 2.3, "cost": 0 }
+  ],
   "signal_count": 24,
   "executed_at": "2026-05-01T10:23:00.000Z"
 }
 ```
+
+`composed_chain` et `total_cost` sont retournés UNIQUEMENT si `compose_chain: true` dans la requête.
 
 ## Réponse (erreur)
 
@@ -63,15 +73,15 @@ Codes possibles :
 Le template engine (`template.ts`) substitue les marqueurs suivants dans
 `system_prompt` ET `user_prompt_template` :
 
-| Variable               | Contenu                                                     |
-|------------------------|-------------------------------------------------------------|
-| `{{run:<task_kind>}}`  | `output_markdown` du dernier run success de ce `task_kind` |
-| `{{signals_block}}`    | Liste markdown lisible des signaux (titre, source, score) |
-| `{{signals}}`          | JSON brut des signaux (tronqué à 30 000 chars)              |
-| `{{topics_emerging}}`  | Noms (csv) des topics avec `trend = 'emerging'` (top 10)    |
-| `{{language}}`         | `fr` \| `en` \| `es` (depuis `settings.language`)           |
-| `{{date}}`             | Date du run au format `YYYY-MM-DD` (UTC)                    |
-| `{{rubric}}`           | Prompt de la rubric active (ou placeholder si absente)      |
+| Variable              | Contenu                                                    |
+| --------------------- | ---------------------------------------------------------- |
+| `{{run:<task_kind>}}` | `output_markdown` du dernier run success de ce `task_kind` |
+| `{{signals_block}}`   | Liste markdown lisible des signaux (titre, source, score)  |
+| `{{signals}}`         | JSON brut des signaux (tronqué à 30 000 chars)             |
+| `{{topics_emerging}}` | Noms (csv) des topics avec `trend = 'emerging'` (top 10)   |
+| `{{language}}`        | `fr` \| `en` \| `es` (depuis `settings.language`)          |
+| `{{date}}`            | Date du run au format `YYYY-MM-DD` (UTC)                   |
+| `{{rubric}}`          | Prompt de la rubric active (ou placeholder si absente)     |
 
 Si une variable `{{run:<kind>}}` n'a pas de run précédent en base, elle
 est remplacée par `(aucun run précédent disponible)`. Idem pour les
@@ -114,7 +124,45 @@ du wording (les seeds incluent déjà le rappel).
 bunx supabase functions serve run-admin-prompt --env-file supabase/.env.local
 ```
 
+## Cascade (`compose_chain`)
+
+Quand `compose_chain: true` est passé dans la requête, pour chaque
+`{{run:<kind>}}` référencé dans le template :
+
+1. Le moteur cherche en base le dernier run success de ce `task_kind`
+   (joint via `admin_prompts.task_kind`).
+2. Si un run récent existe (`now - executed_at <= max_age_hours`) → son
+   `output_markdown` est utilisé tel quel (`source: 'cached'`).
+3. Sinon → le prompt parent du `task_kind` est exécuté en cascade
+   (`source: 'cascade'`). Le run cascadé est persisté normalement dans
+   `admin_prompt_runs` + `llm_costs` et reste visible dans l'historique
+   utilisateur.
+
+Sélection du prompt parent d'un `task_kind` : `admin_prompts WHERE
+task_kind = ? ORDER BY display_order ASC LIMIT 1`.
+
+### Garde-fous
+
+- **Profondeur** (`max_depth`, default 3, hard max 5) : si la pile
+  d'exécution dépasse `max_depth`, fallback `'(profondeur max atteinte)'`
+  avec `source: 'depth_limit'`.
+- **Cycles** : un `Set<task_kind>` `visited` est propagé dans la pile.
+  Si un kind référencé est déjà en cours de résolution, fallback
+  `'(cycle détecté)'` avec `source: 'cycle'`.
+- **Prompt parent absent** : si aucun `admin_prompts` n'existe pour le
+  kind référencé, fallback `'(aucun run précédent disponible)'` avec
+  `source: 'missing'`.
+
+`override_filter` n'est appliqué qu'au prompt principal — les prompts
+cascadés utilisent leur `source_filter` natif (sinon les filtres user
+muteraient sémantiquement les prompts dépendants).
+
 ## Tests
 
 Le template engine (`template.ts`) est isolé et testable en pur Deno.
-Les tests unitaires sont couverts par US-008.
+Tests dans `template.test.ts` (24 cas, story `S-AdminTests`) :
+
+```bash
+deno test --allow-env --node-modules-dir=auto \
+  supabase/functions/run-admin-prompt/template.test.ts
+```

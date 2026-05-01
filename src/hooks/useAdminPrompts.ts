@@ -148,6 +148,16 @@ export function useDeleteAdminPrompt() {
   })
 }
 
+export type ComposedSource = 'cached' | 'cascade' | 'missing' | 'cycle' | 'depth_limit'
+
+export interface ComposedChainEntry {
+  kind: string
+  source: ComposedSource
+  run_id: string | null
+  age_hours: number | null
+  cost: number
+}
+
 export interface RunResult {
   ok: boolean
   run_id?: string
@@ -155,13 +165,22 @@ export interface RunResult {
   model_used?: string
   provider_used?: string
   cost?: number
+  total_cost?: number
+  composed_chain?: ComposedChainEntry[]
   error?: string
   detail?: string
 }
 
+export interface RunAdminPromptInput {
+  prompt_id: string
+  override_filter?: Record<string, unknown>
+  compose_chain?: boolean
+  max_age_hours?: number
+}
+
 export function useRunAdminPrompt() {
   const qc = useQueryClient()
-  return useMutation<RunResult, Error, { prompt_id: string; override_filter?: Record<string, unknown> }>({
+  return useMutation<RunResult, Error, RunAdminPromptInput>({
     mutationFn: async (input) => {
       const { data, error } = await supabase.functions.invoke('run-admin-prompt', { body: input })
       if (error) throw new Error(error.message)
@@ -172,8 +191,16 @@ export function useRunAdminPrompt() {
       return result
     },
     onSuccess: (result) => {
-      toast.success(`Prompt exécuté avec ${result.model_used ?? 'le modèle configuré'}`)
+      const model = result.model_used ?? 'le modèle configuré'
+      const totalCost = result.total_cost ?? result.cost ?? 0
+      const chain = result.composed_chain ?? []
+      const message =
+        chain.length > 0
+          ? `Prompt exécuté avec ${model} · $${totalCost.toFixed(4)} (${chain.length} run(s) en cascade)`
+          : `Prompt exécuté avec ${model}`
+      toast.success(message)
       qc.invalidateQueries({ queryKey: ['admin_prompt_runs'] })
+      qc.invalidateQueries({ queryKey: ['admin_prompt_runs_count'] })
     },
     onError: (err) => toast.error('Échec exécution', { description: err.message.slice(0, 300) }),
   })
