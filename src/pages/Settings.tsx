@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AdminPromptsConfig } from '@/components/features/AdminPromptsConfig'
 import { ApiKeyForm } from '@/components/features/ApiKeyForm'
 import { ApifyConfigForm } from '@/components/features/ApifyConfigForm'
 import { ProvidersConfig } from '@/components/features/ProvidersConfig'
@@ -83,6 +84,7 @@ export default function Settings() {
             <TabsTrigger value="sources">Sources</TabsTrigger>
             <TabsTrigger value="api-keys">Cles API</TabsTrigger>
             <TabsTrigger value="branding">Branding</TabsTrigger>
+            <TabsTrigger value="admin">Admin</TabsTrigger>
           </TabsList>
 
           {/* Onglet 1 : Modeles */}
@@ -291,6 +293,18 @@ export default function Settings() {
                 {errors.score_concurrency && (
                   <p className="text-xs text-red-500">{errors.score_concurrency.message}</p>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Onglet 6 : Admin — Prompts Moat Hunter */}
+          <TabsContent value="admin" className="space-y-4 pt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Admin — Prompts Moat Hunter</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AdminPromptsConfig />
               </CardContent>
             </Card>
           </TabsContent>
