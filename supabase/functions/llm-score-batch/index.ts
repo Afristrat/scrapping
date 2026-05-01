@@ -1,19 +1,10 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import OpenAI from 'npm:openai@4'
-import { getUserApiKey } from '../_shared/api-keys.ts'
 import { formatError, summarizeError } from '../_shared/errors.ts'
-import { getProviderConfig, type ProviderId } from '../_shared/providers.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
-const PRICE_FALLBACK_PER_1K: Record<string, { in: number; out: number }> = {
-  'anthropic/claude-haiku-4.5': { in: 0.001, out: 0.005 },
-  'openrouter/auto': { in: 0.002, out: 0.006 },
 }
 
 interface RequestBody {
@@ -24,6 +15,16 @@ interface ScoringCriterion {
   weight: number
 }
 
+interface DispatchResponse {
+  ok: boolean
+  error?: string
+  detail?: string
+  content?: string
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number }
+  model_used?: string
+  provider_used?: string
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -31,7 +32,13 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization')
   if (!auth) return json({ error: 'missing_authorization' }, 401)
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return json({ error: 'supabase_env_missing' }, 500)
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
   })
 
@@ -39,8 +46,6 @@ Deno.serve(async (req) => {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return json({ error: 'invalid_token' }, 401)
-
-  // Provider+model resolution happens after we load settings (below).
 
   let body: RequestBody
   try {
@@ -81,25 +86,6 @@ Deno.serve(async (req) => {
   const signals = signalsRes.data
   const settings = settingsRes.data
 
-  const taskCfg = (
-    (settings as { model_config?: Record<string, { provider: string; model: string } | null> })
-      .model_config ?? {}
-  )['scoring']
-  const providerId: ProviderId = (taskCfg?.provider as ProviderId | undefined) ?? 'openrouter'
-  const legacyModel = (settings as { model_scoring?: string | null }).model_scoring ?? null
-  const dispatchModel: string =
-    taskCfg?.model || legacyModel || 'openrouter/auto'
-  const providerCfg = getProviderConfig(providerId)
-  if (!providerCfg) return json({ error: 'unknown_provider', provider: providerId }, 500)
-
-  const apiKey = await getUserApiKey(supabase, user.id, providerId)
-  if (!apiKey && providerCfg.modelsRequiresAuth) {
-    return json(
-      { error: 'missing_api_key', provider: providerId },
-      500,
-    )
-  }
-
   let scoringPrompt = settings.prompt_scoring ?? ''
   let criteriaBlock = ''
   if (settings.active_rubric_id) {
@@ -128,24 +114,24 @@ Deno.serve(async (req) => {
 
   const prompt = `${scoringPrompt}${criteriaBlock}\nTu vas scorer ${signals.length} signaux d'un coup. Pour CHAQUE signal, donne un score de 0 a 100 et une justification d'1 phrase courte.\n\nReponds en JSON strict (et UNIQUEMENT en JSON) :\n{"scores":[{"id":"<uuid du signal>","score":<0-100>,"reasoning":"<1 phrase>"},...]}\n\nSignaux a scorer :\n\n${itemsBlock}`
 
-  const client = new OpenAI({
-    baseURL: providerCfg.baseURL,
-    apiKey: apiKey ?? 'not-required',
-    defaultHeaders: {
-      ...(providerCfg.extraHeaders ?? {}),
-      'HTTP-Referer': 'https://theresa-scrap.local',
-      'X-Title': 'theresa-scrap-batch',
-    },
-  })
-
-  let completion
+  let dispatchResult: DispatchResponse
   try {
-    completion = await client.chat.completions.create({
-      model: dispatchModel,
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      max_tokens: Math.min(400 * signals.length, 8000),
+    const dispatchRes = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
+      method: 'POST',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        task: 'scoring',
+        messages: [{ role: 'user', content: prompt }],
+        options: {
+          max_tokens: Math.min(400 * signals.length, 8000),
+          response_format: { type: 'json_object' },
+        },
+      }),
     })
+    dispatchResult = (await dispatchRes.json()) as DispatchResponse
   } catch (err) {
     const formatted = formatError(err)
     await supabase.from('logs').insert({
@@ -153,22 +139,40 @@ Deno.serve(async (req) => {
       action: 'llm:score-batch',
       status: 'error',
       payload: {
-        stage: 'openrouter_call',
+        stage: 'dispatch_fetch',
         count: signals.length,
-        model: dispatchModel,
         prompt_chars: prompt.length,
         ...formatted,
         summary: summarizeError(err),
-        hint:
-          formatted.status === 401
-            ? 'OpenRouter rejette la cle. Verifie Parametres -> Cles API et la validite sur openrouter.ai/keys.'
-            : formatted.hint,
       },
     })
-    return json({ error: 'openrouter_failed', ...formatted }, 502)
+    return json({ error: 'dispatch_unreachable', ...formatted }, 502)
   }
 
-  const raw = completion.choices[0]?.message?.content ?? '{}'
+  if (!dispatchResult.ok) {
+    const reason = dispatchResult.error ?? 'dispatch_failed'
+    const detail = dispatchResult.detail
+    await supabase.from('logs').insert({
+      user_id: user.id,
+      action: 'llm:score-batch',
+      status: 'error',
+      payload: {
+        stage: 'dispatch_call',
+        count: signals.length,
+        prompt_chars: prompt.length,
+        error: reason,
+        detail,
+        hint:
+          reason === 'missing_api_key'
+            ? 'Aucune cle API trouvee pour ce provider. Verifie Parametres -> Cles API.'
+            : undefined,
+      },
+    })
+    return json({ error: 'llm_failed', detail: detail ?? reason }, 502)
+  }
+
+  const dispatchModel = dispatchResult.model_used ?? 'unknown'
+  const raw = dispatchResult.content ?? '{}'
   let parsed: { scores?: Array<{ id: string; score: number; reasoning: string }> }
   try {
     parsed = JSON.parse(raw)
@@ -176,13 +180,10 @@ Deno.serve(async (req) => {
     parsed = {}
   }
 
-  const usage = completion.usage as
-    | { prompt_tokens?: number; completion_tokens?: number; cost?: number }
-    | undefined
+  const usage = dispatchResult.usage
   const promptTokens = usage?.prompt_tokens ?? 0
   const completionTokens = usage?.completion_tokens ?? 0
-  const totalCost =
-    usage?.cost ?? estimateCost(dispatchModel, promptTokens, completionTokens)
+  const totalCost = usage?.cost ?? 0
   const costPerSignal = signals.length > 0 ? totalCost / signals.length : 0
 
   const validById = new Map<string, { score: number; reasoning: string }>()
@@ -258,12 +259,6 @@ Deno.serve(async (req) => {
     200,
   )
 })
-
-function estimateCost(model: string, promptTokens: number, completionTokens: number): number {
-  const price = PRICE_FALLBACK_PER_1K[model]
-  if (!price) return 0
-  return (promptTokens * price.in + completionTokens * price.out) / 1000
-}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
