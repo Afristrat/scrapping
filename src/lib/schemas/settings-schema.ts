@@ -42,6 +42,7 @@ export const settingsSchema = z.object({
   reddit_subs: z.array(z.string().min(1).max(50)).max(50),
   arxiv_categories: z.array(z.string().min(1).max(20)).max(20),
   x_queries: z.array(z.string().min(1).max(100)).max(20),
+  topic_seeds: z.array(z.string().min(1).max(80)).max(50),
   branding: z.object({
     name: z.string().min(1).max(50),
     primary: z.string().regex(/^#[0-9a-fA-F]{6}$/),

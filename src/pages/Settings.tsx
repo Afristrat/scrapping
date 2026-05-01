@@ -45,6 +45,7 @@ export default function Settings() {
           reddit_subs: settings.reddit_subs,
           arxiv_categories: settings.arxiv_categories,
           x_queries: settings.x_queries,
+          topic_seeds: settings.topic_seeds ?? [],
           branding: {
             name: settings.branding.name,
             primary: settings.branding.primary,
@@ -148,6 +149,22 @@ export default function Settings() {
                   />
                   {errors.x_queries && (
                     <p className="text-xs text-red-500">{errors.x_queries.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Topic seeds</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Liste de topics de référence utilisée par le classifier. Le LLM peut aussi
+                    proposer des topics émergents en plus.
+                  </p>
+                  <TagInput
+                    value={settings?.topic_seeds ?? []}
+                    onChange={(next) => setValue('topic_seeds', next, { shouldDirty: true })}
+                    placeholder="ex: Embeddings & Vector DB"
+                  />
+                  {errors.topic_seeds && (
+                    <p className="text-xs text-red-500">{errors.topic_seeds.message}</p>
                   )}
                 </div>
               </CardContent>
