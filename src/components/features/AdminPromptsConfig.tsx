@@ -26,10 +26,10 @@ import {
 import { cn } from '@/lib/utils'
 
 const TASK_BADGE: Record<AdminPromptTaskKind, { label: string; cls: string }> = {
-  'moat:reddit': { label: 'Moat: Reddit', cls: 'bg-orange-100 text-orange-800' },
-  'moat:arxiv': { label: 'Moat: arXiv', cls: 'bg-cyan-100 text-cyan-800' },
-  'moat:x': { label: 'Moat: X', cls: 'bg-indigo-100 text-indigo-800' },
-  'moat:synthesis': { label: 'Moat: Synthesis', cls: 'bg-emerald-100 text-emerald-800' },
+  reddit: { label: 'Reddit', cls: 'bg-orange-100 text-orange-800' },
+  arxiv: { label: 'arXiv', cls: 'bg-cyan-100 text-cyan-800' },
+  x: { label: 'X', cls: 'bg-indigo-100 text-indigo-800' },
+  synthesis: { label: 'Synthesis', cls: 'bg-emerald-100 text-emerald-800' },
   custom: { label: 'Custom', cls: 'bg-slate-100 text-slate-700' },
 }
 
@@ -81,7 +81,7 @@ export function AdminPromptsConfig() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          Bibliothèque de prompts d'analyse Moat Hunter, exécutables sur ton corpus de signaux. 4
+          Bibliothèque de prompts d'analyse stratégique, exécutables sur ton corpus de signaux. 4
           seeds pré-installés + tes prompts custom.
         </p>
         <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
@@ -261,10 +261,10 @@ function EditDialog({
                 value={taskKind}
                 onChange={(e) => setTaskKind(e.target.value as AdminPromptTaskKind)}
               >
-                <option value="moat:reddit">moat:reddit</option>
-                <option value="moat:arxiv">moat:arxiv</option>
-                <option value="moat:x">moat:x</option>
-                <option value="moat:synthesis">moat:synthesis</option>
+                <option value="reddit">reddit</option>
+                <option value="arxiv">arxiv</option>
+                <option value="x">x</option>
+                <option value="synthesis">synthesis</option>
                 <option value="custom">custom</option>
               </select>
             </div>
@@ -294,7 +294,7 @@ function EditDialog({
             <Label htmlFor="ap-tpl" className="text-xs">
               User prompt template (variables :{' '}
               <code className="text-[10px]">
-                {`{{signals_block}} {{language}} {{date}} {{topics_emerging}} {{rubric}} {{run:moat:reddit}}`}
+                {`{{signals_block}} {{language}} {{date}} {{topics_emerging}} {{rubric}} {{run:reddit}}`}
               </code>
               )
             </Label>

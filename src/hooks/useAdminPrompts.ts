@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 
-export type AdminPromptTaskKind = 'moat:reddit' | 'moat:arxiv' | 'moat:x' | 'moat:synthesis' | 'custom'
+export type AdminPromptTaskKind = 'reddit' | 'arxiv' | 'x' | 'synthesis' | 'custom'
 
 export interface AdminPrompt {
   id: string
