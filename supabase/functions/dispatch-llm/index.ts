@@ -112,16 +112,15 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Defensive: if no settings row exists (trigger missed firing), use empty config
+  // → fallback chain in resolveProviderAndModel kicks in (DEFAULT_PROVIDER + DEFAULT_MODEL)
   const settingsRes = await supabase
     .from('settings')
     .select('model_config')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (settingsRes.error || !settingsRes.data) {
-    return json({ ok: false, error: 'settings_not_found' }, 404)
-  }
-  const settings = settingsRes.data as SettingsRow
+  const settings: SettingsRow = (settingsRes.data as SettingsRow | null) ?? { model_config: null }
 
   const { providerId, modelId } = resolveProviderAndModel(settings, body.task)
 
