@@ -8,10 +8,12 @@ import Digest from '@/pages/Digest'
 import Login from '@/pages/Login'
 import Logs from '@/pages/Logs'
 import Settings from '@/pages/Settings'
+import Signup from '@/pages/Signup'
 import Topics from '@/pages/Topics'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
+  { path: '/signup', element: <Signup /> },
   {
     element: <ProtectedRoute />,
     children: [
