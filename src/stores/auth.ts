@@ -19,6 +19,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (loading) => set({ loading }),
   signOut: async () => {
     await supabase.auth.signOut()
-    // onAuthStateChange listener will set session to null
+    // onAuthStateChange listener will set session to null.
+    // Then redirect to the public landing page.
+    if (typeof window !== 'undefined') {
+      window.location.assign('/')
+    }
   },
 }))

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -47,8 +47,17 @@ function GoogleIcon() {
   )
 }
 
+function sanitizeNext(raw: string | null): string {
+  if (!raw) return '/dashboard'
+  // Only allow internal absolute paths to avoid open-redirects
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/dashboard'
+  return raw
+}
+
 export default function Login() {
   const session = useAuthStore((s) => s.session)
+  const [searchParams] = useSearchParams()
+  const nextPath = sanitizeNext(searchParams.get('next'))
   const [magicSent, setMagicSent] = useState(false)
 
   const magicForm = useForm<MagicValues>({
@@ -61,12 +70,14 @@ export default function Login() {
     defaultValues: { email: '', password: '' },
   })
 
-  if (session) return <Navigate to="/" replace />
+  if (session) return <Navigate to={nextPath} replace />
+
+  const redirectUrl = `${window.location.origin}${nextPath}`
 
   async function onMagicSubmit(values: MagicValues) {
     const { error } = await supabase.auth.signInWithOtp({
       email: values.email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: redirectUrl },
     })
     if (error) {
       toast.error(`Échec : ${error.message}`)
@@ -91,7 +102,7 @@ export default function Login() {
   async function onGoogle() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: redirectUrl },
     })
     if (error) {
       toast.error(`Échec Google : ${error.message}`)
@@ -171,7 +182,10 @@ export default function Login() {
                 </Button>
                 <p className="text-center text-xs text-slate-500">
                   Pas encore de compte ?{' '}
-                  <Link to="/signup" className="text-primary hover:underline">
+                  <Link
+                    to={`/signup${searchParams.get('next') ? `?next=${encodeURIComponent(nextPath)}` : ''}`}
+                    className="text-primary hover:underline"
+                  >
                     Créer un compte
                   </Link>
                 </p>

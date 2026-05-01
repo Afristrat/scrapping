@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -24,8 +24,16 @@ const schema = z
   })
 type FormValues = z.infer<typeof schema>
 
+function sanitizeNext(raw: string | null): string {
+  if (!raw) return '/dashboard'
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/dashboard'
+  return raw
+}
+
 export default function Signup() {
   const session = useAuthStore((s) => s.session)
+  const [searchParams] = useSearchParams()
+  const nextPath = sanitizeNext(searchParams.get('next'))
   const [sent, setSent] = useState(false)
 
   const form = useForm<FormValues>({
@@ -33,13 +41,13 @@ export default function Signup() {
     defaultValues: { email: '', password: '', confirm: '' },
   })
 
-  if (session) return <Navigate to="/" replace />
+  if (session) return <Navigate to={nextPath} replace />
 
   async function onSubmit(values: FormValues) {
     const { error } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: `${window.location.origin}${nextPath}` },
     })
     if (error) {
       toast.error(`Échec : ${error.message}`)
@@ -105,7 +113,10 @@ export default function Signup() {
               </Button>
               <p className="text-center text-xs text-slate-500">
                 Déjà inscrit ?{' '}
-                <Link to="/login" className="text-primary hover:underline">
+                <Link
+                  to={`/login${searchParams.get('next') ? `?next=${encodeURIComponent(nextPath)}` : ''}`}
+                  className="text-primary hover:underline"
+                >
                   Se connecter
                 </Link>
               </p>
