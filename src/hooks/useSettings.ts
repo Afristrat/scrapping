@@ -21,6 +21,12 @@ export interface Settings {
   arxiv_categories: string[]
   x_queries: string[]
   topic_seeds: string[]
+  model_config: {
+    scoring?: { provider: string; model: string } | null
+    scraping?: { provider: string; model: string } | null
+    monitoring?: { provider: string; model: string } | null
+    digest?: { provider: string; model: string } | null
+  }
   branding: Branding
   daily_budget_usd: number
   active_rubric_id: string | null

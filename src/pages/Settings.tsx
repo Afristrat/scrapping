@@ -10,6 +10,7 @@ import { ApifyConfigForm } from '@/components/features/ApifyConfigForm'
 import { ProvidersConfig } from '@/components/features/ProvidersConfig'
 import { BrandingForm } from '@/components/features/BrandingForm'
 import { ModelSelectField } from '@/components/features/ModelSelectField'
+import { ModelCascadeSelect, type ModelChoice } from '@/components/features/ModelCascadeSelect'
 import { RubricsManager } from '@/components/features/RubricsManager'
 import { SourcePrioritySliders } from '@/components/features/SourcePrioritySliders'
 import { TagInput } from '@/components/features/TagInput'
@@ -36,7 +37,8 @@ export default function Settings() {
     watch,
     formState: { isDirty, errors },
   } = useForm<SettingsFormValues>({
-    resolver: zodResolver(settingsSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(settingsSchema) as any,
     values: settings
       ? {
           model_scraping: settings.model_scraping,
@@ -47,6 +49,7 @@ export default function Settings() {
           arxiv_categories: settings.arxiv_categories,
           x_queries: settings.x_queries,
           topic_seeds: settings.topic_seeds ?? [],
+          model_config: settings.model_config ?? {},
           branding: {
             name: settings.branding.name,
             primary: settings.branding.primary,
@@ -90,9 +93,44 @@ export default function Settings() {
           <TabsContent value="models" className="space-y-4 pt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Modeles OpenRouter</CardTitle>
+                <CardTitle>Modèles par tâche (BYOK)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Choisis un provider puis un modèle pour chaque tâche. Les modèles sont chargés
+                  depuis l'onglet "Clés API" via "Refresh models" pour chaque provider configuré.
+                </p>
+                {(['scoring', 'scraping', 'monitoring', 'digest'] as const).map((task) => {
+                  const cur = (settings?.model_config ?? {})[task] ?? null
+                  return (
+                    <div key={task} className="space-y-1">
+                      <p className="text-xs font-medium capitalize">{task}</p>
+                      <ModelCascadeSelect
+                        value={(cur as ModelChoice | null) ?? null}
+                        onChange={(next) => {
+                          const current = settings?.model_config ?? {}
+                          setValue(
+                            'model_config',
+                            { ...current, [task]: next ?? undefined },
+                            { shouldDirty: true },
+                          )
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Legacy : Modèles OpenRouter (deprecated)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Les champs ci-dessous sont conservés pour rétrocompatibilité — préfère la
+                  configuration BYOK ci-dessus. Les edge functions liront `model_config` en priorité.
+                </p>
                 <ModelSelectField control={control} name="model_scraping" label="Modele scraping" />
                 <ModelSelectField control={control} name="model_scoring" label="Modele scoring" />
                 <ModelSelectField

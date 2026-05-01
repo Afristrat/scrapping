@@ -2,6 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import OpenAI from 'npm:openai@4'
 import { getUserApiKey } from '../_shared/api-keys.ts'
 import { retryWithBackoff } from '../_shared/retry.ts'
+import { getProviderConfig, type ProviderId } from '../_shared/providers.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -40,14 +41,6 @@ Deno.serve(async (req) => {
   } = await supabase.auth.getUser()
   if (!user) return json({ error: 'invalid_token' }, 401)
 
-  // OpenRouter key: user key > env fallback > error
-  const apiKey = await getUserApiKey(supabase, user.id, 'openrouter')
-  if (!apiKey)
-    return json(
-      { error: 'missing_openrouter_key', detail: 'No OpenRouter key in user_api_keys or env' },
-      500,
-    )
-
   let body: RequestBody
   try {
     body = await req.json()
@@ -67,6 +60,22 @@ Deno.serve(async (req) => {
 
   const signal = signalRes.data
   const settings = settingsRes.data
+
+  // Resolve provider + model from BYOK model_config (preferred) or legacy model_scoring
+  const taskCfg = (settings.model_config as Record<string, { provider: string; model: string } | null> | null)
+    ?.scoring
+  const providerId: ProviderId = (taskCfg?.provider as ProviderId | undefined) ?? 'openrouter'
+  const legacyModel = (settings as { model_scoring?: string | null }).model_scoring ?? null
+  const modelId: string = taskCfg?.model || legacyModel || 'openrouter/auto'
+  const providerCfg = getProviderConfig(providerId)
+  if (!providerCfg) return json({ error: 'unknown_provider', provider: providerId }, 500)
+
+  const apiKey = await getUserApiKey(supabase, user.id, providerId)
+  if (!apiKey && providerCfg.modelsRequiresAuth)
+    return json(
+      { error: 'missing_api_key', provider: providerId },
+      500,
+    )
 
   // Resolve rubric: active rubric > settings.prompt_scoring fallback
   let scoringPrompt = settings.prompt_scoring ?? ''
@@ -100,9 +109,10 @@ Payload: ${JSON.stringify(signal.raw_payload).slice(0, 4000)}
 Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
 
   const client = new OpenAI({
-    baseURL: OPENROUTER_BASE,
-    apiKey,
+    baseURL: providerCfg.baseURL,
+    apiKey: apiKey ?? 'not-required',
     defaultHeaders: {
+      ...(providerCfg.extraHeaders ?? {}),
       'HTTP-Referer': 'https://zlatan-scrap.local',
       'X-Title': 'zlatan-scrap',
     },
@@ -113,7 +123,7 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
     completion = await retryWithBackoff(
       () =>
         client.chat.completions.create({
-          model: settings.model_scoring,
+          model: modelId,
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },
           max_tokens: 200,
@@ -128,7 +138,7 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
       status: 'error',
       payload: { signal_id: body.signal_id, error: reason },
     })
-    return json({ error: 'openrouter_failed', detail: reason }, 502)
+    return json({ error: 'llm_failed', provider: providerId, detail: reason }, 502)
   }
 
   const raw = completion.choices[0]?.message?.content ?? '{}'
@@ -139,7 +149,7 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
     | undefined
   const promptTokens = usage?.prompt_tokens ?? 0
   const completionTokens = usage?.completion_tokens ?? 0
-  const cost = usage?.cost ?? estimateCost(settings.model_scoring, promptTokens, completionTokens)
+  const cost = usage?.cost ?? estimateCost(modelId, promptTokens, completionTokens)
 
   const [scoreInsert, costInsert] = await Promise.all([
     supabase.from('scores').upsert(
@@ -148,7 +158,7 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
         user_id: user.id,
         score,
         reasoning,
-        model_used: settings.model_scoring,
+        model_used: modelId,
         cost,
       },
       { onConflict: 'signal_id,user_id' },
@@ -156,7 +166,7 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
     supabase.from('llm_costs').insert({
       user_id: user.id,
       task: 'scoring',
-      model: settings.model_scoring,
+      model: modelId,
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
       cost,

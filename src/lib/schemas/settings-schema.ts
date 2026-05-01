@@ -43,6 +43,14 @@ export const settingsSchema = z.object({
   arxiv_categories: z.array(z.string().min(1).max(20)).max(20),
   x_queries: z.array(z.string().min(1).max(100)).max(20),
   topic_seeds: z.array(z.string().min(1).max(80)).max(50),
+  model_config: z
+    .object({
+      scoring: z.object({ provider: z.string(), model: z.string() }).nullable().optional(),
+      scraping: z.object({ provider: z.string(), model: z.string() }).nullable().optional(),
+      monitoring: z.object({ provider: z.string(), model: z.string() }).nullable().optional(),
+      digest: z.object({ provider: z.string(), model: z.string() }).nullable().optional(),
+    })
+    .default({}),
   branding: z.object({
     name: z.string().min(1).max(50),
     primary: z.string().regex(/^#[0-9a-fA-F]{6}$/),
