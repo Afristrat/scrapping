@@ -14,6 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_prompt_runs: {
+        Row: {
+          completion_tokens: number
+          cost: number
+          error: string | null
+          executed_at: string
+          id: string
+          model_used: string | null
+          output_markdown: string | null
+          prompt_id: string
+          prompt_tokens: number
+          provider_used: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completion_tokens?: number
+          cost?: number
+          error?: string | null
+          executed_at?: string
+          id?: string
+          model_used?: string | null
+          output_markdown?: string | null
+          prompt_id: string
+          prompt_tokens?: number
+          provider_used?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          completion_tokens?: number
+          cost?: number
+          error?: string | null
+          executed_at?: string
+          id?: string
+          model_used?: string | null
+          output_markdown?: string | null
+          prompt_id?: string
+          prompt_tokens?: number
+          provider_used?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_prompt_runs_prompt_id_fkey"
+            columns: ["prompt_id"]
+            isOneToOne: false
+            referencedRelation: "admin_prompts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_prompts: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          is_seed: boolean
+          name: string
+          source_filter: Json
+          system_prompt: string
+          task_kind: string
+          updated_at: string
+          user_id: string
+          user_prompt_template: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_seed?: boolean
+          name: string
+          source_filter?: Json
+          system_prompt: string
+          task_kind: string
+          updated_at?: string
+          user_id: string
+          user_prompt_template: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_seed?: boolean
+          name?: string
+          source_filter?: Json
+          system_prompt?: string
+          task_kind?: string
+          updated_at?: string
+          user_id?: string
+          user_prompt_template?: string
+        }
+        Relationships: []
+      }
       digests: {
         Row: {
           content: string
