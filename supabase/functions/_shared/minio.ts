@@ -34,7 +34,7 @@ async function readObject(client: S3Client, bucket: string, key: string): Promis
     return await res.Body.transformToString()
   } catch (err) {
     const name = (err as { name?: string }).name
-    if (name === 'NoSuchKey' || name === 'NotFound') return null
+    if (name === 'NoSuchKey' || name === 'NotFound' || name === 'NoSuchBucket') return null
     throw err
   }
 }
@@ -76,30 +76,40 @@ export async function appendTopicEntry(opts: {
 
   if (archived.length > 0) {
     const previousArchive = (await readObject(client, bucket, archiveKey)) ?? ''
-    await writeObject(client, bucket, archiveKey, previousArchive + archived.join('\n') + '\n')
+    const sep = previousArchive.length > 0 && !previousArchive.endsWith('\n\n')
+      ? (previousArchive.endsWith('\n') ? '\n' : '\n\n')
+      : ''
+    await writeObject(
+      client,
+      bucket,
+      archiveKey,
+      previousArchive + sep + archived.join('\n\n') + '\n',
+    )
   }
 
   await writeObject(client, bucket, currentKey, kept + entry + '\n')
 }
 
 export function rotateEntries(content: string, cutoffMs: number): { kept: string; archived: string[] } {
-  const blockRegex = /^### (\d{4}-\d{2}-\d{2}T[\d:.Z+-]+)\n([\s\S]*?)(?=\n### |\n*$)/gm
+  const parts = content.split(/(?=^### \d{4}-\d{2}-\d{2}T)/m)
+  const header = parts[0] ?? ''
   const archived: string[] = []
   const keptBlocks: string[] = []
-  let lastIndex = 0
-  let header = ''
-  let m: RegExpExecArray | null
 
-  while ((m = blockRegex.exec(content)) !== null) {
-    if (header === '') header = content.slice(0, m.index)
-    const ts = Date.parse(m[1])
-    if (ts < cutoffMs) archived.push(m[0])
-    else keptBlocks.push(m[0])
-    lastIndex = blockRegex.lastIndex
+  for (const block of parts.slice(1)) {
+    const tsMatch = block.match(/^### (\S+)/)
+    const ts = tsMatch ? Date.parse(tsMatch[1]) : NaN
+    if (!Number.isNaN(ts) && ts < cutoffMs) {
+      archived.push(block.trimEnd())
+    } else {
+      keptBlocks.push(block.trimEnd())
+    }
   }
 
-  if (header === '') header = content.slice(0, lastIndex || content.length)
-  const kept = keptBlocks.length > 0 ? header + keptBlocks.join('\n\n') + '\n\n' : header
+  const kept = keptBlocks.length > 0
+    ? header + keptBlocks.join('\n\n') + '\n'
+    : header
+
   return { kept, archived }
 }
 
@@ -124,7 +134,7 @@ export function slugify(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036F]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 }
