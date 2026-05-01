@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError, summarizeError } from '../_shared/errors.ts'
+import { parseScoringResponse, ScoreParseError } from '../_shared/parse-score.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -172,13 +173,7 @@ Deno.serve(async (req) => {
   }
 
   const dispatchModel = dispatchResult.model_used ?? 'unknown'
-  const raw = dispatchResult.content ?? '{}'
-  let parsed: { scores?: Array<{ id: string; score: number; reasoning: string }> }
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    parsed = {}
-  }
+  const raw = dispatchResult.content ?? ''
 
   const usage = dispatchResult.usage
   const promptTokens = usage?.prompt_tokens ?? 0
@@ -187,24 +182,50 @@ Deno.serve(async (req) => {
   const costPerSignal = signals.length > 0 ? totalCost / signals.length : 0
 
   const validById = new Map<string, { score: number; reasoning: string }>()
-  for (const s of parsed.scores ?? []) {
-    if (typeof s.id !== 'string' || !signals.find((x) => x.id === s.id)) continue
-    const score = Math.max(0, Math.min(100, Number(s.score) || 0))
-    const reasoning = typeof s.reasoning === 'string' ? s.reasoning.slice(0, 1000) : ''
-    validById.set(s.id, { score, reasoning })
+  try {
+    const entries = parseScoringResponse(raw)
+    const knownIds = new Set(signals.map((s) => s.id))
+    for (const e of entries) {
+      if (!knownIds.has(e.id)) continue
+      validById.set(e.id, { score: e.score, reasoning: e.reasoning })
+    }
+  } catch (err) {
+    const reason = err instanceof ScoreParseError ? err.message : 'unknown_parse_error'
+    await supabase.from('logs').insert({
+      user_id: user.id,
+      action: 'llm-score-batch:parse_fail',
+      status: 'error',
+      payload: {
+        stage: 'parse_response',
+        count: signals.length,
+        reason,
+        model: dispatchModel,
+        raw_preview: raw.slice(0, 2000),
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+      },
+    })
+    return json({ error: 'parse_failed', detail: reason }, 502)
   }
 
-  const scoreRows = signals.map((sig) => {
-    const v = validById.get(sig.id) ?? { score: 0, reasoning: '(LLM batch missed this signal)' }
-    return {
-      signal_id: sig.id,
-      user_id: user.id,
-      score: v.score,
-      reasoning: v.reasoning,
-      model_used: dispatchModel,
-      cost: costPerSignal,
-    }
-  })
+  // Critical : do NOT insert placeholder rows for missed signals. A row
+  // with score=0 used to be written for every absent id, which polluted
+  // the dashboard with false-positive zeros. Missed ids stay unscored
+  // (visible in the UI as "—") and remain eligible for the next run via
+  // the `unscored_signals` RPC.
+  const scoreRows = signals
+    .filter((sig) => validById.has(sig.id))
+    .map((sig) => {
+      const v = validById.get(sig.id)!
+      return {
+        signal_id: sig.id,
+        user_id: user.id,
+        score: v.score,
+        reasoning: v.reasoning,
+        model_used: dispatchModel,
+        cost: costPerSignal,
+      }
+    })
 
   const { error: scoreErr } = await supabase
     .from('scores')
