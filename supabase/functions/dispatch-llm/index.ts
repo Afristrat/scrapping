@@ -27,11 +27,6 @@ const CORS = {
 const DEFAULT_PROVIDER = 'openrouter'
 const DEFAULT_MODEL = 'openrouter/auto'
 
-const PRICE_FALLBACK_PER_1K: Record<string, { in: number; out: number }> = {
-  'anthropic/claude-haiku-4.5': { in: 0.001, out: 0.005 },
-  'openrouter/auto': { in: 0.002, out: 0.006 },
-}
-
 type Task = 'scoring' | 'scraping' | 'monitoring' | 'digest'
 
 interface ChatMessage {
@@ -199,7 +194,21 @@ Deno.serve(async (req) => {
     | undefined
   const promptTokens = rawUsage?.prompt_tokens ?? 0
   const completionTokens = rawUsage?.completion_tokens ?? 0
-  const cost = rawUsage?.cost ?? estimateCost(modelId, promptTokens, completionTokens)
+  // Fallback chain for cost calculation:
+  //   1. usage.cost from the provider (OpenRouter is the only one returning this today)
+  //   2. provider_models.pricing_* — populated by /refresh-models per user
+  //   3. 0 — never crash; missing pricing simply means we cannot track precisely
+  let cost: number = rawUsage?.cost ?? 0
+  if (rawUsage?.cost === undefined) {
+    cost = await computeCostFromProviderModels(
+      supabase,
+      user.id,
+      providerId,
+      modelId,
+      promptTokens,
+      completionTokens,
+    )
+  }
 
   return json(
     {
@@ -230,10 +239,41 @@ function resolveProviderAndModel(
   return { providerId, modelId }
 }
 
-function estimateCost(model: string, promptTokens: number, completionTokens: number): number {
-  const price = PRICE_FALLBACK_PER_1K[model]
-  if (!price) return 0
-  return (promptTokens * price.in + completionTokens * price.out) / 1000
+/**
+ * Compute cost in USD from `provider_models.pricing_*` (per 1M tokens).
+ *
+ * Returns 0 if no row exists for (user_id, provider, model_id) or if both
+ * pricing fields are null. Single-purpose: dispatch-llm fallback when the
+ * provider didn't return `usage.cost`.
+ */
+async function computeCostFromProviderModels(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  provider: string,
+  model: string,
+  promptTokens: number,
+  completionTokens: number,
+): Promise<number> {
+  if (promptTokens <= 0 && completionTokens <= 0) return 0
+  const { data, error } = await supabase
+    .from('provider_models')
+    .select('pricing_input_per_1m, pricing_output_per_1m')
+    .eq('user_id', userId)
+    .eq('provider', provider)
+    .eq('model_id', model)
+    .maybeSingle()
+
+  if (error || !data) return 0
+
+  const row = data as {
+    pricing_input_per_1m: number | null
+    pricing_output_per_1m: number | null
+  }
+  const inRate = row.pricing_input_per_1m ?? 0
+  const outRate = row.pricing_output_per_1m ?? 0
+  if (inRate === 0 && outRate === 0) return 0
+
+  return (promptTokens * inRate + completionTokens * outRate) / 1_000_000
 }
 
 function json(body: unknown, status: number): Response {

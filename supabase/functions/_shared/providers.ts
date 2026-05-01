@@ -70,22 +70,91 @@ export interface NormalizedModel {
   capabilities: string[]
 }
 
+// Approximate USD/CNY rate used to convert Moonshot prices (which are billed in
+// CNY per 1M tokens on the official Kimi pricing page). Kept conservative to avoid
+// under-reporting cost. Updated periodically — not authoritative for accounting.
+const CNY_PER_USD = 7.2
+
 export function normalizeModelsResponse(provider: string, raw: unknown): NormalizedModel[] {
   const data = (raw as { data?: unknown[] })?.data
   if (!Array.isArray(data)) return []
-  return data.map((m) => {
-    const obj = m as Record<string, unknown>
-    const id = (obj.id ?? obj.name) as string | undefined
-    if (!id) return null
-    let pricingIn: number | null = null
-    let pricingOut: number | null = null
-    if (provider === 'openrouter' && obj.pricing) {
-      const p = obj.pricing as { prompt?: string; completion?: string }
-      pricingIn = p.prompt ? Number(p.prompt) * 1_000_000 : null
-      pricingOut = p.completion ? Number(p.completion) * 1_000_000 : null
-    }
-    const ctx = (obj.context_length as number | undefined) ?? (obj.context_window as number | undefined) ?? null
-    const displayName = (obj.name as string | undefined) ?? (obj.display_name as string | undefined) ?? null
-    return { id, displayName, contextWindow: ctx, pricingInputPer1M: pricingIn, pricingOutputPer1M: pricingOut, capabilities: [] } satisfies NormalizedModel
-  }).filter((m): m is NormalizedModel => m !== null)
+  return data
+    .map((m) => {
+      const obj = m as Record<string, unknown>
+      const id = (obj.id ?? obj.name) as string | undefined
+      if (!id) return null
+
+      const { pricingIn, pricingOut } = extractPricing(provider, obj)
+
+      const ctx =
+        (obj.context_length as number | undefined) ??
+        (obj.context_window as number | undefined) ??
+        (obj.max_context_length as number | undefined) ??
+        null
+      const displayName =
+        (obj.name as string | undefined) ??
+        (obj.display_name as string | undefined) ??
+        null
+      return {
+        id,
+        displayName,
+        contextWindow: ctx,
+        pricingInputPer1M: pricingIn,
+        pricingOutputPer1M: pricingOut,
+        capabilities: [],
+      } satisfies NormalizedModel
+    })
+    .filter((m): m is NormalizedModel => m !== null)
+}
+
+/**
+ * Extract per-1M-tokens pricing (USD) from a /models entry, provider-specific.
+ *
+ * Returns null when the provider's /models endpoint does not surface pricing —
+ * in that case dispatch-llm will use `usage.cost` from the completion if the
+ * provider returns it, otherwise fall back to 0 (no cost tracked).
+ *
+ * Supported:
+ *   - openrouter : `pricing.prompt` / `pricing.completion` (USD per token, /1)
+ *   - moonshot   : `input_price` / `output_price` (CNY per 1M, converted to USD)
+ *   - mistral    : `pricing.input` / `pricing.output` (USD per 1M) when present
+ *   - anthropic, openai, groq, together, deepseek : pricing absent from /models
+ *     → returns null, dispatch-llm uses usage.cost or 0.
+ */
+function extractPricing(
+  provider: string,
+  obj: Record<string, unknown>,
+): { pricingIn: number | null; pricingOut: number | null } {
+  let pricingIn: number | null = null
+  let pricingOut: number | null = null
+
+  if (provider === 'openrouter' && obj.pricing) {
+    const p = obj.pricing as { prompt?: string; completion?: string }
+    pricingIn = p.prompt ? Number(p.prompt) * 1_000_000 : null
+    pricingOut = p.completion ? Number(p.completion) * 1_000_000 : null
+  } else if (provider === 'moonshot') {
+    // Moonshot/Kimi exposes per-1M prices in CNY directly on the model object.
+    // Field names observed: input_price/output_price (numeric or string CNY/1M).
+    const inCny = toNumberOrNull(obj.input_price) ?? toNumberOrNull(obj.prompt_price)
+    const outCny = toNumberOrNull(obj.output_price) ?? toNumberOrNull(obj.completion_price)
+    if (inCny !== null) pricingIn = inCny / CNY_PER_USD
+    if (outCny !== null) pricingOut = outCny / CNY_PER_USD
+  } else if (provider === 'mistral' && obj.pricing) {
+    // Mistral occasionally returns pricing in /v1/models — when present, USD/1M.
+    const p = obj.pricing as { input?: number | string; output?: number | string }
+    pricingIn = toNumberOrNull(p.input)
+    pricingOut = toNumberOrNull(p.output)
+  }
+
+  // Sanity guard: pricing must be a finite, non-negative number.
+  if (pricingIn !== null && (!Number.isFinite(pricingIn) || pricingIn < 0)) pricingIn = null
+  if (pricingOut !== null && (!Number.isFinite(pricingOut) || pricingOut < 0)) pricingOut = null
+
+  return { pricingIn, pricingOut }
+}
+
+function toNumberOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
 }

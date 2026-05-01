@@ -13,6 +13,7 @@ import {
   useLLMCostsRecent,
   type LLMTask,
 } from '@/hooks/useLLMCosts'
+import { useProviderModels } from '@/hooks/useProviderModels'
 import { useSettings } from '@/hooks/useSettings'
 import { useTokensSummary } from '@/hooks/useTokensSummary'
 import { cn } from '@/lib/utils'
@@ -31,6 +32,7 @@ export default function Costs() {
   const { data: costsByDay } = useCostsByDay(period)
   const { data: recent, isLoading } = useLLMCostsRecent(period)
   const { data: tokensSummary } = useTokensSummary(period)
+  const { data: providerModels } = useProviderModels()
 
   const totals = useMemo(() => (recent ? computeTotals(recent) : null), [recent])
   const breakdown = useMemo(() => (recent ? computeBreakdown(recent, period) : []), [recent, period])
@@ -82,6 +84,22 @@ export default function Costs() {
     }
     return [...map.values()].sort((a, b) => b.total_cost - a.total_cost)
   }, [tokensSummary])
+
+  // "Tarifs par modèle" — show every cached provider_models row with input/output
+  // pricing per 1M tokens. Ordered by total cost desc (models actually used first),
+  // then by provider/model_id alphabetically for the long tail with cost = 0.
+  const pricingTable = useMemo(() => {
+    if (!providerModels) return []
+    const costByModel = new Map<string, number>()
+    for (const m of modelSummary) costByModel.set(m.model, m.total_cost)
+    return [...providerModels]
+      .map((m) => ({ ...m, total_cost: costByModel.get(m.model_id) ?? 0 }))
+      .sort((a, b) => {
+        if (b.total_cost !== a.total_cost) return b.total_cost - a.total_cost
+        if (a.provider !== b.provider) return a.provider.localeCompare(b.provider)
+        return a.model_id.localeCompare(b.model_id)
+      })
+  }, [providerModels, modelSummary])
 
   if (isLoading) {
     return (
@@ -197,6 +215,58 @@ export default function Costs() {
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-xs font-medium">
                         ${row.total_cost.toFixed(5)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tarifs par modele (catalogue) */}
+      {pricingTable.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Tarifs par modele</CardTitle>
+            <p className="text-xs text-slate-500">
+              Prix unitaires (USD / 1M tokens) tires de provider_models. Actualises via Reglages -&gt; Modeles.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
+                  <tr>
+                    <th className="px-4 py-2.5">Provider</th>
+                    <th className="px-4 py-2.5">Modele</th>
+                    <th className="px-4 py-2.5 text-right">Context</th>
+                    <th className="px-4 py-2.5 text-right">Input ($/1M)</th>
+                    <th className="px-4 py-2.5 text-right">Output ($/1M)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pricingTable.map((row) => (
+                    <tr key={`${row.provider}:${row.model_id}`}>
+                      <td className="px-4 py-3 text-xs font-medium uppercase text-slate-700">
+                        {row.provider}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">{row.model_id}</td>
+                      <td className="px-4 py-3 text-right font-mono text-xs">
+                        {row.context_window != null
+                          ? row.context_window.toLocaleString()
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs">
+                        {row.pricing_input_per_1m != null
+                          ? `$${row.pricing_input_per_1m.toFixed(4)}`
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs">
+                        {row.pricing_output_per_1m != null
+                          ? `$${row.pricing_output_per_1m.toFixed(4)}`
+                          : '—'}
                       </td>
                     </tr>
                   ))}
