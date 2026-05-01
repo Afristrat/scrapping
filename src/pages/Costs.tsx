@@ -39,17 +39,20 @@ export default function Costs() {
   const avgDaily = totals ? totals.total7d / 7 : 0
   const isOverBudget = avgDaily > dailyBudget * 1.1
 
+  // Stable "now" snapshot — captured once on mount to avoid impure call during render.
+  const [nowMs] = useState(() => Date.now())
+
   // Cost by task
   const costByTask = useMemo(() => {
     if (!recent) return { scraping: 0, scoring: 0, monitoring: 0 }
-    const sinceMs = Date.now() - period * 86_400_000
+    const sinceMs = nowMs - period * 86_400_000
     const filtered = recent.filter((r) => new Date(r.ts).getTime() >= sinceMs)
     const map: Record<LLMTask, number> = { scraping: 0, scoring: 0, monitoring: 0 }
     for (const r of filtered) {
       map[r.task] += Number(r.cost)
     }
     return map
-  }, [recent, period])
+  }, [recent, period, nowMs])
 
   const totalTaskCost = costByTask.scraping + costByTask.scoring + costByTask.monitoring
 

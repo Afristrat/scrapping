@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { type Control, Controller, type FieldPath } from 'react-hook-form'
+import { type Control, Controller, type FieldPath, useWatch } from 'react-hook-form'
 import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,13 +21,17 @@ interface Props {
 }
 
 export function ModelSelectField({ control, name, label }: Props) {
+  const watchedValue = useWatch({ control, name })
+  const initialValue = typeof watchedValue === 'string' ? watchedValue : ''
+  const initialIsInPopular = POPULAR_MODELS.some((m) => m.id === initialValue)
+  const [customMode, setCustomMode] = useState(!initialIsInPopular && Boolean(initialValue))
+
   return (
     <Controller
       control={control}
       name={name}
       render={({ field, fieldState }) => {
         const isInPopular = POPULAR_MODELS.some((m) => m.id === field.value)
-        const [customMode, setCustomMode] = useState(!isInPopular && Boolean(field.value))
 
         return (
           <div className="space-y-1.5">
