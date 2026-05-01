@@ -48,8 +48,107 @@ Deno.serve(async (req) => {
   }
   if (!Array.isArray(body.signal_ids) || !body.run_at) return json({ error: 'bad_body' }, 400)
 
-  return json({ ok: true, todo: 'implement_classification' }, 202)
+  // ---- Récupérer les seeds + topics émergents existants
+  const [{ data: settings }, { data: existingTopics }] = await Promise.all([
+    supabase.from('settings').select('topic_seeds').eq('user_id', user.id).single(),
+    supabase.from('topics').select('id, name, slug').eq('user_id', user.id),
+  ])
+
+  if (!settings) return json({ error: 'settings_not_found' }, 404)
+
+  const seeds: string[] = settings.topic_seeds ?? []
+  const knownNames = new Set([
+    ...seeds,
+    ...(existingTopics ?? []).map((t: { name: string }) => t.name),
+  ])
+  const knownList = Array.from(knownNames)
+
+  // ---- Récupérer les signaux à classifier
+  const { data: signals } = await supabase
+    .from('signals')
+    .select('id, source, title, raw_payload')
+    .in('id', body.signal_ids)
+
+  if (!signals || signals.length === 0) return json({ ok: true, classified: 0 }, 202)
+
+  // ---- Clé OpenRouter (user > env fallback)
+  const apiKey = await getUserApiKey(supabase, user.id, 'openrouter')
+  if (!apiKey) return json({ error: 'missing_openrouter_key' }, 500)
+
+  const client = new OpenAI({
+    baseURL: OPENROUTER_BASE,
+    apiKey,
+    defaultHeaders: { 'HTTP-Referer': 'https://zlatan-scrap.local', 'X-Title': 'zlatan-scrap' },
+  })
+
+  // ---- Classifier par batch avec concurrence limitée
+  type Classification = { signal_id: string; topics: string[] }
+  const classifications: Classification[] = []
+
+  for (let i = 0; i < signals.length; i += BATCH_SIZE * CONCURRENCY) {
+    const slice = signals.slice(i, i + BATCH_SIZE * CONCURRENCY)
+    const promises: Promise<Classification[]>[] = []
+    for (let j = 0; j < slice.length; j += BATCH_SIZE) {
+      const batch = slice.slice(j, j + BATCH_SIZE)
+      promises.push(classifyBatch(client, batch, knownList))
+    }
+    const results = await Promise.allSettled(promises)
+    for (const r of results) {
+      if (r.status === 'fulfilled') classifications.push(...r.value)
+    }
+  }
+
+  return json({ ok: true, classified: classifications.length, signals: signals.length }, 202)
 })
+
+async function classifyBatch(
+  client: OpenAI,
+  signals: Array<{ id: string; source: string; title: string | null; raw_payload: unknown }>,
+  knownTopics: string[],
+): Promise<Array<{ signal_id: string; topics: string[] }>> {
+  const list = signals
+    .map((s, idx) => {
+      const payload = JSON.stringify(s.raw_payload).slice(0, 300)
+      return `${idx}. [${s.source}] ${s.title ?? '(no title)'} — ${payload}`
+    })
+    .join('\n')
+
+  const prompt = `Topics existants : ${knownTopics.join(', ')}
+
+Signaux :
+${list}
+
+Pour chaque signal, assigne 1-2 topics parmi les existants.
+Si aucun ne convient (pertinence < 60%), propose un nouveau topic court (3-4 mots max).
+
+Réponds en JSON strict :
+{"results": [{"i": 0, "topics": ["Topic A", "Topic B"]}, ...]}`
+
+  const completion = await retryWithBackoff(
+    () => client.chat.completions.create({
+      model: MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      max_tokens: 600,
+    }),
+    { maxAttempts: 3, baseDelayMs: 1500 },
+  )
+
+  const raw = completion.choices[0]?.message?.content ?? '{}'
+  let parsed: { results?: Array<{ i: number; topics: string[] }> } = {}
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return []
+  }
+
+  return (parsed.results ?? [])
+    .map((r) => ({
+      signal_id: signals[r.i]?.id ?? '',
+      topics: Array.isArray(r.topics) ? r.topics.filter((t) => typeof t === 'string') : [],
+    }))
+    .filter((r) => r.signal_id)
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
