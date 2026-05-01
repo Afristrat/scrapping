@@ -13,7 +13,7 @@
     "test": "vitest --run",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
