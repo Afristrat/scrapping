@@ -1,7 +1,7 @@
 {
   "project": "zlatan-scrap",
-  "version": "0.2.0",
-  "objective": "Eliminate technical and supervision debt — refactor BYOK to single dispatch, drop legacy, fix lint, add CI, implement digest properly",
+  "version": "0.3.0",
+  "objective": "Eliminate technical and supervision debt — refactor BYOK to single dispatch, drop legacy, fix lint, add CI, implement digest properly. Wave 4 : durcir le moteur admin (tests + vraie cascade {{run:<kind>}}).",
   "context": {
     "branch": "feat/topic-tracking-minio",
     "supabase_project_ref": "crplceoptyeslqyfcqvj",
@@ -9,16 +9,149 @@
     "deployed_url": "https://scrap.ai-mpower.com"
   },
   "stories": [
-    { "id": "S-A",          "title": "Refactor: dispatch-llm edge function unique",        "passes": true, "commit": "41fdb8c", "wave": 1 },
-    { "id": "S-B",          "title": "Migration: llm_providers DB table",                  "passes": true, "commit": "4eaeb92", "wave": 1 },
-    { "id": "S-Lint",       "title": "Fix: 3 lint errors préexistants",                    "passes": true, "commit": "67842e9", "wave": 1 },
-    { "id": "S-Husky",      "title": "Fix: Husky skip si pas de .git",                     "passes": true, "commit": "9e312a8", "wave": 1 },
-    { "id": "S-Split",      "title": "Optim: Vite code-splitting (1.2MB → 5 chunks)",      "passes": true, "commit": "ecff577", "wave": 1 },
-    { "id": "S-CI",         "title": "Ops: GitHub Actions CI workflow",                    "passes": true, "commit": "11111fe", "wave": 1 },
-    { "id": "S-CascadeFix", "title": "Fix: cascade lit form state via watch",             "passes": true, "commit": "7a1c89f", "wave": 1.5 },
-    { "id": "S-DeadCode",   "title": "Cleanup: purge constantes mortes (no-op après S-A)", "passes": true, "commit": null,      "wave": 2 },
-    { "id": "S-DropLegacy", "title": "Cleanup: drop legacy model_* columns",              "passes": true, "commit": "e1099b1", "wave": 2 },
-    { "id": "S-Digest",     "title": "Feature: digest edge fn + UI complète",              "passes": true, "commit": "082cf38", "wave": 2 }
+    {
+      "id": "S-A",
+      "title": "Refactor: dispatch-llm edge function unique",
+      "passes": true,
+      "commit": "41fdb8c",
+      "wave": 1
+    },
+    {
+      "id": "S-B",
+      "title": "Migration: llm_providers DB table",
+      "passes": true,
+      "commit": "4eaeb92",
+      "wave": 1
+    },
+    {
+      "id": "S-Lint",
+      "title": "Fix: 3 lint errors préexistants",
+      "passes": true,
+      "commit": "67842e9",
+      "wave": 1
+    },
+    {
+      "id": "S-Husky",
+      "title": "Fix: Husky skip si pas de .git",
+      "passes": true,
+      "commit": "9e312a8",
+      "wave": 1
+    },
+    {
+      "id": "S-Split",
+      "title": "Optim: Vite code-splitting (1.2MB → 5 chunks)",
+      "passes": true,
+      "commit": "ecff577",
+      "wave": 1
+    },
+    {
+      "id": "S-CI",
+      "title": "Ops: GitHub Actions CI workflow",
+      "passes": true,
+      "commit": "11111fe",
+      "wave": 1
+    },
+    {
+      "id": "S-CascadeFix",
+      "title": "Fix: cascade lit form state via watch",
+      "passes": true,
+      "commit": "7a1c89f",
+      "wave": 1.5
+    },
+    {
+      "id": "S-DeadCode",
+      "title": "Cleanup: purge constantes mortes (no-op après S-A)",
+      "passes": true,
+      "commit": null,
+      "wave": 2
+    },
+    {
+      "id": "S-DropLegacy",
+      "title": "Cleanup: drop legacy model_* columns",
+      "passes": true,
+      "commit": "e1099b1",
+      "wave": 2
+    },
+    {
+      "id": "S-Digest",
+      "title": "Feature: digest edge fn + UI complète",
+      "passes": true,
+      "commit": "082cf38",
+      "wave": 2
+    },
+    {
+      "id": "S-AdminTests",
+      "title": "Tests Deno: template engine (renderTemplate + extractComposedRunKinds)",
+      "passes": true,
+      "commit": "4d763ce",
+      "wave": 4,
+      "completed_at": "2026-05-01T17:30:00Z",
+      "metadata": {
+        "test_count": 24,
+        "test_pass": 24,
+        "test_runtime_ms": 35
+      },
+      "files_scope": [
+        "supabase/functions/run-admin-prompt/template.test.ts",
+        "supabase/functions/run-admin-prompt/README.md"
+      ],
+      "validate": [
+        "deno test --allow-env --node-modules-dir=auto supabase/functions/run-admin-prompt/template.test.ts",
+        "npm run typecheck",
+        "npm run lint"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "S-AdminCompose",
+      "title": "Feature: cascade automatique {{run:<kind>}} (vraie synthèse multi-sources)",
+      "passes": true,
+      "commit": "56d45f8",
+      "wave": 4,
+      "completed_at": "2026-05-01T17:35:00Z",
+      "metadata": {
+        "files_created": ["supabase/functions/run-admin-prompt/compose.ts"],
+        "files_modified": [
+          "supabase/functions/run-admin-prompt/index.ts",
+          "supabase/functions/run-admin-prompt/README.md",
+          "src/hooks/useAdminPrompts.ts",
+          "src/components/features/AdminPromptsConfig.tsx"
+        ],
+        "validation": {
+          "typecheck": "0 errors",
+          "lint": "0 new warnings (Settings.tsx:65 préexistant hors scope)",
+          "vitest": "44/44 pass",
+          "deno_test": "24/24 pass",
+          "build": "ok (1.72s)"
+        }
+      },
+      "files_scope": [
+        "supabase/functions/run-admin-prompt/index.ts",
+        "supabase/functions/run-admin-prompt/compose.ts",
+        "supabase/functions/run-admin-prompt/README.md",
+        "src/hooks/useAdminPrompts.ts",
+        "src/components/features/AdminPromptsConfig.tsx"
+      ],
+      "validate": [
+        "deno test --allow-env --node-modules-dir=auto supabase/functions/run-admin-prompt/",
+        "npm run typecheck",
+        "npm run lint",
+        "npm test",
+        "npm run build"
+      ],
+      "depends_on": ["S-AdminTests"],
+      "design_notes": [
+        "Opt-in via body { compose_chain: true, max_age_hours?: number }",
+        "Default max_age_hours = 6 ; default max_depth = 3",
+        "Cycle detection : Set<task_kind> visited transmis en récursion",
+        "Cascade exécute le prompt parent du task_kind (pas n'importe lequel) et persiste le run en DB comme un appel normal",
+        "Si plusieurs prompts ont le même task_kind, prendre celui avec display_order le plus bas (premier seed)",
+        "Logger composed_chain: [{ kind, source: 'cached'|'cascade', run_id, age_hours }] dans logs.payload",
+        "Frontend: checkbox ‘Composer la chaîne’ dans Run dialog + warning coût N×"
+      ]
+    }
   ],
-  "completed_at": "2026-05-01T16:50:00Z"
+  "completed_at": "2026-05-01T17:35:00Z",
+  "wave_4_opened_at": "2026-05-01T17:00:00Z",
+  "wave_4_completed_at": "2026-05-01T17:35:00Z"
 }
