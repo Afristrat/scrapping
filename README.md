@@ -93,8 +93,9 @@ Tu te réveilles le matin, tu vois les 20 meilleurs signaux des dernières 24 h,
                               ▼
          ┌─────────────────────────────────────────┐
          │  Dashboard React (toi)                  │
-         │  6 pages : Dashboard, Digest, Topics,   │
-         │  Costs, Logs, Settings (5 onglets)      │
+         │  7 pages : Dashboard, Digest, Topics,   │
+         │  Costs, Logs, Settings (6 onglets),     │
+         │  Login/Signup                           │
          └─────────────────────────────────────────┘
 ```
 
