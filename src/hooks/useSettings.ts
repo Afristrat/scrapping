@@ -11,10 +11,6 @@ export interface Branding {
 
 export interface Settings {
   user_id: string
-  model_scraping: string
-  model_scoring: string
-  model_monitoring: string
-  model_digest: string
   prompt_scoring: string
   language: 'fr' | 'en' | 'es'
   reddit_subs: string[]
@@ -49,7 +45,6 @@ export function useSettings() {
         apify_config: raw.apify_config ?? DEFAULT_APIFY_CONFIG,
         active_rubric_id: raw.active_rubric_id ?? null,
         language: raw.language ?? 'fr',
-        model_digest: raw.model_digest ?? 'anthropic/claude-haiku-4.5',
         score_concurrency: raw.score_concurrency ?? 20,
       }
     },

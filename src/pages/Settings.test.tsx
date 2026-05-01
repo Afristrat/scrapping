@@ -7,14 +7,12 @@ import type { Settings as SettingsType } from '@/hooks/useSettings'
 
 const MOCK_SETTINGS: SettingsType = {
   user_id: 'user-1',
-  model_scraping: 'anthropic/claude-haiku-4.5',
-  model_scoring: 'anthropic/claude-sonnet-4.6',
-  model_monitoring: 'openai/gpt-4o-mini',
   prompt_scoring: 'Score ce signal de 0 a 100 selon sa pertinence pour un builder IA.',
   reddit_subs: ['MachineLearning', 'LocalLLaMA'],
   arxiv_categories: ['cs.AI'],
   x_queries: ['#LLM'],
   topic_seeds: [],
+  model_config: {},
   branding: {
     name: 'Mon Dashboard',
     primary: '#3b82f6',
@@ -32,7 +30,6 @@ const MOCK_SETTINGS: SettingsType = {
     reddit_max_per_sub: 25,
   },
   language: 'fr',
-  model_digest: 'anthropic/claude-haiku-4.5',
   score_concurrency: 20,
   updated_at: '2026-04-30T00:00:00Z',
 }
@@ -106,8 +103,8 @@ describe('Settings', () => {
     const user = userEvent.setup()
     renderSettings()
 
-    // Default tab is Models, should show OpenRouter
-    expect(screen.getByText('Modeles OpenRouter')).toBeInTheDocument()
+    // Default tab is Models, should show BYOK card
+    expect(screen.getByText(/Modèles par tâche \(BYOK\)/)).toBeInTheDocument()
 
     // Click Sources tab
     await user.click(screen.getByRole('tab', { name: /sources/i }))

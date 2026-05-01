@@ -11,9 +11,8 @@ import { getProviderConfig } from '../_shared/providers.ts'
  * instead of duplicating provider logic.
  *
  * Resolution order for (provider, model):
- *   1. settings.model_config[task] (preferred, BYOK multi-provider)
- *   2. settings.model_<task> (legacy single-column scoring/scraping/...)
- *   3. fallback to OpenRouter + 'openrouter/auto'
+ *   1. settings.model_config[task] (BYOK multi-provider, single source of truth)
+ *   2. fallback to OpenRouter + 'openrouter/auto'
  *
  * OpenRouter remains a first-class citizen as the default provider when
  * nothing is configured (see DEFAULT_PROVIDER below).
@@ -59,10 +58,6 @@ interface ModelConfigEntry {
 
 interface SettingsRow {
   model_config?: Record<string, ModelConfigEntry | null> | null
-  model_scoring?: string | null
-  model_scraping?: string | null
-  model_monitoring?: string | null
-  model_digest?: string | null
 }
 
 const VALID_TASKS: ReadonlySet<Task> = new Set([
@@ -119,7 +114,7 @@ Deno.serve(async (req) => {
 
   const settingsRes = await supabase
     .from('settings')
-    .select('model_config, model_scoring, model_scraping, model_monitoring, model_digest')
+    .select('model_config')
     .eq('user_id', user.id)
     .single()
 
@@ -231,11 +226,7 @@ function resolveProviderAndModel(
 
   // OpenRouter is the default fallback provider — it remains first-class.
   const providerId: string = taskCfg?.provider ?? DEFAULT_PROVIDER
-
-  const legacyKey = `model_${task}` as const
-  const legacyModel = (settings[legacyKey] as string | null | undefined) ?? null
-
-  const modelId: string = taskCfg?.model || legacyModel || DEFAULT_MODEL
+  const modelId: string = taskCfg?.model || DEFAULT_MODEL
 
   return { providerId, modelId }
 }

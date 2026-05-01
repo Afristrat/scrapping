@@ -73,10 +73,7 @@ Tracking coût par appel OpenRouter.
 | Colonne             | Type       | Default                                                                                        | Notes                               |
 | ------------------- | ---------- | ---------------------------------------------------------------------------------------------- | ----------------------------------- |
 | `user_id`           | UUID PK FK |                                                                                                |                                     |
-| `model_scraping`    | TEXT       | `openrouter/auto`                                                                              |                                     |
-| `model_scoring`     | TEXT       | `anthropic/claude-haiku-4.5`                                                                   |                                     |
-| `model_monitoring`  | TEXT       | `openrouter/auto`                                                                              |                                     |
-| `model_digest`      | TEXT       | `anthropic/claude-haiku-4.5`                                                                   |                                     |
+| `model_config`      | JSONB      | `{}`                                                                                           | `{task: {provider, model}}` BYOK    |
 | `prompt_scoring`    | TEXT       | (legacy fallback si pas de rubric)                                                             |                                     |
 | `language`          | TEXT       | `fr`                                                                                           | CHECK fr/en/es                      |
 | `reddit_subs`       | TEXT[]     | 18 subs IA                                                                                     |                                     |

@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      digests: {
+        Row: {
+          content: string
+          cost: number | null
+          generated_at: string
+          id: string
+          language: string
+          min_score: number
+          model_used: string | null
+          signal_count: number
+          user_id: string
+          window_hours: number
+        }
+        Insert: {
+          content: string
+          cost?: number | null
+          generated_at?: string
+          id?: string
+          language?: string
+          min_score?: number
+          model_used?: string | null
+          signal_count?: number
+          user_id: string
+          window_hours?: number
+        }
+        Update: {
+          content?: string
+          cost?: number | null
+          generated_at?: string
+          id?: string
+          language?: string
+          min_score?: number
+          model_used?: string | null
+          signal_count?: number
+          user_id?: string
+          window_hours?: number
+        }
+        Relationships: []
+      }
       llm_costs: {
         Row: {
           completion_tokens: number
@@ -279,10 +318,6 @@ export type Database = {
           daily_budget_usd: number
           language: string
           model_config: Json
-          model_digest: string
-          model_monitoring: string
-          model_scoring: string
-          model_scraping: string
           prompt_scoring: string
           reddit_subs: string[]
           score_concurrency: number
@@ -300,10 +335,6 @@ export type Database = {
           daily_budget_usd?: number
           language?: string
           model_config?: Json
-          model_digest?: string
-          model_monitoring?: string
-          model_scoring?: string
-          model_scraping?: string
           prompt_scoring?: string
           reddit_subs?: string[]
           score_concurrency?: number
@@ -321,10 +352,6 @@ export type Database = {
           daily_budget_usd?: number
           language?: string
           model_config?: Json
-          model_digest?: string
-          model_monitoring?: string
-          model_scoring?: string
-          model_scraping?: string
           prompt_scoring?: string
           reddit_subs?: string[]
           score_concurrency?: number

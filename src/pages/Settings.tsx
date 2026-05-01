@@ -9,7 +9,6 @@ import { ApiKeyForm } from '@/components/features/ApiKeyForm'
 import { ApifyConfigForm } from '@/components/features/ApifyConfigForm'
 import { ProvidersConfig } from '@/components/features/ProvidersConfig'
 import { BrandingForm } from '@/components/features/BrandingForm'
-import { ModelSelectField } from '@/components/features/ModelSelectField'
 import { ModelCascadeSelect, type ModelChoice } from '@/components/features/ModelCascadeSelect'
 import { RubricsManager } from '@/components/features/RubricsManager'
 import { SourcePrioritySliders } from '@/components/features/SourcePrioritySliders'
@@ -41,9 +40,6 @@ export default function Settings() {
     resolver: zodResolver(settingsSchema) as any,
     values: settings
       ? {
-          model_scraping: settings.model_scraping,
-          model_scoring: settings.model_scoring,
-          model_monitoring: settings.model_monitoring,
           prompt_scoring: settings.prompt_scoring,
           reddit_subs: settings.reddit_subs,
           arxiv_categories: settings.arxiv_categories,
@@ -60,7 +56,6 @@ export default function Settings() {
           daily_budget_usd: settings.daily_budget_usd ?? 5,
           active_rubric_id: settings.active_rubric_id ?? null,
           language: settings.language ?? 'fr',
-          model_digest: settings.model_digest ?? 'anthropic/claude-haiku-4.5',
           score_concurrency: settings.score_concurrency ?? 20,
         }
       : undefined,
@@ -119,25 +114,6 @@ export default function Settings() {
                     </div>
                   )
                 })}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Legacy : Modèles OpenRouter (deprecated)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-xs text-muted-foreground">
-                  Les champs ci-dessous sont conservés pour rétrocompatibilité — préfère la
-                  configuration BYOK ci-dessus. Les edge functions liront `model_config` en priorité.
-                </p>
-                <ModelSelectField control={control} name="model_scraping" label="Modele scraping" />
-                <ModelSelectField control={control} name="model_scoring" label="Modele scoring" />
-                <ModelSelectField
-                  control={control}
-                  name="model_monitoring"
-                  label="Modele monitoring"
-                />
               </CardContent>
             </Card>
           </TabsContent>

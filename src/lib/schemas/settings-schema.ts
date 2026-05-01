@@ -35,9 +35,6 @@ export const DEFAULT_SOURCE_PRIORITY: SourcePriority = {
 }
 
 export const settingsSchema = z.object({
-  model_scraping: z.string().min(1),
-  model_scoring: z.string().min(1),
-  model_monitoring: z.string().min(1),
   prompt_scoring: z.string().min(10).max(2000),
   reddit_subs: z.array(z.string().min(1).max(50)).max(50),
   arxiv_categories: z.array(z.string().min(1).max(20)).max(20),
@@ -61,7 +58,6 @@ export const settingsSchema = z.object({
   daily_budget_usd: z.number().min(0).max(1000),
   active_rubric_id: z.string().uuid().nullable(),
   language: z.enum(['fr', 'en', 'es']),
-  model_digest: z.string().min(1),
   score_concurrency: z.number().min(1).max(100),
 })
 
