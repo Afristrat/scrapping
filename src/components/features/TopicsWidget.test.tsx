@@ -64,7 +64,7 @@ describe('TopicsWidget', () => {
         },
       ],
       isLoading: false,
-    } as ReturnType<typeof useTopicsModule.useTopics>)
+    } as unknown as ReturnType<typeof useTopicsModule.useTopics>)
 
     renderWidget()
     const items = screen.getAllByTestId('topic-row')
@@ -77,7 +77,7 @@ describe('TopicsWidget', () => {
     vi.spyOn(useTopicsModule, 'useTopics').mockReturnValue({
       data: [],
       isLoading: false,
-    } as ReturnType<typeof useTopicsModule.useTopics>)
+    } as unknown as ReturnType<typeof useTopicsModule.useTopics>)
 
     renderWidget()
     expect(screen.getByText(/aucun topic/i)).toBeInTheDocument()
