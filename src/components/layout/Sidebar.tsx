@@ -5,6 +5,7 @@ import {
   DollarSign,
   LogOut,
   Sparkles,
+  TrendingUp,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils'
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/digest', label: 'Brief', icon: Sparkles },
+  { to: '/topics', label: 'Topics', icon: TrendingUp },
   { to: '/costs', label: 'Coûts', icon: DollarSign },
   { to: '/logs', label: 'Logs', icon: ScrollText },
   { to: '/settings', label: 'Paramètres', icon: SettingsIcon },

@@ -8,6 +8,7 @@ import Digest from '@/pages/Digest'
 import Login from '@/pages/Login'
 import Logs from '@/pages/Logs'
 import Settings from '@/pages/Settings'
+import Topics from '@/pages/Topics'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: <Dashboard /> },
           { path: '/digest', element: <Digest /> },
+          { path: '/topics', element: <Topics /> },
           { path: '/costs', element: <Costs /> },
           { path: '/settings', element: <Settings /> },
           { path: '/logs', element: <Logs /> },
