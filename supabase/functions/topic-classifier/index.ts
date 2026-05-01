@@ -157,35 +157,37 @@ Deno.serve(async (req) => {
       classifications.flatMap((c) => c.topics).find((t) => slugify(t) === slug) ??
       slug
 
+    // Snapshot the existing topic state ONCE — reused across retries to keep Welford idempotent
+    const { data: existingSnapshot } = await supabase
+      .from('topics')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('slug', slug)
+      .maybeSingle()
+
     try {
       await retryWithBackoff(async () => {
-        const { data: existing } = await supabase
-          .from('topics')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('slug', slug)
-          .maybeSingle()
-
         let topicId: string
         let baseline = { mean: 0, m2: 0, n: 0 }
-        if (existing) {
-          topicId = existing.id
+        if (existingSnapshot) {
+          topicId = existingSnapshot.id
           baseline = {
-            mean: existing.baseline_mean,
-            m2: existing.baseline_m2,
-            n: existing.baseline_n,
+            mean: existingSnapshot.baseline_mean,
+            m2: existingSnapshot.baseline_m2,
+            n: existingSnapshot.baseline_n,
           }
         } else {
-          const { data: inserted, error: insErr } = await supabase
+          // Upsert handles the race where a previous retry created the row
+          const { data: upserted, error: upErr } = await supabase
             .from('topics')
-            .insert({
+            .upsert({
               user_id: user.id, name: topicName, slug,
               is_seed: isSeed, is_emerging: !isSeed,
-            })
+            }, { onConflict: 'user_id,slug' })
             .select('id')
             .single()
-          if (insErr || !inserted) throw new Error(`topic_insert_failed: ${insErr?.message}`)
-          topicId = inserted.id
+          if (upErr || !upserted) throw new Error(`topic_insert_failed: ${upErr?.message}`)
+          topicId = upserted.id
         }
 
         const newBaseline = welfordUpdate(baseline, bucket.signalIds.length)
@@ -201,38 +203,41 @@ Deno.serve(async (req) => {
 
         const { error: runErr } = await supabase
           .from('topic_runs')
-          .insert({
+          .upsert({
             topic_id: topicId, user_id: user.id, run_at: body.run_at,
             signal_count: bucket.signalIds.length,
             sources: sourcesJson,
             top_signal_title: bucket.topSignal?.title ?? null,
             top_signal_score: bucket.topSignal?.score ?? null,
-          })
+          }, { onConflict: 'topic_id,run_at', ignoreDuplicates: true })
         if (runErr) throw new Error(`topic_run_insert_failed: ${runErr.message}`)
 
-        await supabase
+        const { error: updateErr } = await supabase
           .from('topics')
           .update({
             baseline_mean: newBaseline.mean,
             baseline_m2: newBaseline.m2,
             baseline_n: newBaseline.n,
             trend, last_seen_at: body.run_at,
-            total_signal_count: (existing?.total_signal_count ?? 0) + bucket.signalIds.length,
+            total_signal_count: (existingSnapshot?.total_signal_count ?? 0) + bucket.signalIds.length,
           })
           .eq('id', topicId)
+        if (updateErr) throw new Error(`topic_update_failed: ${updateErr.message}`)
 
         if (bucket.signalIds.length > 0) {
-          await supabase.from('topic_signals').insert(
+          const { error: sigErr } = await supabase.from('topic_signals').upsert(
             bucket.signalIds.map((sid) => ({
               topic_id: topicId, signal_id: sid, user_id: user.id,
             })),
+            { onConflict: 'topic_id,signal_id', ignoreDuplicates: true },
           )
+          if (sigErr) throw new Error(`topic_signals_insert_failed: ${sigErr.message}`)
         }
 
         bucket.topicId = topicId
         bucket.topicName = topicName
         bucket.isSeed = isSeed
-        bucket.firstSeenAt = existing?.first_seen_at ?? body.run_at
+        bucket.firstSeenAt = existingSnapshot?.first_seen_at ?? body.run_at
       }, { maxAttempts: 3, baseDelayMs: 1000 })
       persistedTopics++
     } catch (err) {
