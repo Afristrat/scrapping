@@ -297,11 +297,11 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* Onglet 6 : Admin — Prompts Moat Hunter */}
+          {/* Onglet 6 : Admin — Prompts d'analyse */}
           <TabsContent value="admin" className="space-y-4 pt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Admin — Prompts Moat Hunter</CardTitle>
+                <CardTitle>Admin — Prompts d'analyse</CardTitle>
               </CardHeader>
               <CardContent>
                 <AdminPromptsConfig />
