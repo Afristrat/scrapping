@@ -20,6 +20,7 @@ export interface Settings {
   reddit_subs: string[]
   arxiv_categories: string[]
   x_queries: string[]
+  topic_seeds: string[]
   branding: Branding
   daily_budget_usd: number
   active_rubric_id: string | null
