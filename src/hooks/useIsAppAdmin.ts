@@ -28,16 +28,14 @@ export function useIsAppAdmin(): UseQueryResult<boolean, Error> {
     queryFn: async () => {
       // Cast nécessaire : `is_app_admin` absent de Database tant que les types
       // ne sont pas régénérés post-migration. Cf. CLAUDE.md piège connu.
-      const rpc = (
-        supabase as unknown as {
-          rpc: (fn: string) => Promise<{ data: unknown; error: { message: string } | null }>
-        }
-      ).rpc
-      const { data, error } = await rpc('is_app_admin')
+      // IMPORTANT : appeler supabase.rpc directement (pas dans une variable
+      // détachée) pour conserver le `this` binding du SDK — sinon on a
+      // « Cannot read properties of undefined (reading 'rest') ».
+      const client = supabase as unknown as {
+        rpc: (fn: string) => Promise<{ data: unknown; error: { message: string } | null }>
+      }
+      const { data, error } = await client.rpc('is_app_admin')
       if (error) {
-        // En cas d'erreur (réseau, RPC manquante) on retombe en non-admin.
-        // C'est un fail-safe sécurité : mieux vaut bloquer l'accès qu'autoriser
-        // par défaut.
         return false
       }
       return data === true
