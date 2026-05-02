@@ -32,17 +32,23 @@ export function useTeamMembers() {
     staleTime: 30 * 1000,
     queryFn: async () => {
       if (!orgId) return []
-      // Cast nécessaire : `organization_members_view` n'est pas dans
-      // `Database` tant que les types ne sont pas régénérés post-migration
-      // (cf. CLAUDE.md piège connu).
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = supabase as unknown as { from: (t: string) => any }
-      const { data, error } = await client
-        .from('organization_members_view')
-        .select('org_id, user_id, role, joined_at, email')
-        .eq('org_id', orgId)
-        .order('joined_at', { ascending: true })
-      if (error) throw error
+      // On utilise le RPC `list_org_members(p_org_id)` SECURITY DEFINER
+      // (migration 20260502000015_fix_orgm_recursion.sql) plutôt que la vue
+      // `organization_members_view` qui plante en 403 — celle-ci joint
+      // auth.users en mode security_invoker mais authenticated n'a pas
+      // SELECT sur auth.users (et c'est sain : sinon on exposerait tous les
+      // emails). Le RPC fait le JOIN avec les droits du définisseur tout en
+      // gateant en interne (caller doit être membre de l'org demandée).
+      const client = supabase as unknown as {
+        rpc: (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: { message: string } | null }>
+      }
+      const { data, error } = await client.rpc('list_org_members', {
+        p_org_id: orgId,
+      })
+      if (error) throw new Error(error.message)
       return (data ?? []) as TeamMember[]
     },
   })
