@@ -439,12 +439,20 @@ export function PricingTable(): React.ReactElement {
               minutes.
             </p>
           </div>
-          <Button asChild variant="outline" className="gap-2">
-            <a href={`mailto:${CONTACT_EMAIL}?subject=Kairos%20-%20Demande%20de%20d%C3%A9mo`}>
-              <Mail className="h-4 w-4" aria-hidden />
-              Contactez-nous pour une démo
-            </a>
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild variant="default" className="gap-2">
+              <Link to="/pricing">
+                Configurer ma stack
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-2">
+              <a href={`mailto:${CONTACT_EMAIL}?subject=Kairos%20-%20Demande%20de%20d%C3%A9mo`}>
+                <Mail className="h-4 w-4" aria-hidden />
+                Contactez-nous
+              </a>
+            </Button>
+          </div>
         </div>
       </div>
     </section>
