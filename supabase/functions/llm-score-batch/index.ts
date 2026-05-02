@@ -205,7 +205,31 @@ Deno.serve(async (req) => {
         completion_tokens: completionTokens,
       },
     })
-    return json({ error: 'parse_failed', detail: reason }, 502)
+    // Erreur métier (LLM a renvoyé du texte inexploitable) : on retourne 200
+    // pour que le frontend puisse afficher un toast clair plutôt qu'un
+    // « non-2xx status code » générique. Le coût LLM est tracé dans
+    // llm_costs car le call a bien eu lieu — l'utilisateur le verra dans
+    // /costs. Aucun signal n'est écrit en DB (pas de placeholder score=0).
+    await supabase.from('llm_costs').insert({
+      user_id: user.id,
+      task: 'scoring',
+      model: dispatchModel,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      cost: totalCost,
+    })
+    return json(
+      {
+        batch_size: signals.length,
+        scored: 0,
+        missed: signals.length,
+        cost: totalCost,
+        parse_failed: true,
+        error: 'parse_failed',
+        detail: reason,
+      },
+      200,
+    )
   }
 
   // Critical : do NOT insert placeholder rows for missed signals. A row
