@@ -6,10 +6,14 @@ import {
   LogOut,
   Sparkles,
   TrendingUp,
+  Users,
+  ShieldCheck,
+  Crown,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth'
+import { useIsAppAdmin } from '@/hooks/useIsAppAdmin'
 import { cn } from '@/lib/utils'
 
 const NAV = [
@@ -19,12 +23,15 @@ const NAV = [
   { to: '/costs', label: 'Coûts', icon: DollarSign },
   { to: '/logs', label: 'Logs', icon: ScrollText },
   { to: '/settings', label: 'Paramètres', icon: SettingsIcon },
+  { to: '/settings/team', label: 'Équipe', icon: Users },
+  { to: '/settings/audit', label: 'Audit log', icon: ShieldCheck },
 ] as const
 
 export function Sidebar() {
   const { pathname } = useLocation()
   const user = useAuthStore((s) => s.user)
   const signOut = useAuthStore((s) => s.signOut)
+  const { data: isAdmin = false } = useIsAppAdmin()
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-slate-50">
@@ -48,6 +55,26 @@ export function Sidebar() {
             </Link>
           )
         })}
+
+        {isAdmin && (
+          <>
+            <div className="my-3 border-t border-slate-200" aria-hidden="true" />
+            <Link
+              to="/admin"
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                pathname === '/admin'
+                  ? 'bg-emerald-100 font-medium text-emerald-900'
+                  : 'text-emerald-700 hover:bg-emerald-50',
+              )}
+              aria-current={pathname === '/admin' ? 'page' : undefined}
+              title="Réservé aux administrateurs Kairos"
+            >
+              <Crown className="h-4 w-4" />
+              Admin Kairos
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="border-t border-slate-200 p-4">

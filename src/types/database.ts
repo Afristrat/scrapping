@@ -1,10 +1,16 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.5'
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -56,11 +62,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'admin_prompt_runs_prompt_id_fkey'
-            columns: ['prompt_id']
+            foreignKeyName: "admin_prompt_runs_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'admin_prompts'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_prompt_runs_prompt_id_fkey"
+            columns: ["prompt_id"]
+            isOneToOne: false
+            referencedRelation: "admin_prompts"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -110,7 +123,92 @@ export type Database = {
           user_id?: string
           user_prompt_template?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "admin_prompts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_admins: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          notes?: string | null
+          user_id?: string
+        }
         Relationships: []
+      }
+      audit_log: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          created_at: string
+          description: string | null
+          diff: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          org_id: string
+          severity: Database["public"]["Enums"]["audit_severity"]
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          created_at?: string
+          description?: string | null
+          diff?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          org_id: string
+          severity?: Database["public"]["Enums"]["audit_severity"]
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          created_at?: string
+          description?: string | null
+          diff?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          org_id?: string
+          severity?: Database["public"]["Enums"]["audit_severity"]
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       digests: {
         Row: {
@@ -152,7 +250,15 @@ export type Database = {
           user_id?: string
           window_hours?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "digests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invitations: {
         Row: {
@@ -163,7 +269,7 @@ export type Database = {
           id: string
           invited_by: string | null
           org_id: string
-          role: Database['public']['Enums']['org_role']
+          role: Database["public"]["Enums"]["org_role"]
           token: string
         }
         Insert: {
@@ -174,7 +280,7 @@ export type Database = {
           id?: string
           invited_by?: string | null
           org_id: string
-          role?: Database['public']['Enums']['org_role']
+          role?: Database["public"]["Enums"]["org_role"]
           token: string
         }
         Update: {
@@ -185,16 +291,16 @@ export type Database = {
           id?: string
           invited_by?: string | null
           org_id?: string
-          role?: Database['public']['Enums']['org_role']
+          role?: Database["public"]["Enums"]["org_role"]
           token?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'invitations_org_id_fkey'
-            columns: ['org_id']
+            foreignKeyName: "invitations_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -206,7 +312,7 @@ export type Database = {
           model: string
           org_id: string
           prompt_tokens: number
-          task: Database['public']['Enums']['llm_task']
+          task: Database["public"]["Enums"]["llm_task"]
           ts: string
           user_id: string
         }
@@ -217,7 +323,7 @@ export type Database = {
           model: string
           org_id?: string
           prompt_tokens?: number
-          task: Database['public']['Enums']['llm_task']
+          task: Database["public"]["Enums"]["llm_task"]
           ts?: string
           user_id: string
         }
@@ -228,11 +334,19 @@ export type Database = {
           model?: string
           org_id?: string
           prompt_tokens?: number
-          task?: Database['public']['Enums']['llm_task']
+          task?: Database["public"]["Enums"]["llm_task"]
           ts?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "llm_costs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       llm_providers: {
         Row: {
@@ -310,68 +424,76 @@ export type Database = {
           ts?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_members: {
         Row: {
           joined_at: string
           org_id: string
-          role: Database['public']['Enums']['org_role']
+          role: Database["public"]["Enums"]["org_role"]
           user_id: string
         }
         Insert: {
           joined_at?: string
           org_id: string
-          role?: Database['public']['Enums']['org_role']
+          role?: Database["public"]["Enums"]["org_role"]
           user_id: string
         }
         Update: {
           joined_at?: string
           org_id?: string
-          role?: Database['public']['Enums']['org_role']
+          role?: Database["public"]["Enums"]["org_role"]
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'organization_members_org_id_fkey'
-            columns: ['org_id']
+            foreignKeyName: "organization_members_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
       organizations: {
         Row: {
           billing_email: string | null
-          billing_mode: Database['public']['Enums']['billing_mode']
+          billing_mode: Database["public"]["Enums"]["billing_mode"]
           created_at: string
           id: string
           name: string
-          plan: Database['public']['Enums']['org_plan']
-          segment: Database['public']['Enums']['org_segment']
+          plan: Database["public"]["Enums"]["org_plan"]
+          segment: Database["public"]["Enums"]["org_segment"]
           slug: string
           updated_at: string
         }
         Insert: {
           billing_email?: string | null
-          billing_mode?: Database['public']['Enums']['billing_mode']
+          billing_mode?: Database["public"]["Enums"]["billing_mode"]
           created_at?: string
           id?: string
           name: string
-          plan?: Database['public']['Enums']['org_plan']
-          segment?: Database['public']['Enums']['org_segment']
+          plan?: Database["public"]["Enums"]["org_plan"]
+          segment?: Database["public"]["Enums"]["org_segment"]
           slug: string
           updated_at?: string
         }
         Update: {
           billing_email?: string | null
-          billing_mode?: Database['public']['Enums']['billing_mode']
+          billing_mode?: Database["public"]["Enums"]["billing_mode"]
           created_at?: string
           id?: string
           name?: string
-          plan?: Database['public']['Enums']['org_plan']
-          segment?: Database['public']['Enums']['org_segment']
+          plan?: Database["public"]["Enums"]["org_plan"]
+          segment?: Database["public"]["Enums"]["org_segment"]
           slug?: string
           updated_at?: string
         }
@@ -410,11 +532,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'pending_minio_writes_topic_id_fkey'
-            columns: ['topic_id']
+            foreignKeyName: "pending_minio_writes_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'topics'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_minio_writes_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -455,7 +584,15 @@ export type Database = {
           provider?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "provider_models_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scores: {
         Row: {
@@ -490,11 +627,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'scores_signal_id_fkey'
-            columns: ['signal_id']
+            foreignKeyName: "scores_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'signals'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scores_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -535,7 +679,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scoring_rubrics_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
@@ -594,11 +746,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'settings_active_rubric_id_fkey'
-            columns: ['active_rubric_id']
+            foreignKeyName: "settings_active_rubric_id_fkey"
+            columns: ["active_rubric_id"]
             isOneToOne: false
-            referencedRelation: 'scoring_rubrics'
-            referencedColumns: ['id']
+            referencedRelation: "scoring_rubrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -610,7 +769,7 @@ export type Database = {
           raw_payload: Json
           scraped_at: string
           signal_date: string | null
-          source: Database['public']['Enums']['signal_source']
+          source: Database["public"]["Enums"]["signal_source"]
           title: string | null
           url: string | null
           user_id: string
@@ -622,7 +781,7 @@ export type Database = {
           raw_payload: Json
           scraped_at?: string
           signal_date?: string | null
-          source: Database['public']['Enums']['signal_source']
+          source: Database["public"]["Enums"]["signal_source"]
           title?: string | null
           url?: string | null
           user_id: string
@@ -634,12 +793,20 @@ export type Database = {
           raw_payload?: Json
           scraped_at?: string
           signal_date?: string | null
-          source?: Database['public']['Enums']['signal_source']
+          source?: Database["public"]["Enums"]["signal_source"]
           title?: string | null
           url?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "signals_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscription_seats: {
         Row: {
@@ -662,55 +829,55 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'subscription_seats_subscription_id_fkey'
-            columns: ['subscription_id']
+            foreignKeyName: "subscription_seats_subscription_id_fkey"
+            columns: ["subscription_id"]
             isOneToOne: false
-            referencedRelation: 'subscriptions'
-            referencedColumns: ['id']
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
           },
         ]
       }
       subscriptions: {
         Row: {
-          billing_mode: Database['public']['Enums']['billing_mode']
+          billing_mode: Database["public"]["Enums"]["billing_mode"]
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
           id: string
           org_id: string
-          plan: Database['public']['Enums']['org_plan']
+          plan: Database["public"]["Enums"]["org_plan"]
           seats: number
-          status: Database['public']['Enums']['subscription_status']
+          status: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
-          billing_mode: Database['public']['Enums']['billing_mode']
+          billing_mode: Database["public"]["Enums"]["billing_mode"]
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
           org_id: string
-          plan: Database['public']['Enums']['org_plan']
+          plan: Database["public"]["Enums"]["org_plan"]
           seats?: number
-          status?: Database['public']['Enums']['subscription_status']
+          status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
-          billing_mode?: Database['public']['Enums']['billing_mode']
+          billing_mode?: Database["public"]["Enums"]["billing_mode"]
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
           org_id?: string
-          plan?: Database['public']['Enums']['org_plan']
+          plan?: Database["public"]["Enums"]["org_plan"]
           seats?: number
-          status?: Database['public']['Enums']['subscription_status']
+          status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           trial_ends_at?: string | null
@@ -718,11 +885,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'subscriptions_org_id_fkey'
-            columns: ['org_id']
+            foreignKeyName: "subscriptions_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -765,11 +932,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'topic_runs_topic_id_fkey'
-            columns: ['topic_id']
+            foreignKeyName: "topic_runs_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'topics'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "topic_runs_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -794,18 +968,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'topic_signals_signal_id_fkey'
-            columns: ['signal_id']
+            foreignKeyName: "topic_signals_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'signals'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'topic_signals_topic_id_fkey'
-            columns: ['topic_id']
+            foreignKeyName: "topic_signals_signal_id_fkey"
+            columns: ["signal_id"]
             isOneToOne: false
-            referencedRelation: 'topics'
-            referencedColumns: ['id']
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "topic_signals_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -858,7 +1039,15 @@ export type Database = {
           trend?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "topics_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       usage_records: {
         Row: {
@@ -896,11 +1085,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'usage_records_org_id_fkey'
-            columns: ['org_id']
+            foreignKeyName: "usage_records_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -944,20 +1133,50 @@ export type Database = {
           user_id?: string
           validation_status?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_api_keys_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
-      [_ in never]: never
+      organization_members_view: {
+        Row: {
+          email: string | null
+          joined_at: string | null
+          org_id: string | null
+          role: Database["public"]["Enums"]["org_role"] | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       costs_by_day: {
         Args: { days?: number }
         Returns: {
           day: string
-          task: Database['public']['Enums']['llm_task']
+          task: Database["public"]["Enums"]["llm_task"]
           total_cost: number
         }[]
+      }
+      is_app_admin: { Args: never; Returns: boolean }
+      seed_admin_prompts_for_org: {
+        Args: { target_org_id: string }
+        Returns: undefined
       }
       tokens_summary: {
         Args: { days?: number }
@@ -976,15 +1195,52 @@ export type Database = {
           id: string
         }[]
       }
+      user_default_org_id: { Args: never; Returns: string }
     }
     Enums: {
-      billing_mode: 'maison' | 'byok'
-      llm_task: 'scraping' | 'scoring' | 'monitoring'
-      org_plan: 'solo' | 'pro' | 'enterprise'
-      org_role: 'owner' | 'admin' | 'member' | 'viewer'
-      org_segment: 'vc_pe' | 'legal' | 'newsletter' | 'brand' | 'cto_sme' | 'solo'
-      signal_source: 'reddit' | 'arxiv' | 'x'
-      subscription_status: 'active' | 'past_due' | 'canceled' | 'trialing' | 'incomplete'
+      audit_action:
+        | "settings.update"
+        | "rubric.create"
+        | "rubric.update"
+        | "rubric.delete"
+        | "admin_prompt.create"
+        | "admin_prompt.update"
+        | "admin_prompt.delete"
+        | "admin_prompt.run"
+        | "api_key.create"
+        | "api_key.update"
+        | "api_key.delete"
+        | "member.invite"
+        | "member.accept"
+        | "member.remove"
+        | "member.role_change"
+        | "org.update"
+        | "org.billing_change"
+        | "signal.delete"
+        | "signal.bulk_delete"
+        | "digest.export"
+        | "audit.export"
+        | "pipeline.run"
+        | "pipeline.purge"
+      audit_severity: "info" | "warning" | "critical"
+      billing_mode: "maison" | "byok"
+      llm_task: "scraping" | "scoring" | "monitoring"
+      org_plan: "solo" | "pro" | "enterprise"
+      org_role: "owner" | "admin" | "member" | "viewer"
+      org_segment:
+        | "vc_pe"
+        | "legal"
+        | "newsletter"
+        | "brand"
+        | "cto_sme"
+        | "solo"
+      signal_source: "reddit" | "arxiv" | "x"
+      subscription_status:
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "trialing"
+        | "incomplete"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -992,31 +1248,33 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
-    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -1025,23 +1283,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -1050,23 +1308,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1075,48 +1333,80 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
-    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema['CompositeTypes']
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
-    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
     Enums: {
-      billing_mode: ['maison', 'byok'],
-      llm_task: ['scraping', 'scoring', 'monitoring'],
-      org_plan: ['solo', 'pro', 'enterprise'],
-      org_role: ['owner', 'admin', 'member', 'viewer'],
-      org_segment: ['vc_pe', 'legal', 'newsletter', 'brand', 'cto_sme', 'solo'],
-      signal_source: ['reddit', 'arxiv', 'x'],
-      subscription_status: ['active', 'past_due', 'canceled', 'trialing', 'incomplete'],
+      audit_action: [
+        "settings.update",
+        "rubric.create",
+        "rubric.update",
+        "rubric.delete",
+        "admin_prompt.create",
+        "admin_prompt.update",
+        "admin_prompt.delete",
+        "admin_prompt.run",
+        "api_key.create",
+        "api_key.update",
+        "api_key.delete",
+        "member.invite",
+        "member.accept",
+        "member.remove",
+        "member.role_change",
+        "org.update",
+        "org.billing_change",
+        "signal.delete",
+        "signal.bulk_delete",
+        "digest.export",
+        "audit.export",
+        "pipeline.run",
+        "pipeline.purge",
+      ],
+      audit_severity: ["info", "warning", "critical"],
+      billing_mode: ["maison", "byok"],
+      llm_task: ["scraping", "scoring", "monitoring"],
+      org_plan: ["solo", "pro", "enterprise"],
+      org_role: ["owner", "admin", "member", "viewer"],
+      org_segment: ["vc_pe", "legal", "newsletter", "brand", "cto_sme", "solo"],
+      signal_source: ["reddit", "arxiv", "x"],
+      subscription_status: [
+        "active",
+        "past_due",
+        "canceled",
+        "trialing",
+        "incomplete",
+      ],
     },
   },
 } as const
