@@ -181,7 +181,7 @@ export default function Settings() {
             {/* Onglet 3 : Sources */}
             <TabsContent value="sources" className="space-y-6 pt-8">
               <SectionHeader
-                title="Sources de donnees"
+                title="Sources de données"
                 description="Gérez les flux d'informations alimentant votre moteur d'IA Kairos."
               />
 

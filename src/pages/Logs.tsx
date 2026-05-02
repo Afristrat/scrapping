@@ -42,7 +42,7 @@ export default function Logs() {
       <header>
         <h2 className="text-on-surface text-3xl font-bold tracking-tight">Logs</h2>
         <p className="text-on-surface-variant mt-1 text-sm">
-          Actions recentes du pipeline. Auto-refresh 30s. Purges automatiquement apres 24h.
+          Actions récentes du pipeline. Auto-refresh 30 s. Purges automatiques après 24 h.
         </p>
       </header>
 
