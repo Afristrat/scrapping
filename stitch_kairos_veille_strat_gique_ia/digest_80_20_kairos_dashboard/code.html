@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos AI - Digest</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#85f8c4",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary-fixed-variant": "#7f2928",
+                        "on-background": "#0d1c2e",
+                        "secondary-fixed": "#dbe1ff",
+                        "primary-container": "#00855d",
+                        "on-error": "#ffffff",
+                        "outline-variant": "#bccac0",
+                        "on-secondary": "#ffffff",
+                        "on-primary-container": "#f5fff7",
+                        "surface-container": "#e6eeff",
+                        "surface-bright": "#f8f9ff",
+                        "surface-variant": "#d5e3fc",
+                        "inverse-surface": "#233144",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "secondary-container": "#316bf3",
+                        "on-surface-variant": "#3d4a42",
+                        "error-container": "#ffdad6",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed": "#ffdad7",
+                        "surface-dim": "#ccdbf3",
+                        "on-primary-fixed-variant": "#005137",
+                        "surface-container-low": "#eff4ff",
+                        "tertiary-fixed-dim": "#ffb3ae",
+                        "tertiary": "#9b3e3b",
+                        "outline": "#6d7a72",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#dce9ff",
+                        "on-tertiary-container": "#fffbff",
+                        "on-tertiary-fixed": "#410004",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "primary": "#006948",
+                        "inverse-primary": "#68dba9",
+                        "surface-tint": "#006c4a",
+                        "primary-fixed-dim": "#68dba9",
+                        "on-surface": "#0d1c2e",
+                        "tertiary-container": "#ba5551",
+                        "surface": "#f8f9ff",
+                        "secondary": "#0051d5",
+                        "on-secondary-container": "#fefcff",
+                        "on-primary-fixed": "#002114",
+                        "on-secondary-fixed": "#00174b",
+                        "surface-container-highest": "#d5e3fc",
+                        "on-tertiary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "background": "#f8f9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit-base": "4px",
+                        "max-width-marketing": "1152px",
+                        "max-width-dashboard": "1280px",
+                        "margin-page": "2rem",
+                        "stack-sm": "8px",
+                        "stack-lg": "24px",
+                        "gutter": "1.5rem",
+                        "stack-md": "16px"
+                    },
+                    "fontFamily": {
+                        "h2-4xl": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "h1-6xl": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h3-2xl": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h2-4xl": ["36px", { "lineHeight": "2.5rem", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "1.25rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "1rem", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "h1-6xl": ["60px", { "lineHeight": "1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.75rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h3-2xl": ["24px", { "lineHeight": "2rem", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-slate-50 dark:bg-slate-900 font-inter antialiased text-sm font-medium h-screen w-64 fixed left-0 top-0 border-r border-r border-slate-200 dark:border-slate-800 flex flex-col h-full py-6 z-50">
+<div class="px-6 mb-8 flex items-center gap-3">
+<img alt="Kairos Brand Logo" class="w-8 h-8 rounded-lg" data-alt="A minimalist, highly stylized geometric icon representing a stylized eye or radar in shades of emerald green and deep navy blue. It signifies monitoring and intelligence. The aesthetic is clean, corporate, and precise, suitable for a high-end B2B AI dashboard logo." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+<div>
+<div class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Kairos AI</div>
+<div class="text-xs text-slate-500">Enterprise Monitoring</div>
+</div>
+</div>
+<div class="flex-1 px-4 space-y-1">
+<!-- Dashboard (Inactive) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 opacity-90 transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+<!-- Digest (Active) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-r-2 border-emerald-600 transition-colors duration-200 opacity-90 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_stories</span>
+<span>Digest</span>
+</a>
+<!-- Sources (Inactive) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 opacity-90 transition-all" href="#">
+<span class="material-symbols-outlined">source</span>
+<span>Sources</span>
+</a>
+<!-- Alertes (Inactive) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 opacity-90 transition-all" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span>Alertes</span>
+</a>
+</div>
+<div class="px-4 mt-auto">
+<!-- Paramètres (Inactive) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 opacity-90 transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Paramètres</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col ml-64 w-[calc(100%-16rem)] relative">
+<!-- TopAppBar -->
+<header class="bg-white/80 dark:bg-slate-950/80 backdrop-blur-md font-inter text-base font-semibold fixed top-0 right-0 z-40 border-b border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none flex justify-between items-center h-16 px-8 ml-64 w-[calc(100%-16rem)]">
+<div class="flex items-center gap-4">
+<span class="text-lg font-bold text-slate-900 dark:text-white">Digest</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="pl-9 pr-4 py-1.5 bg-slate-100 border-transparent rounded-full text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all w-64" placeholder="Rechercher..." type="text"/>
+</div>
+<button class="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors rounded-full focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors rounded-full focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<button class="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors rounded-full focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 overflow-y-auto pt-24 px-8 pb-12">
+<div class="max-w-[1280px] mx-auto space-y-8">
+<!-- Header Section -->
+<div>
+<h1 class="font-h2-4xl text-h2-4xl text-on-surface mb-2">Digest 80/20</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Synthèse des signaux qui comptent, dans votre langue.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Config Panel (Left Column) -->
+<div class="lg:col-span-1">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-6 sticky top-28">
+<h2 class="font-h3-2xl text-h3-2xl text-on-surface mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">tune</span>
+                                Configuration
+                            </h2>
+<div class="space-y-6">
+<!-- Langue -->
+<div>
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-2">LANGUE CIBLE</label>
+<select class="w-full bg-surface border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors">
+<option selected="" value="fr">Français</option>
+<option value="en">English</option>
+<option value="es">Español</option>
+</select>
+</div>
+<!-- Période -->
+<div>
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-2">PÉRIODE D'ANALYSE</label>
+<div class="grid grid-cols-3 gap-2">
+<button class="bg-primary-container text-on-primary-container py-2 rounded-lg text-sm font-medium border border-transparent">24h</button>
+<button class="bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-variant py-2 rounded-lg text-sm font-medium transition-colors">7j</button>
+<button class="bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-variant py-2 rounded-lg text-sm font-medium transition-colors">30j</button>
+</div>
+</div>
+<!-- Score -->
+<div>
+<label class="flex justify-between items-center font-label-caps text-label-caps text-on-surface-variant mb-2">
+<span>SCORE DE PERTINENCE MINIMUM</span>
+<span class="text-primary font-bold">80</span>
+</label>
+<input class="w-full h-2 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary" max="100" min="0" type="range" value="80"/>
+<div class="flex justify-between text-xs text-on-surface-variant mt-1">
+<span>Bruit</span>
+<span>Signaux forts</span>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary font-medium py-3 rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 mt-4 shadow-sm focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:outline-none">
+<span class="material-symbols-outlined text-sm">magic_button</span>
+                                    Générer le brief
+                                </button>
+</div>
+</div>
+</div>
+<!-- Brief Area (Right Column) -->
+<div class="lg:col-span-2 space-y-6">
+<!-- Current Brief Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant overflow-hidden flex flex-col">
+<!-- Brief Header -->
+<div class="border-b border-outline-variant p-6 bg-surface-bright flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface">Brief Stratégique</h3>
+<span class="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed text-xs font-bold uppercase tracking-wider">Généré</span>
+</div>
+<p class="text-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">calendar_today</span>
+                                        24 Octobre 2023, 08:30 • Période: 24h
+                                    </p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-variant transition-colors tooltip" title="Copier">
+<span class="material-symbols-outlined text-[20px]">content_copy</span>
+</button>
+<button class="p-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-variant transition-colors tooltip" title="Export PDF">
+<span class="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+</button>
+<button class="p-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-variant transition-colors tooltip" title="Envoyer par Email">
+<span class="material-symbols-outlined text-[20px]">mail</span>
+</button>
+</div>
+</div>
+<!-- Brief Content (Markdown-like prose) -->
+<div class="p-8 bg-surface-container-lowest flex-1 prose prose-slate max-w-none">
+<h4>Résumé Exécutif</h4>
+<p>Sur les dernières 24 heures, <strong>142 signaux</strong> ont été analysés. L'activité est dominée par des annonces concurrentielles majeures dans le secteur de l'IA générative et des ajustements réglementaires imminents en Europe.</p>
+<h4>Top Signaux (Score &gt; 80)</h4>
+<ul>
+<li><strong>Acquisition Stratégique:</strong> TechCorp a annoncé l'acquisition de DataSight pour 2.4B€, consolidant leur position sur l'analyse prédictive. <em>(Score: 95)</em></li>
+<li><strong>Réglementation EU:</strong> Le projet de loi AI Act a passé sa dernière révision en commission, imposant de nouvelles contraintes sur les modèles fondateurs d'ici Q3. <em>(Score: 92)</em></li>
+<li><strong>Vulnérabilité Sécurité:</strong> Une faille zero-day identifiée dans le framework open-source largement utilisé 'TensorFlow-lite'. Un patch d'urgence est recommandé. <em>(Score: 88)</em></li>
+</ul>
+<h4>Tendances Émergentes</h4>
+<p>On observe une augmentation de 45% des discussions autour de "l'IA frugale" et de l'optimisation des coûts d'inférence, suggérant un pivot du marché vers l'efficience énergétique.</p>
+</div>
+<!-- Brief Footer Technicals -->
+<div class="bg-surface px-6 py-3 border-t border-outline-variant flex items-center justify-between text-xs text-on-surface-variant">
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">psychology</span> GPT-4 (Kairos-tuned)</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">data_object</span> 4,250 tokens</span>
+</div>
+<div class="font-mono text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">payments</span>
+                                    Coût: 0.12€
+                                </div>
+</div>
+</div>
+<!-- History Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
+<div class="p-5 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
+<h3 class="font-h3-2xl text-lg font-semibold text-on-surface">Historique des Générations</h3>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm text-on-surface">
+<thead class="bg-surface font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant">
+<tr>
+<th class="px-6 py-3 font-semibold">Date</th>
+<th class="px-6 py-3 font-semibold">Langue</th>
+<th class="px-6 py-3 font-semibold">Signaux Analysés</th>
+<th class="px-6 py-3 font-semibold">Coût</th>
+<th class="px-6 py-3 font-semibold text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 whitespace-nowrap">23 Oct, 08:00</td>
+<td class="px-6 py-4"><span class="px-2 py-1 bg-surface-variant text-on-surface-variant rounded text-xs">Français</span></td>
+<td class="px-6 py-4">128</td>
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">0.11€</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary-container font-medium text-sm flex items-center justify-end w-full gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    Voir <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 whitespace-nowrap">22 Oct, 08:00</td>
+<td class="px-6 py-4"><span class="px-2 py-1 bg-surface-variant text-on-surface-variant rounded text-xs">English</span></td>
+<td class="px-6 py-4">156</td>
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">0.14€</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary-container font-medium text-sm flex items-center justify-end w-full gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    Voir <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 whitespace-nowrap">21 Oct, 14:30</td>
+<td class="px-6 py-4"><span class="px-2 py-1 bg-surface-variant text-on-surface-variant rounded text-xs">Français</span></td>
+<td class="px-6 py-4">89 (Urgence)</td>
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">0.08€</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary-container font-medium text-sm flex items-center justify-end w-full gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    Voir <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

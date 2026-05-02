@@ -82,7 +82,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
         'Support email 48 h',
       ],
       ctaLabel: 'Configurer mon offre',
-      ctaTo: '/signup?next=/dashboard',
+      ctaTo: '/pricing',
       ctaVariant: 'default',
       seatPricing: {
         base: 399,
@@ -149,7 +149,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
         'Support email 48 h',
       ],
       ctaLabel: 'Configurer mon offre',
-      ctaTo: '/signup?next=/dashboard',
+      ctaTo: '/pricing',
       ctaVariant: 'default',
       seatPricing: {
         base: 699,

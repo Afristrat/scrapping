@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos - Configuration des sources</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-container": "#fefcff",
+                      "on-error-container": "#93000a",
+                      "on-secondary-fixed-variant": "#003ea8",
+                      "tertiary": "#9b3e3b",
+                      "on-surface": "#0d1c2e",
+                      "on-primary-fixed": "#002114",
+                      "error": "#ba1a1a",
+                      "on-secondary": "#ffffff",
+                      "on-primary-container": "#f5fff7",
+                      "surface-bright": "#f8f9ff",
+                      "inverse-primary": "#68dba9",
+                      "on-surface-variant": "#3d4a42",
+                      "outline-variant": "#bccac0",
+                      "on-tertiary": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "secondary-fixed": "#dbe1ff",
+                      "secondary-fixed-dim": "#b4c5ff",
+                      "surface": "#f8f9ff",
+                      "primary-fixed": "#85f8c4",
+                      "on-tertiary-container": "#fffbff",
+                      "surface-container": "#e6eeff",
+                      "tertiary-container": "#ba5551",
+                      "secondary": "#0051d5",
+                      "surface-container-low": "#eff4ff",
+                      "on-error": "#ffffff",
+                      "surface-container-lowest": "#ffffff",
+                      "on-tertiary-fixed-variant": "#7f2928",
+                      "surface-tint": "#006c4a",
+                      "on-tertiary-fixed": "#410004",
+                      "surface-variant": "#d5e3fc",
+                      "surface-dim": "#ccdbf3",
+                      "surface-container-high": "#dce9ff",
+                      "secondary-container": "#316bf3",
+                      "primary-container": "#00855d",
+                      "inverse-on-surface": "#eaf1ff",
+                      "tertiary-fixed-dim": "#ffb3ae",
+                      "tertiary-fixed": "#ffdad7",
+                      "on-secondary-fixed": "#00174b",
+                      "on-primary-fixed-variant": "#005137",
+                      "primary-fixed-dim": "#68dba9",
+                      "inverse-surface": "#233144",
+                      "background": "#f8f9ff",
+                      "surface-container-highest": "#d5e3fc",
+                      "outline": "#6d7a72",
+                      "on-background": "#0d1c2e",
+                      "on-primary": "#ffffff",
+                      "primary": "#006948"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-page": "2rem",
+                      "unit-base": "4px",
+                      "gutter": "1.5rem",
+                      "stack-sm": "8px",
+                      "max-width-marketing": "1152px",
+                      "max-width-dashboard": "1280px",
+                      "stack-md": "16px",
+                      "stack-lg": "24px"
+              },
+              "fontFamily": {
+                      "h1-6xl": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "h3-2xl": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "h2-4xl": [
+                              "Inter"
+                      ],
+                      "label-caps": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "h1-6xl": [
+                              "60px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.25rem",
+                                      "letterSpacing": "0",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "h3-2xl": [
+                              "24px",
+                              {
+                                      "lineHeight": "2rem",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "1.75rem",
+                                      "letterSpacing": "0",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "h2-4xl": [
+                              "36px",
+                              {
+                                      "lineHeight": "2.5rem",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "1rem",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5rem",
+                                      "letterSpacing": "0",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full flex flex-col justify-between py-6 h-screen w-64 border-r border-outline-variant bg-surface-container-lowest text-on-surface">
+<div>
+<div class="px-6 mb-8 flex items-center gap-3">
+<img alt="Kairos Logo" class="w-8 h-8 rounded-DEFAULT" data-alt="Minimalist emerald green Kairos brand logo representing AI monitoring and precision on a light background." src="data:image/png;base64,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"/>
+<div>
+<span class="font-label-caps text-primary tracking-widest block">KAIROS</span>
+<span class="font-body-sm text-on-surface-variant block">AI Enterprise</span>
+</div>
+</div>
+<ul class="space-y-1 px-4">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+<span class="font-body-sm font-medium">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-container-high text-primary border-r-4 border-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">database</span>
+<span class="font-body-sm font-medium">Sources</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">analytics</span>
+<span class="font-body-sm font-medium">Analyses</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+<span class="font-body-sm font-medium">Paramètres</span>
+</a>
+</li>
+</ul>
+</div>
+<div class="px-4">
+<ul class="space-y-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">help</span>
+<span class="font-body-sm font-medium">Aide</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">logout</span>
+<span class="font-body-sm font-medium">Déconnexion</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="ml-64 flex-1 overflow-y-auto p-8">
+<div class="max-w-max-width-dashboard mx-auto space-y-stack-lg">
+<!-- Page Header -->
+<header class="flex justify-between items-end mb-stack-lg">
+<div>
+<h1 class="font-h2-4xl text-on-surface">Configuration des sources</h1>
+<p class="font-body-md text-on-surface-variant mt-2">Gérez les flux d'informations alimentant votre moteur d'IA Kairos.</p>
+</div>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Add Source Form (Bento Layout Left) -->
+<section class="lg:col-span-5 bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-6">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+<h2 class="font-h3-2xl text-on-surface">Ajouter une source</h2>
+</div>
+<form class="space-y-stack-md">
+<div>
+<label class="block font-label-caps text-on-surface-variant mb-1" for="sourceName">Nom de la source</label>
+<input class="w-full bg-surface border border-outline-variant rounded-DEFAULT px-4 py-2 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all" id="sourceName" placeholder="Ex: TechCrunch RSS" type="text"/>
+</div>
+<div>
+<label class="block font-label-caps text-on-surface-variant mb-1" for="sourceType">Type de source</label>
+<select class="w-full bg-surface border border-outline-variant rounded-DEFAULT px-4 py-2 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all" id="sourceType">
+<option>Flux RSS</option>
+<option>LinkedIn (Company/Profile)</option>
+<option>Twitter (X) List/Account</option>
+<option>Newsletter (Email Inbox)</option>
+</select>
+</div>
+<div>
+<label class="block font-label-caps text-on-surface-variant mb-1" for="sourceUrl">URL ou Identifiant</label>
+<input class="w-full bg-surface border border-outline-variant rounded-DEFAULT px-4 py-2 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all" id="sourceUrl" placeholder="https://..." type="text"/>
+</div>
+<div>
+<label class="block font-label-caps text-on-surface-variant mb-1" for="sourceCriteria">Critères spécifiques de l'IA</label>
+<textarea class="w-full bg-surface border border-outline-variant rounded-DEFAULT px-4 py-2 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all" id="sourceCriteria" placeholder="Ex: Filtrer uniquement les articles parlant d'IA générative et de B2B..." rows="3"></textarea>
+<p class="font-body-sm text-outline mt-1 text-xs">Ces instructions guideront l'analyse sémantique de Kairos.</p>
+</div>
+<button class="w-full bg-primary text-on-primary font-body-md font-medium py-2 px-4 rounded-DEFAULT hover:bg-primary-container hover:text-on-primary-container transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary shadow-sm flex items-center justify-center gap-2" type="button">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">save</span>
+                            Enregistrer la source
+                        </button>
+</form>
+</section>
+<!-- Active Sources List (Bento Layout Right) -->
+<section class="lg:col-span-7 space-y-stack-md">
+<div class="flex items-center justify-between mb-4">
+<h2 class="font-h3-2xl text-on-surface">Sources actives</h2>
+<span class="bg-surface-container-high text-on-surface font-label-caps px-2 py-1 rounded-full">3 config.</span>
+</div>
+<!-- Source Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-6 flex items-start justify-between group hover:border-primary-fixed-dim transition-colors">
+<div class="flex gap-4">
+<div class="bg-surface-container-high p-3 rounded-DEFAULT text-primary flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">rss_feed</span>
+</div>
+<div>
+<h3 class="font-body-lg font-semibold text-on-surface">Hacker News AI Feed</h3>
+<p class="font-body-sm text-on-surface-variant line-clamp-1">https://hnrss.org/newest?q=AI</p>
+<div class="mt-2 flex gap-2">
+<span class="bg-surface-container text-on-surface-variant font-label-caps px-2 py-1 rounded-DEFAULT text-xs">Tech</span>
+<span class="bg-surface-container text-on-surface-variant font-label-caps px-2 py-1 rounded-DEFAULT text-xs">Fréquence: Haute</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<!-- Toggle Switch -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-outline-variant rounded-full peer peer-focus:ring-2 peer-focus:ring-primary peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+<!-- Delete Button -->
+<button class="text-outline hover:text-error transition-colors focus:outline-none focus:ring-2 focus:ring-error rounded-DEFAULT p-1">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">delete</span>
+</button>
+</div>
+</div>
+<!-- Source Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-6 flex items-start justify-between group hover:border-primary-fixed-dim transition-colors">
+<div class="flex gap-4">
+<div class="bg-surface-container-low p-3 rounded-DEFAULT text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">work</span>
+</div>
+<div>
+<h3 class="font-body-lg font-semibold text-on-surface">LinkedIn B2B Leaders</h3>
+<p class="font-body-sm text-on-surface-variant line-clamp-1">List ID: 8934271</p>
+<div class="mt-2 flex gap-2">
+<span class="bg-surface-container text-on-surface-variant font-label-caps px-2 py-1 rounded-DEFAULT text-xs">Réseau</span>
+<span class="bg-surface-container text-on-surface-variant font-label-caps px-2 py-1 rounded-DEFAULT text-xs">Filtre: "Lancement"</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<!-- Toggle Switch -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-outline-variant rounded-full peer peer-focus:ring-2 peer-focus:ring-primary peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+<button class="text-outline hover:text-error transition-colors focus:outline-none focus:ring-2 focus:ring-error rounded-DEFAULT p-1">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">delete</span>
+</button>
+</div>
+</div>
+<!-- Source Card 3 (Inactive State) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-6 flex items-start justify-between group hover:border-primary-fixed-dim transition-colors opacity-75">
+<div class="flex gap-4">
+<div class="bg-surface-container p-3 rounded-DEFAULT text-outline flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">mail</span>
+</div>
+<div>
+<h3 class="font-body-lg font-semibold text-outline">Newsletter AI Weekly</h3>
+<p class="font-body-sm text-outline-variant line-clamp-1">inbox: ai-weekly@kairos.ai</p>
+<div class="mt-2 flex gap-2">
+<span class="bg-surface-container text-outline font-label-caps px-2 py-1 rounded-DEFAULT text-xs">Email</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<!-- Toggle Switch -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-outline-variant rounded-full peer peer-focus:ring-2 peer-focus:ring-primary peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+<button class="text-outline hover:text-error transition-colors focus:outline-none focus:ring-2 focus:ring-error rounded-DEFAULT p-1">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">delete</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+</body></html>

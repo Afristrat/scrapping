@@ -1,0 +1,322 @@
+# =============================================================================
+# Kairos — Bundle Docker Compose Enterprise (self-hosted)
+# =============================================================================
+# Add-on Enterprise (+499 EUR/an). Permet aux clients de déployer Kairos
+# entièrement sur leur infrastructure (data residency, air-gapped, etc.).
+#
+# Services :
+#   - postgres            : Postgres 17 (db Supabase)
+#   - supabase-auth       : GoTrue (magic link auth)
+#   - supabase-rest       : PostgREST (auto-API depuis le schéma)
+#   - supabase-storage    : Storage API (assets branding, etc.)
+#   - supabase-functions  : Runtime Deno pour les edge functions
+#   - supabase-studio     : UI admin Supabase
+#   - supabase-meta       : Meta API utilisée par Studio
+#   - minio               : S3 storage (backend du Storage API)
+#   - kairos-frontend     : nginx servant le bundle Vite + reverse proxy
+#
+# Lancement :
+#   ./scripts/enterprise-setup.sh           # 1er démarrage (interactif)
+#   docker compose -f docker-compose.enterprise.yml up -d
+#
+# Prérequis : Docker Engine 24+, 8 Go RAM, 50 Go disque libres.
+# Voir docs/enterprise/self-host.md pour la documentation complète.
+# =============================================================================
+
+name: kairos-enterprise
+
+services:
+  # ---------------------------------------------------------------------------
+  # Postgres : base de données principale + extensions
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: supabase/postgres:15.8.1.060
+    container_name: kairos-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      JWT_EXP: 3600
+    ports:
+      - "${POSTGRES_PORT:-54322}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d/migrations:ro
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_min_messages=fatal
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # GoTrue : authentication (magic link, JWT)
+  # ---------------------------------------------------------------------------
+  supabase-auth:
+    image: supabase/gotrue:v2.180.1
+    container_name: kairos-auth
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL:-http://localhost:8080}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-http://localhost:8080}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_MAILER_AUTOCONFIRM: ${MAILER_AUTOCONFIRM:-false}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:?SMTP_HOST requis pour magic link}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-admin@kairos.local}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Kairos}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # PostgREST : auto-API REST sur le schéma public
+  # ---------------------------------------------------------------------------
+  supabase-rest:
+    image: postgrest/postgrest:v12.2.13
+    container_name: kairos-rest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      PGRST_DB_SCHEMAS: public,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # Storage API : files (branding, exports CSV, etc.)
+  # ---------------------------------------------------------------------------
+  supabase-storage:
+    image: supabase/storage-api:v1.14.5
+    container_name: kairos-storage
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:5000/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      ANON_KEY: ${ANON_KEY:?ANON_KEY requis}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY:?SERVICE_ROLE_KEY requis}
+      POSTGREST_URL: http://supabase-rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: s3
+      GLOBAL_S3_BUCKET: ${MINIO_BUCKET:-kairos}
+      GLOBAL_S3_ENDPOINT: http://minio:9000
+      GLOBAL_S3_PROTOCOL: http
+      GLOBAL_S3_FORCE_PATH_STYLE: "true"
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?MINIO_ROOT_USER requis}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD requis}
+      AWS_DEFAULT_REGION: ${MINIO_REGION:-us-east-1}
+      TENANT_ID: stub
+      REGION: ${MINIO_REGION:-us-east-1}
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://imgproxy:5001
+    volumes:
+      - storage-data:/var/lib/storage
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # Edge Functions runtime (Deno)
+  # ---------------------------------------------------------------------------
+  supabase-functions:
+    image: supabase/edge-runtime:v1.67.4
+    container_name: kairos-functions
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      VERIFY_JWT: "true"
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      APIFY_TOKEN: ${APIFY_TOKEN:-}
+    volumes:
+      - ./supabase/functions:/home/deno/functions:ro
+    command: ["start", "--main-service", "/home/deno/functions/main"]
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # Supabase Meta : utilisée par Studio pour introspection
+  # ---------------------------------------------------------------------------
+  supabase-meta:
+    image: supabase/postgres-meta:v0.91.4
+    container_name: kairos-meta
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: postgres
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # Supabase Studio : UI admin (DB explorer, SQL editor, Auth users)
+  # Exposée uniquement sur le réseau interne — accès via VPN/reverse proxy
+  # ---------------------------------------------------------------------------
+  supabase-studio:
+    image: supabase/studio:2025.10.07-sha-c33fb89
+    container_name: kairos-studio
+    restart: unless-stopped
+    depends_on:
+      supabase-meta:
+        condition: service_started
+    environment:
+      STUDIO_PG_META_URL: http://supabase-meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DEFAULT_ORGANIZATION_NAME: ${ORG_NAME:-Kairos Enterprise}
+      DEFAULT_PROJECT_NAME: ${PROJECT_NAME:-kairos}
+      SUPABASE_URL: http://localhost:${KONG_PORT:-8000}
+      SUPABASE_PUBLIC_URL: ${SITE_URL:-http://localhost:8080}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "${STUDIO_PORT:-54323}:3000"
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # Kong : API gateway (route /auth/v1, /rest/v1, /storage/v1, /functions/v1)
+  # ---------------------------------------------------------------------------
+  kong:
+    image: kong:3.9.0
+    container_name: kairos-kong
+    restart: unless-stopped
+    depends_on:
+      - supabase-auth
+      - supabase-rest
+      - supabase-storage
+      - supabase-functions
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    ports:
+      - "${KONG_PORT:-8000}:8000"
+      - "${KONG_HTTPS_PORT:-8443}:8443"
+    volumes:
+      - ./docker/kong.yml:/var/lib/kong/kong.yml:ro
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # MinIO : object storage S3-compatible (backend du Storage API)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: kairos-minio
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER requis}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD requis}
+      MINIO_REGION_NAME: ${MINIO_REGION:-us-east-1}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - kairos-net
+
+  # ---------------------------------------------------------------------------
+  # Frontend Kairos : nginx servant dist + reverse proxy vers Kong
+  # ---------------------------------------------------------------------------
+  kairos-frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_SUPABASE_URL: ${SITE_URL:-http://localhost:8080}
+        VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
+    image: kairos-frontend:enterprise
+    container_name: kairos-frontend
+    restart: unless-stopped
+    depends_on:
+      - kong
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    networks:
+      - kairos-net
+
+# =============================================================================
+# Réseaux
+# =============================================================================
+networks:
+  kairos-net:
+    driver: bridge
+
+# =============================================================================
+# Volumes persistants
+# =============================================================================
+# Backup recommandé : voir docs/enterprise/self-host.md § Backup/Restore
+# =============================================================================
+volumes:
+  postgres-data:
+    name: kairos-postgres-data
+  storage-data:
+    name: kairos-storage-data
+  minio-data:
+    name: kairos-minio-data

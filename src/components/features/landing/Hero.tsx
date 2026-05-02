@@ -1,4 +1,4 @@
-import { ArrowRight, PlayCircle, Sparkles } from 'lucide-react'
+import { ArrowRight, BookOpen, PlayCircle, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,12 @@ export function Hero({ demoCtaTo, demoCtaLabel }: HeroProps): React.ReactElement
               <Link to={demoCtaTo}>
                 <PlayCircle className="h-4 w-4" aria-hidden="true" />
                 {demoCtaLabel}
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="ghost" className="gap-2">
+              <Link to="/case-studies">
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
+                Voir nos case studies
               </Link>
             </Button>
           </div>

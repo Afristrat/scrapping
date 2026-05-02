@@ -114,6 +114,68 @@ export function buildSkuId(segment: KairosSegment, billingMode: KairosBillingMod
 }
 
 /**
+ * Inverse de `buildSkuId` : décompose un `kairos_sku` (`<segment_alias>_<billing_mode>`)
+ * en `{ segment, billing_mode }` typés (KairosSegment + KairosBillingMode).
+ *
+ * Utile pour les edge functions consommatrices du webhook Stripe : la
+ * subscription Stripe transporte uniquement `metadata.kairos_sku` ; on doit
+ * en re-extraire le segment/billing pour synchroniser la table
+ * `subscriptions` (colonnes `plan`, `billing_mode`, etc.).
+ *
+ * @throws si le SKU ne matche aucune combinaison connue (signal d'un SKU
+ *   ajouté côté Stripe sans mise à jour du catalogue local).
+ */
+export function splitSku(skuId: string): {
+  segment: KairosSegment
+  billing_mode: KairosBillingMode
+} {
+  // Reverse map : alias Stripe → segment Kairos
+  const aliasToSegment: Record<string, KairosSegment> = {
+    solo: 'solo',
+    cto: 'cto_sme',
+    newsletter: 'newsletter',
+    brand: 'brand',
+    legal: 'legal',
+    vc: 'vc_pe',
+  }
+  // On extrait le suffix billing_mode (dernier underscore) pour gérer
+  // proprement les segments multi-mots (aucun aujourd'hui mais sûr pour le
+  // futur).
+  const lastUnderscore = skuId.lastIndexOf('_')
+  if (lastUnderscore < 1 || lastUnderscore === skuId.length - 1) {
+    throw new Error(`splitSku : invalid kairos_sku format '${skuId}'`)
+  }
+  const aliasPart = skuId.slice(0, lastUnderscore)
+  const billingPart = skuId.slice(lastUnderscore + 1)
+
+  const segment = aliasToSegment[aliasPart]
+  if (!segment) {
+    throw new Error(`splitSku : unknown segment alias '${aliasPart}' in sku '${skuId}'`)
+  }
+  if (billingPart !== 'maison' && billingPart !== 'byok') {
+    throw new Error(`splitSku : invalid billing_mode '${billingPart}' in sku '${skuId}'`)
+  }
+  return { segment, billing_mode: billingPart }
+}
+
+/**
+ * Mappe un segment Kairos → plan d'organisation (`org_plan`).
+ *
+ * Convention :
+ *  - `solo`              → plan `solo`
+ *  - `cto_sme`           → plan `pro`
+ *  - `newsletter`/`brand`/`legal`/`vc_pe` → plan `enterprise`
+ *
+ * Utilisé par le webhook Stripe pour pré-remplir `subscriptions.plan` lors
+ * d'un sync `customer.subscription.{created,updated}`.
+ */
+export function planForSegment(segment: KairosSegment): 'solo' | 'pro' | 'enterprise' {
+  if (segment === 'solo') return 'solo'
+  if (segment === 'cto_sme') return 'pro'
+  return 'enterprise'
+}
+
+/**
  * Vérifie une signature webhook Stripe et parse l'event. Helper de base
  * pour la future edge fn `stripe-webhook` (story S6-StripeWebhook).
  *
