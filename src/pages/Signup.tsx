@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useCheckout } from '@/hooks/useCheckout'
+import { looseEmailRegex, normalizeEmail } from '@/lib/email-utils'
 import { ADDONS, type AddonId, type BillingMode, BASE_PRICES, type Segment } from '@/lib/pricing'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
@@ -22,7 +23,10 @@ import { useAuthStore } from '@/stores/auth'
 
 const schema = z
   .object({
-    email: z.string().email('Adresse email invalide'),
+    email: z
+      .string()
+      .min(3, 'Adresse email invalide')
+      .regex(looseEmailRegex, 'Adresse email invalide'),
     password: z.string().min(8, 'Au moins 8 caractères').max(100),
     confirm: z.string(),
   })
@@ -149,8 +153,9 @@ export default function Signup(): React.ReactElement {
   }
 
   async function onSubmit(values: FormValues): Promise<void> {
+    const email = normalizeEmail(values.email)
     const { error } = await supabase.auth.signUp({
-      email: values.email,
+      email,
       password: values.password,
       options: { emailRedirectTo: `${window.location.origin}${nextPath}` },
     })
