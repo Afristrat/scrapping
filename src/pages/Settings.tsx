@@ -1,20 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AdminPromptsConfig } from '@/components/features/AdminPromptsConfig'
-import { ApiKeyForm } from '@/components/features/ApiKeyForm'
+import { ApiKeysConfig } from '@/components/features/ApiKeysConfig'
 import { ApifyConfigForm } from '@/components/features/ApifyConfigForm'
-import { ProvidersConfig } from '@/components/features/ProvidersConfig'
 import { BrandingForm } from '@/components/features/BrandingForm'
 import { ModelCascadeSelect, type ModelChoice } from '@/components/features/ModelCascadeSelect'
 import { RubricsManager } from '@/components/features/RubricsManager'
 import { SourcePrioritySliders } from '@/components/features/SourcePrioritySliders'
 import { TagInput } from '@/components/features/TagInput'
-import { useApiKeys } from '@/hooks/useApiKeys'
 import { useSettings } from '@/hooks/useSettings'
 import { useUpdateSettings } from '@/hooks/useUpdateSettings'
 import {
@@ -26,7 +24,6 @@ import {
 
 export default function Settings() {
   const { data: settings } = useSettings()
-  const { data: apiKeys } = useApiKeys()
   const updateMutation = useUpdateSettings()
 
   const {
@@ -34,7 +31,6 @@ export default function Settings() {
     handleSubmit,
     register,
     setValue,
-    watch,
     formState: { isDirty, errors },
   } = useForm<SettingsFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,15 +58,15 @@ export default function Settings() {
       : undefined,
   })
 
-  const sourcePriority = watch('source_priority')
-  const apifyConfig = watch('apify_config')
-  const watchedModelConfig = watch('model_config')
+  // useWatch est stable côté React Compiler (vs watch() qui force des
+  // re-renders non mémorisables — règle react-hooks/incompatible-library).
+  const sourcePriority = useWatch({ control, name: 'source_priority' })
+  const apifyConfig = useWatch({ control, name: 'apify_config' })
+  const watchedModelConfig = useWatch({ control, name: 'model_config' })
 
   const onSubmit = (values: SettingsFormValues) => {
     updateMutation.mutate(values)
   }
-
-  const apifyKey = apiKeys?.find((k) => k.provider === 'apify')
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-6">
@@ -94,7 +90,7 @@ export default function Settings() {
                 <CardTitle>Modèles par tâche (BYOK)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Choisis un provider puis un modèle pour chaque tâche. Les modèles sont chargés
                   depuis l'onglet "Clés API" via "Refresh models" pour chaque provider configuré.
                 </p>
@@ -171,7 +167,7 @@ export default function Settings() {
 
                 <div className="space-y-1.5">
                   <Label>Topic seeds</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Liste de topics de référence utilisée par le classifier. Le LLM peut aussi
                     proposer des topics émergents en plus.
                   </p>
@@ -200,22 +196,7 @@ export default function Settings() {
 
           {/* Onglet 4 : Cles API */}
           <TabsContent value="api-keys" className="space-y-4 pt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Providers LLM (BYOK)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ProvidersConfig />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Apify (scraping)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ApiKeyForm provider="apify" existingKey={apifyKey} label="Apify" />
-              </CardContent>
-            </Card>
+            <ApiKeysConfig />
           </TabsContent>
 
           {/* Onglet 5 : Branding & Budget */}
