@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react'
 import { useEffect } from 'react'
 import { DEFAULT_BRANDING, useSettings } from '@/hooks/useSettings'
+import { OrgSelector } from './OrgSelector'
 
 export function BrandedHeader() {
   const { data: settings } = useSettings()
@@ -29,6 +30,11 @@ export function BrandedHeader() {
         </div>
       )}
       <h1 className="text-lg font-semibold text-slate-900">{branding.name}</h1>
+
+      <div className="ml-3 h-6 w-px bg-slate-200" aria-hidden="true" />
+      <OrgSelector />
+
+      <div className="flex-1" />
     </header>
   )
 }
