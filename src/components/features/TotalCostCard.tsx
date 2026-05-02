@@ -1,4 +1,5 @@
 import { TrendingDown, TrendingUp, Minus, Wallet } from 'lucide-react'
+import { useFormatCost } from '@/hooks/useFormatCost'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export function TotalCostCard({ total7d, delta }: Props) {
+  const formatCost = useFormatCost()
   const Icon = delta > 1 ? TrendingUp : delta < -1 ? TrendingDown : Minus
   const deltaColor =
     delta > 1 ? 'text-tertiary' : delta < -1 ? 'text-primary' : 'text-on-surface-variant'
@@ -20,7 +22,7 @@ export function TotalCostCard({ total7d, delta }: Props) {
         Coût total · 7 derniers jours
       </p>
       <div className="mt-2 flex items-baseline gap-3">
-        <p className="text-on-surface text-4xl font-bold tracking-tight">${total7d.toFixed(4)}</p>
+        <p className="text-on-surface text-4xl font-bold tracking-tight">{formatCost(total7d)}</p>
         <p className={cn('flex items-center gap-1 text-sm font-medium', deltaColor)}>
           <Icon className="h-4 w-4" />
           {delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`}

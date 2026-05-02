@@ -9,6 +9,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { CostByDayRow, LLMTask } from '@/hooks/useLLMCosts'
+import { useFormatCost } from '@/hooks/useFormatCost'
 
 // Material You — palette Kairos (cf. Wave 7.3 design tokens)
 const TASK_COLORS: Record<LLMTask, string> = {
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export function CostChart({ data }: Props) {
+  const formatCost = useFormatCost()
   if (!data || data.length === 0) {
     return (
       <div className="border-outline-variant bg-surface-container-low text-on-surface-variant rounded-xl border border-dashed p-12 text-center text-sm">
@@ -49,10 +51,10 @@ export function CostChart({ data }: Props) {
           <YAxis
             tick={{ fontSize: 11, fill: '#3d4a42' }}
             stroke="#bccac0"
-            tickFormatter={(v) => `$${Number(v).toFixed(3)}`}
+            tickFormatter={(v) => formatCost(Number(v), 3)}
           />
           <Tooltip
-            formatter={(v) => `$${Number(v).toFixed(5)}`}
+            formatter={(v) => formatCost(Number(v), 5)}
             contentStyle={{
               backgroundColor: '#233144',
               border: 'none',
