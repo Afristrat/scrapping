@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos - La solution de veille IA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#9b3e3b",
+                        "primary-fixed": "#85f8c4",
+                        "tertiary-container": "#ba5551",
+                        "on-tertiary-container": "#fffbff",
+                        "on-secondary-container": "#fefcff",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#006c4a",
+                        "surface-dim": "#ccdbf3",
+                        "on-primary": "#ffffff",
+                        "surface-container-high": "#dce9ff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-container-highest": "#d5e3fc",
+                        "on-tertiary-fixed": "#410004",
+                        "on-surface-variant": "#3d4a42",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary": "#0051d5",
+                        "surface": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "outline-variant": "#bccac0",
+                        "inverse-surface": "#233144",
+                        "outline": "#6d7a72",
+                        "background": "#f8f9ff",
+                        "secondary-container": "#316bf3",
+                        "surface-variant": "#d5e3fc",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "on-error": "#ffffff",
+                        "primary-container": "#00855d",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed": "#ffdad7",
+                        "surface-container": "#e6eeff",
+                        "primary": "#006948",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface": "#0d1c2e",
+                        "on-primary-container": "#f5fff7",
+                        "tertiary-fixed-dim": "#ffb3ae",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed-variant": "#7f2928",
+                        "on-primary-fixed-variant": "#005137",
+                        "on-background": "#0d1c2e",
+                        "primary-fixed-dim": "#68dba9",
+                        "inverse-primary": "#68dba9",
+                        "on-secondary-fixed": "#00174b",
+                        "surface-bright": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#002114",
+                        "secondary-fixed": "#dbe1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "1.5rem",
+                        "stack-sm": "8px",
+                        "max-width-dashboard": "1280px",
+                        "stack-md": "16px",
+                        "max-width-marketing": "1152px",
+                        "margin-page": "2rem",
+                        "unit-base": "4px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "h1-6xl": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h3-2xl": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "h2-4xl": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h1-6xl": ["60px", { "lineHeight": "1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.75rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h3-2xl": ["24px", { "lineHeight": "2rem", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-caps": ["12px", { "lineHeight": "1rem", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "h2-4xl": ["36px", { "lineHeight": "2.5rem", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "1.25rem", "letterSpacing": "0", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased">
+<!-- TopAppBar -->
+<header class="bg-surface-container-lowest/80 dark:bg-slate-950/80 backdrop-blur-md font-body-md antialiased sticky top-0 w-full z-50 border-b border-outline-variant shadow-sm text-on-surface">
+<div class="max-w-max-width-marketing mx-auto flex justify-between items-center px-6 h-16">
+<div class="flex items-center gap-8">
+<a class="text-2xl font-h3-2xl tracking-tighter text-on-background flex items-center gap-2" href="#">
+<img alt="Kairos Logo" class="w-8 h-8 rounded" data-alt="A small, crisp, modern logo mark for an AI SaaS company named Kairos. The logo uses a vibrant emerald green #10b981 primary color set against a dark slate background #0f172a, emphasizing precision and technological advancement. It features a minimalist geometric design hinting at time and data processing." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+                    Kairos
+                </a>
+<nav class="hidden md:flex gap-6">
+<a class="text-primary font-body-md font-semibold border-b-2 border-primary py-5" href="#">Platform</a>
+<a class="text-on-surface-variant font-body-md font-medium hover:text-primary transition-all duration-200" href="#">Solutions</a>
+<a class="text-on-surface-variant font-body-md font-medium hover:text-primary transition-all duration-200" href="#">Resources</a>
+<a class="text-on-surface-variant font-body-md font-medium hover:text-primary transition-all duration-200" href="#">Pricing</a>
+</nav>
+</div>
+<div class="hidden md:flex items-center gap-4">
+<a class="text-on-surface-variant font-body-md font-medium hover:text-primary transition-all duration-200" href="#">Login</a>
+<a class="bg-primary text-on-primary px-4 py-2 rounded-lg font-body-md font-medium hover:bg-primary-container transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">Get Started</a>
+</div>
+<button class="md:hidden text-on-surface-variant">
+<span class="material-symbols-outlined text-3xl">menu</span>
+</button>
+</div>
+</header>
+<main>
+<!-- PROBLEM SECTION -->
+<section class="w-full bg-slate-900 text-white py-24 px-6 relative overflow-hidden">
+<!-- Background Texture/Gradient Overlay -->
+<div class="absolute inset-0 bg-gradient-to-br from-emerald-900/20 to-slate-900 z-0 pointer-events-none"></div>
+<div class="max-w-4xl mx-auto text-center relative z-10">
+<p class="text-emerald-400 font-label-caps uppercase tracking-wider mb-stack-md">Le problème</p>
+<h2 class="font-h2-4xl text-h2-4xl mb-stack-md">90 % de bruit, 10 % de signal, 100 % de fatigue.</h2>
+<p class="font-body-lg text-body-lg text-slate-300 mb-stack-lg max-w-3xl mx-auto">
+                    Chaque jour : ~30 nouveaux papiers arXiv en IA, ~50 lancements produits sur X, des centaines de fils Reddit. Aucun outil de veille générique ne comprend ce qui compte POUR VOTRE équipe.
+                </p>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12 border-t border-slate-700/50 pt-12">
+<div class="flex flex-col items-center">
+<span class="text-emerald-400 font-h2-4xl text-4xl mb-2">~30</span>
+<span class="text-slate-400 font-body-sm text-sm">papiers / jour</span>
+<span class="text-slate-500 font-body-sm text-xs mt-1">arXiv cs.AI cs.LG cs.CL</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-emerald-400 font-h2-4xl text-4xl mb-2">~50</span>
+<span class="text-slate-400 font-body-sm text-sm">lancements / jour</span>
+<span class="text-slate-500 font-body-sm text-xs mt-1">X listes IA tier 1</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-emerald-400 font-h2-4xl text-4xl mb-2">18</span>
+<span class="text-slate-400 font-body-sm text-sm">subs · 35+ communautés</span>
+<span class="text-slate-500 font-body-sm text-xs mt-1">Reddit sélectionnés</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SOLUTION SECTION -->
+<section class="w-full bg-slate-50 py-24 px-6">
+<div class="max-w-max-width-marketing mx-auto">
+<div class="text-center mb-16">
+<p class="text-slate-500 font-label-caps uppercase tracking-wider mb-stack-md">La solution Kairos</p>
+<h2 class="font-h2-4xl text-h2-4xl text-on-surface">3 étapes pour transformer le bruit en signal qualifié.</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- Card 1 -->
+<div class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm transition-all duration-300 hover:border-emerald-300 hover:shadow-md flex flex-col items-start group">
+<div class="bg-emerald-100 p-4 rounded-lg mb-6 text-emerald-600 group-hover:bg-emerald-200 transition-colors">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">filter_alt</span>
+</div>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-stack-sm">1. Agrégation</h3>
+<p class="font-body-md text-body-md text-slate-600 leading-relaxed">
+                            X via listes dédiées, Reddit via subs paramétrables, arXiv via catégories sélectionnées. Ajoutez vos propres flux RSS et listes privées.
+                        </p>
+</div>
+<!-- Card 2 -->
+<div class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm transition-all duration-300 hover:border-emerald-300 hover:shadow-md flex flex-col items-start group">
+<div class="bg-emerald-100 p-4 rounded-lg mb-6 text-emerald-600 group-hover:bg-emerald-200 transition-colors">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">tune</span>
+</div>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-stack-sm">2. Scoring custom</h3>
+<p class="font-body-md text-body-md text-slate-600 leading-relaxed">
+                            Définissez votre rubrique de scoring. Choisissez le LLM : Sonnet inclus OU vos propres clés (OpenAI, Anthropic, etc.).
+                        </p>
+</div>
+<!-- Card 3 -->
+<div class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm transition-all duration-300 hover:border-emerald-300 hover:shadow-md flex flex-col items-start group">
+<div class="bg-emerald-100 p-4 rounded-lg mb-6 text-emerald-600 group-hover:bg-emerald-200 transition-colors">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">newspaper</span>
+</div>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-stack-sm">3. Digest 80/20</h3>
+<p class="font-body-md text-body-md text-slate-600 leading-relaxed">
+                            Brief quotidien automatique en français, anglais ou espagnol. Cascade transversale Compose Engine.
+                        </p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest font-body-sm text-body-sm text-on-surface-variant w-full py-12 border-t border-outline-variant">
+<div class="max-w-max-width-marketing mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="font-h3-2xl text-on-background font-bold tracking-tight text-lg">Kairos</div>
+<p class="text-center md:text-left text-slate-500">© 2024 Kairos AI. All rights reserved. Precision in every moment.</p>
+<nav class="flex gap-6">
+<a class="text-slate-500 hover:text-primary transition-opacity duration-200 hover:underline decoration-emerald-500 underline-offset-4" href="#">Privacy Policy</a>
+<a class="text-slate-500 hover:text-primary transition-opacity duration-200 hover:underline decoration-emerald-500 underline-offset-4" href="#">Terms of Service</a>
+<a class="text-slate-500 hover:text-primary transition-opacity duration-200 hover:underline decoration-emerald-500 underline-offset-4" href="#">Security</a>
+<a class="text-slate-500 hover:text-primary transition-opacity duration-200 hover:underline decoration-emerald-500 underline-offset-4" href="#">Contact</a>
+</nav>
+</div>
+</footer>
+</body></html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Logs - Kairos AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#002114",
+                        "surface": "#f8f9ff",
+                        "on-secondary-container": "#fefcff",
+                        "surface-tint": "#006c4a",
+                        "secondary-container": "#316bf3",
+                        "on-primary-fixed-variant": "#005137",
+                        "surface-bright": "#f8f9ff",
+                        "on-surface-variant": "#3d4a42",
+                        "tertiary": "#9b3e3b",
+                        "on-tertiary-fixed": "#410004",
+                        "tertiary-fixed": "#ffdad7",
+                        "surface-container-low": "#eff4ff",
+                        "surface-container-highest": "#d5e3fc",
+                        "secondary-fixed": "#dbe1ff",
+                        "secondary": "#0051d5",
+                        "on-secondary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed": "#00174b",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#68dba9",
+                        "surface-container": "#e6eeff",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "on-tertiary-fixed-variant": "#7f2928",
+                        "error-container": "#ffdad6",
+                        "primary-fixed": "#85f8c4",
+                        "inverse-on-surface": "#eaf1ff",
+                        "outline": "#6d7a72",
+                        "outline-variant": "#bccac0",
+                        "surface-container-high": "#dce9ff",
+                        "on-background": "#0d1c2e",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#d5e3fc",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "primary": "#006948",
+                        "on-surface": "#0d1c2e",
+                        "surface-dim": "#ccdbf3",
+                        "background": "#f8f9ff",
+                        "on-primary-container": "#f5fff7",
+                        "primary-container": "#00855d",
+                        "tertiary-fixed-dim": "#ffb3ae",
+                        "inverse-surface": "#233144",
+                        "primary-fixed-dim": "#68dba9",
+                        "tertiary-container": "#ba5551",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-container-lowest": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "stack-lg": "24px",
+                        "margin-page": "2rem",
+                        "max-width-dashboard": "1280px",
+                        "stack-md": "16px",
+                        "max-width-marketing": "1152px",
+                        "unit-base": "4px",
+                        "gutter": "1.5rem"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "h3-2xl": ["Inter"],
+                        "h1-6xl": ["Inter"],
+                        "h2-4xl": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["12px", { "lineHeight": "1rem", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.75rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "1.25rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h3-2xl": ["24px", { "lineHeight": "2rem", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "h1-6xl": ["60px", { "lineHeight": "1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h2-4xl": ["36px", { "lineHeight": "2.5rem", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body-md h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="hidden lg:flex flex-col fixed left-0 top-0 h-full p-4 gap-2 bg-slate-50 dark:bg-slate-950 text-emerald-600 dark:text-emerald-400 font-sans text-sm font-medium h-screen w-64 border-r border-slate-200 dark:border-slate-800 flat no shadows z-40">
+<div class="flex items-center gap-3 mb-6 px-2">
+<img alt="Organization Logo" class="w-8 h-8 rounded-full border border-slate-200" data-alt="A small, crisp logo graphic representing a modern enterprise AI organization, featuring a stylized letter K or geometric brain in vibrant emerald green and dark slate gray, set against a pristine white background with sharp, clean edges. The lighting is flat and even." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+<div>
+<div class="text-lg font-black text-emerald-600 dark:text-emerald-500">Enterprise View</div>
+<div class="text-xs text-slate-500">AI Monitoring Tier</div>
+</div>
+</div>
+<button class="bg-primary hover:bg-on-primary-fixed-variant text-on-primary rounded-xl py-2 px-4 flex items-center justify-center gap-2 mb-4 transition-colors font-body-sm font-semibold shadow-sm">
+<span class="material-symbols-outlined text-sm">add</span> New Monitor
+        </button>
+<div class="flex-1 overflow-y-auto space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-100 transition-all focus:ring-2 focus:ring-emerald-500 outline-none" href="#">
+<span class="material-symbols-outlined">dashboard</span> Dashboard
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-100 transition-all focus:ring-2 focus:ring-emerald-500 outline-none" href="#">
+<span class="material-symbols-outlined">list_alt</span> Activity Logs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20 hover:text-slate-900 dark:hover:text-slate-100 transition-all focus:ring-2 focus:ring-emerald-500 outline-none" href="#">
+<span class="material-symbols-outlined">monitoring</span> Logs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-100 transition-all focus:ring-2 focus:ring-emerald-500 outline-none" href="#">
+<span class="material-symbols-outlined">extension</span> Integrations
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-100 transition-all focus:ring-2 focus:ring-emerald-500 outline-none" href="#">
+<span class="material-symbols-outlined">query_stats</span> Analytics
+            </a>
+</div>
+<div class="mt-auto border-t border-slate-200 dark:border-slate-800 pt-2 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-100 transition-all focus:ring-2 focus:ring-emerald-500 outline-none" href="#">
+<span class="material-symbols-outlined">help_outline</span> Help Center
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-100 transition-all focus:ring-2 focus:ring-emerald-500 outline-none" href="#">
+<span class="material-symbols-outlined">manage_accounts</span> Account
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 lg:ml-64 flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md text-emerald-600 dark:text-emerald-400 font-sans antialiased text-sm docked full-width top-0 border-b border-slate-200 dark:border-slate-800 z-40 shadow-sm sticky top-0 w-full h-16 flex items-center justify-between px-6 z-50">
+<div class="flex items-center md:hidden">
+<span class="material-symbols-outlined text-2xl cursor-pointer">menu</span>
+</div>
+<div class="text-xl font-bold tracking-tight text-slate-900 dark:text-white md:hidden">Kairos AI</div>
+<div class="flex-1 max-w-md mx-4 hidden md:flex items-center relative">
+<span class="material-symbols-outlined absolute left-3 text-slate-400">search</span>
+<input class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-colors" placeholder="Search..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors active:scale-95 duration-150 p-2 rounded-full">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors active:scale-95 duration-150 p-2 rounded-full">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<img alt="User profile" class="w-8 h-8 rounded-full border border-slate-200 cursor-pointer" data-alt="A tiny square avatar image for a user profile showing a generic human silhouette in a modern minimal style, colored with slate gray and soft emerald highlights, typical of an enterprise dashboard top bar." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 overflow-y-auto p-6 md:p-8">
+<div class="max-w-max-width-dashboard mx-auto">
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-stack-lg gap-4">
+<div>
+<h1 class="font-h3-2xl text-on-surface">Logs</h1>
+<p class="font-body-sm text-on-surface-variant">Activité des dernières 24 heures</p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 rounded-lg border border-outline text-on-surface hover:bg-surface-variant transition-colors font-body-sm font-semibold flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">content_copy</span> Copier les logs
+                        </button>
+<button class="px-4 py-2 rounded-lg text-error hover:bg-error-container transition-colors font-body-sm font-semibold flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">delete</span> Tout supprimer
+                        </button>
+</div>
+</div>
+<!-- Filters -->
+<div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-outline-variant mb-stack-lg flex flex-col md:flex-row gap-4">
+<div class="flex flex-1 gap-4">
+<select class="form-select bg-surface border-outline-variant rounded-lg text-body-sm text-on-surface focus:ring-primary focus:border-primary flex-1">
+<option>Status: Tous</option>
+<option>Status: OK</option>
+<option>Status: Erreur</option>
+<option>Status: Warning</option>
+</select>
+<select class="form-select bg-surface border-outline-variant rounded-lg text-body-sm text-on-surface focus:ring-primary focus:border-primary flex-1">
+<option>Action: Toutes</option>
+<option>Action: scoring</option>
+<option>Action: scraping</option>
+<option>Action: monitoring</option>
+<option>Action: dispatch</option>
+<option>Action: admin-prompt</option>
+</select>
+</div>
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-lg">search</span>
+<input class="form-input w-full bg-surface border-outline-variant rounded-lg pl-10 text-body-sm focus:ring-primary focus:border-primary" placeholder="Rechercher dans les logs..." type="text"/>
+</div>
+</div>
+<!-- Log Timeline Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant overflow-hidden">
+<!-- Table Header (Hidden on small screens, visual only) -->
+<div class="hidden md:flex bg-surface-variant px-6 py-3 border-b border-outline-variant text-label-caps text-on-surface-variant">
+<div class="w-32">Status</div>
+<div class="w-48">Action</div>
+<div class="flex-1">Message</div>
+<div class="w-32 text-right">Time</div>
+<div class="w-16"></div>
+</div>
+<div class="divide-y divide-outline-variant">
+<!-- Log Item 1 (OK) -->
+<div class="group px-6 py-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:bg-surface-container-low transition-colors relative">
+<div class="w-32 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-label-caps text-primary">OK</span>
+</div>
+<div class="w-48 font-mono text-sm text-on-surface-variant bg-surface-container py-1 px-2 rounded">scraping</div>
+<div class="flex-1 font-body-sm text-on-surface truncate">Successfully extracted 45 entities from target domain.</div>
+<div class="w-32 font-body-sm text-on-surface-variant md:text-right">il y a 3 min</div>
+<div class="absolute right-6 top-4 md:relative md:top-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 w-16 justify-end">
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined text-sm">content_copy</span></button>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined text-sm">open_in_new</span></button>
+</div>
+</div>
+<!-- Log Item 2 (Error) - Open State -->
+<div class="group px-6 py-4 flex flex-col gap-4 bg-error-container/20 border-l-4 border-error">
+<div class="flex flex-col md:flex-row items-start md:items-center gap-4 relative">
+<div class="w-32 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-label-caps text-error">ERREUR</span>
+</div>
+<div class="w-48 font-mono text-sm text-on-surface-variant bg-surface-container py-1 px-2 rounded">scoring</div>
+<div class="flex-1 font-body-sm text-on-surface font-semibold">Model timeout during inference pipeline.</div>
+<div class="w-32 font-body-sm text-on-surface-variant md:text-right">il y a 15 min</div>
+<div class="absolute right-0 top-0 md:relative md:top-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 w-16 justify-end">
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined text-sm">content_copy</span></button>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined text-sm">open_in_new</span></button>
+</div>
+</div>
+<!-- JSON Details -->
+<details class="w-full mt-2" open="">
+<summary class="font-label-caps text-on-surface-variant cursor-pointer mb-2 hover:text-primary list-none flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">expand_more</span> Payload Details
+                                </summary>
+<div class="bg-inverse-surface text-inverse-on-surface p-4 rounded-lg font-mono text-sm overflow-x-auto">
+<pre><code>{
+  "timestamp": "2023-10-27T10:15:30Z",
+  "level": "ERROR",
+  "service": "scoring-engine-v2",
+  "error_code": "ERR_TIMEOUT_504",
+  "trace_id": "req-987a-b452-11ee",
+  "message": "Upstream model endpoint took longer than 3000ms to respond.",
+  "context": {
+    "model_version": "v4.1.2-beta",
+    "batch_size": 128,
+    "retry_count": 3
+  }
+}</code></pre>
+</div>
+</details>
+</div>
+<!-- Log Item 3 (Warning) -->
+<div class="group px-6 py-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:bg-surface-container-low transition-colors relative">
+<div class="w-32 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="font-label-caps text-tertiary">WARNING</span>
+</div>
+<div class="w-48 font-mono text-sm text-on-surface-variant bg-surface-container py-1 px-2 rounded">monitoring</div>
+<div class="flex-1 font-body-sm text-on-surface truncate">High memory usage detected on node worker-3.</div>
+<div class="w-32 font-body-sm text-on-surface-variant md:text-right">il y a 1 h</div>
+<div class="absolute right-6 top-4 md:relative md:top-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 w-16 justify-end">
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined text-sm">content_copy</span></button>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined text-sm">open_in_new</span></button>
+</div>
+</div>
+</div>
+<div class="bg-surface-variant px-6 py-3 border-t border-outline-variant flex justify-center">
+<button class="text-body-sm font-semibold text-primary hover:text-on-primary-fixed-variant transition-colors">Charger plus de logs</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

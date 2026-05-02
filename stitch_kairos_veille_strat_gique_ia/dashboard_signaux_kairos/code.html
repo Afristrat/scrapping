@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos - Signaux</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "primary-container": "#00855d",
+                "outline": "#6d7a72",
+                "inverse-on-surface": "#eaf1ff",
+                "on-primary-fixed-variant": "#005137",
+                "surface-variant": "#d5e3fc",
+                "on-tertiary-fixed-variant": "#7f2928",
+                "error-container": "#ffdad6",
+                "on-tertiary-container": "#fffbff",
+                "surface-container-high": "#dce9ff",
+                "secondary": "#0051d5",
+                "surface-container": "#e6eeff",
+                "on-secondary": "#ffffff",
+                "on-secondary-fixed-variant": "#003ea8",
+                "secondary-container": "#316bf3",
+                "primary": "#006948",
+                "on-background": "#0d1c2e",
+                "inverse-surface": "#233144",
+                "error": "#ba1a1a",
+                "on-primary-container": "#f5fff7",
+                "surface": "#f8f9ff",
+                "on-primary": "#ffffff",
+                "on-tertiary-fixed": "#410004",
+                "surface-bright": "#f8f9ff",
+                "on-error-container": "#93000a",
+                "on-secondary-container": "#fefcff",
+                "tertiary-container": "#ba5551",
+                "on-tertiary": "#ffffff",
+                "on-secondary-fixed": "#00174b",
+                "surface-container-highest": "#d5e3fc",
+                "background": "#f8f9ff",
+                "secondary-fixed-dim": "#b4c5ff",
+                "inverse-primary": "#68dba9",
+                "tertiary": "#9b3e3b",
+                "surface-container-lowest": "#ffffff",
+                "on-surface-variant": "#3d4a42",
+                "on-surface": "#0d1c2e",
+                "surface-tint": "#006c4a",
+                "tertiary-fixed-dim": "#ffb3ae",
+                "outline-variant": "#bccac0",
+                "on-primary-fixed": "#002114",
+                "tertiary-fixed": "#ffdad7",
+                "primary-fixed": "#85f8c4",
+                "primary-fixed-dim": "#68dba9",
+                "on-error": "#ffffff",
+                "surface-container-low": "#eff4ff",
+                "surface-dim": "#ccdbf3",
+                "secondary-fixed": "#dbe1ff"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "max-width-marketing": "1152px",
+                "unit-base": "4px",
+                "stack-sm": "8px",
+                "max-width-dashboard": "1280px",
+                "gutter": "1.5rem",
+                "stack-md": "16px",
+                "stack-lg": "24px",
+                "margin-page": "2rem"
+        },
+        "fontFamily": {
+                "label-caps": [
+                        "Inter"
+                ],
+                "body-sm": [
+                        "Inter"
+                ],
+                "h1-6xl": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "h3-2xl": [
+                        "Inter"
+                ],
+                "body-md": [
+                        "Inter"
+                ],
+                "h2-4xl": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "label-caps": [
+                        "12px",
+                        {
+                                "lineHeight": "1rem",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "1.25rem",
+                                "letterSpacing": "0",
+                                "fontWeight": "400"
+                        }
+                ],
+                "h1-6xl": [
+                        "60px",
+                        {
+                                "lineHeight": "1",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "1.75rem",
+                                "letterSpacing": "0",
+                                "fontWeight": "400"
+                        }
+                ],
+                "h3-2xl": [
+                        "24px",
+                        {
+                                "lineHeight": "2rem",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "1.5rem",
+                                "letterSpacing": "0",
+                                "fontWeight": "400"
+                        }
+                ],
+                "h2-4xl": [
+                        "36px",
+                        {
+                                "lineHeight": "2.5rem",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex">
+<!-- SideNavBar from JSON -->
+<nav class="bg-surface-container-lowest text-primary flex-col h-screen w-64 fixed left-0 top-0 border-r border-outline-variant shadow-sm z-50 flex py-6 px-4 hidden md:flex">
+<div class="flex items-center gap-3 mb-8 px-2">
+<img alt="Enterprise Logo" class="w-8 h-8 rounded-lg" data-alt="A striking digital installation art piece featuring glowing, generative geometric shapes suspended in a vast, minimalist gallery space. The room is illuminated by high-key, soft white lighting that creates a bright, modern light-mode aesthetic. The artwork relies on a sophisticated palette of deep blacks and pristine whites, punctuated by intense accents of vibrant red. The mood is serene yet technologically advanced." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+<div>
+<h1 class="text-xl font-bold text-primary tracking-tighter">Kairos AI</h1>
+<p class="text-xs text-outline font-medium tracking-tight">Enterprise Monitoring</p>
+</div>
+</div>
+<ul class="flex-1 space-y-2">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-outline hover:bg-surface-variant transition-all duration-200 ease-in-out cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-sans text-sm font-medium tracking-tight">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-variant text-primary border-r-2 border-primary transition-all duration-200 ease-in-out cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">sensors</span>
+<span class="font-sans text-sm font-medium tracking-tight">Signals</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-outline hover:bg-surface-variant transition-all duration-200 ease-in-out cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-sans text-sm font-medium tracking-tight">Alerts</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-outline hover:bg-surface-variant transition-all duration-200 ease-in-out cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-sans text-sm font-medium tracking-tight">Models</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-outline hover:bg-surface-variant transition-all duration-200 ease-in-out cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-sans text-sm font-medium tracking-tight">Settings</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto border-t border-outline-variant pt-4 space-y-2">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-outline hover:bg-surface-variant transition-all duration-200 ease-in-out cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="font-sans text-sm font-medium tracking-tight">Documentation</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-outline hover:bg-surface-variant transition-all duration-200 ease-in-out cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-sans text-sm font-medium tracking-tight">Support</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-64 flex-1 p-margin-page bg-surface min-h-screen">
+<div class="max-w-max-width-dashboard mx-auto space-y-stack-lg relative">
+<!-- Sticky Bulk Bar (Hidden by default, shown for example) -->
+<div class="sticky top-0 z-40 bg-inverse-surface text-on-tertiary-container rounded-lg shadow-md flex items-center justify-between p-4 mb-4">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined cursor-pointer hover:text-outline-variant">close</span>
+<span class="font-body-md text-body-md font-semibold">3 signaux sélectionnés</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-4 py-2 text-sm font-medium bg-inverse-primary text-on-primary-fixed rounded-md hover:opacity-90 transition-opacity">Re-scorer</button>
+<button class="px-4 py-2 text-sm font-medium bg-error-container text-on-error-container rounded-md hover:bg-error/20 transition-colors">Supprimer</button>
+</div>
+</div>
+<!-- Header -->
+<header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h1 class="font-h2-4xl text-h2-4xl text-on-background">Signaux</h1>
+<p class="font-body-md text-body-md text-outline mt-1">Analyse et priorisation des flux de données entrants.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="h-10 px-4 flex items-center justify-center border border-tertiary-container text-tertiary-container rounded-md hover:bg-surface-variant transition-colors font-body-sm text-body-sm font-semibold">Re-scorer</button>
+<button class="h-10 px-4 flex items-center justify-center bg-primary text-on-primary rounded-md hover:bg-primary-container transition-colors shadow-sm font-body-sm text-body-sm font-semibold">Lancer la pipeline</button>
+</div>
+</header>
+<!-- Filters -->
+<section class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-outline-variant flex flex-wrap gap-4 items-center">
+<div class="flex flex-col">
+<label class="font-label-caps text-label-caps text-on-surface-variant mb-1">Source</label>
+<select class="form-select block w-full rounded-md border-outline-variant bg-surface-container-low text-on-surface focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm h-10">
+<option>Toutes les sources</option>
+<option>X (Twitter)</option>
+<option>Reddit</option>
+<option>arXiv</option>
+</select>
+</div>
+<div class="flex flex-col">
+<label class="font-label-caps text-label-caps text-on-surface-variant mb-1">Score</label>
+<select class="form-select block w-full rounded-md border-outline-variant bg-surface-container-low text-on-surface focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm h-10">
+<option>Tous les scores</option>
+<option>&gt; 80 (Critique)</option>
+<option>&gt; 50 (Moyen)</option>
+<option>&lt; 50 (Faible)</option>
+</select>
+</div>
+<div class="flex flex-col">
+<label class="font-label-caps text-label-caps text-on-surface-variant mb-1">Période</label>
+<select class="form-select block w-full rounded-md border-outline-variant bg-surface-container-low text-on-surface focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm h-10">
+<option>Dernières 24h</option>
+<option>Derniers 7 jours</option>
+<option>Ce mois-ci</option>
+</select>
+</div>
+<div class="ml-auto mt-5">
+<button class="text-sm font-medium text-primary hover:text-primary-container flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+                       Plus de filtres
+                   </button>
+</div>
+</section>
+<!-- Table Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant">
+<tr>
+<th class="p-4 w-12"><input checked="" class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></th>
+<th class="p-4 w-24">Score</th>
+<th class="p-4 w-32">Source</th>
+<th class="p-4">Titre</th>
+<th class="p-4 w-32">Date</th>
+<th class="p-4 w-16"></th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm text-on-surface divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-high transition-colors group relative bg-surface-variant/30">
+<td class="p-4"><input checked="" class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="p-4 relative">
+<div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-on-primary font-bold shadow-sm cursor-help peer">
+                                    82
+                                </div>
+<!-- Hover Card Reasoning -->
+<div class="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-64 p-3 bg-inverse-surface text-on-tertiary-container rounded-lg shadow-lg opacity-0 invisible peer-hover:opacity-100 peer-hover:visible transition-all z-50">
+<p class="font-label-caps text-label-caps mb-1 opacity-80">Raisonnement IA</p>
+<p class="text-xs">Forte corrélation sémantique avec la CVE-2023-4567. Mentions d'exploitation active. Source vérifiée avec historique fiable.</p>
+</div>
+</td>
+<td class="p-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary-fixed text-on-secondary-fixed">
+                                    X (Twitter)
+                                </span>
+</td>
+<td class="p-4 max-w-md">
+<p class="truncate group-hover:whitespace-normal transition-all text-on-background font-medium">Nouveau zero-day découvert dans le framework Spring, PoC public disponible sur Github. Impact critique pour les serveurs exposés.</p>
+</td>
+<td class="p-4 text-outline text-xs">Il y a 10 min</td>
+<td class="p-4 text-right">
+<button class="text-error hover:text-on-error-container opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-high transition-colors group">
+<td class="p-4"><input checked="" class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="p-4 relative">
+<div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container font-bold shadow-sm cursor-help peer">
+                                    54
+                                </div>
+</td>
+<td class="p-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-tertiary-fixed text-on-tertiary-fixed">
+                                    Reddit
+                                </span>
+</td>
+<td class="p-4 max-w-md">
+<p class="truncate group-hover:whitespace-normal transition-all text-on-background">Discussion sur des latences anormales sur les instances AWS eu-west-3. Plusieurs utilisateurs rapportent des problèmes similaires depuis 2h.</p>
+</td>
+<td class="p-4 text-outline text-xs">Il y a 2 h</td>
+<td class="p-4 text-right">
+<button class="text-error hover:text-on-error-container opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-high transition-colors group bg-surface-variant/30">
+<td class="p-4"><input checked="" class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="p-4 relative">
+<div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-error-container text-on-error-container font-bold shadow-sm cursor-help peer">
+                                    28
+                                </div>
+</td>
+<td class="p-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-variant text-on-surface-variant">
+                                    arXiv
+                                </span>
+</td>
+<td class="p-4 max-w-md">
+<p class="truncate group-hover:whitespace-normal transition-all text-on-background">Nouvelle méthode d'optimisation pour les modèles LLM utilisant la quantification adaptative. Potentiel de réduction de coût de 30%.</p>
+</td>
+<td class="p-4 text-outline text-xs">Il y a 5 h</td>
+<td class="p-4 text-right">
+<button class="text-error hover:text-on-error-container opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-high transition-colors group">
+<td class="p-4"><input class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="p-4 relative">
+<div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant font-bold border border-outline-variant">
+                                    --
+                                </div>
+</td>
+<td class="p-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary-fixed text-on-secondary-fixed">
+                                    X (Twitter)
+                                </span>
+</td>
+<td class="p-4 max-w-md">
+<p class="truncate group-hover:whitespace-normal transition-all text-on-background">Mise à jour mineure de l'API Stripe prévue pour la semaine prochaine. Changements rétrocompatibles uniquement.</p>
+</td>
+<td class="p-4 text-outline text-xs">Il y a 1 j</td>
+<td class="p-4 text-right">
+<button class="text-error hover:text-on-error-container opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="p-4 border-t border-outline-variant bg-surface-container-low flex items-center justify-between">
+<span class="text-sm text-outline">Affichage de 1-4 sur 120 signaux</span>
+<div class="flex gap-2">
+<button class="px-3 py-1 rounded border border-outline-variant text-sm font-medium hover:bg-surface disabled:opacity-50" disabled="">Précédent</button>
+<button class="px-3 py-1 rounded border border-outline-variant text-sm font-medium hover:bg-surface bg-surface-container-lowest">Suivant</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

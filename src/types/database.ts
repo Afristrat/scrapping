@@ -210,6 +210,56 @@ export type Database = {
           },
         ]
       }
+      csm_onboardings: {
+        Row: {
+          created_at: string
+          csm_user_id: string | null
+          kickoff_done_at: string | null
+          month_1_check_at: string | null
+          notes: string | null
+          nps_score: number | null
+          org_id: string
+          qbr_done_at: string | null
+          started_at: string
+          training_done_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          csm_user_id?: string | null
+          kickoff_done_at?: string | null
+          month_1_check_at?: string | null
+          notes?: string | null
+          nps_score?: number | null
+          org_id: string
+          qbr_done_at?: string | null
+          started_at?: string
+          training_done_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          csm_user_id?: string | null
+          kickoff_done_at?: string | null
+          month_1_check_at?: string | null
+          notes?: string | null
+          nps_score?: number | null
+          org_id?: string
+          qbr_done_at?: string | null
+          started_at?: string
+          training_done_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csm_onboardings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       digests: {
         Row: {
           content: string
@@ -259,6 +309,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      health_checks: {
+        Row: {
+          checked_at: string
+          error: string | null
+          id: number
+          latency_ms: number | null
+          service: Database["public"]["Enums"]["health_service"]
+          status: Database["public"]["Enums"]["health_status"]
+        }
+        Insert: {
+          checked_at?: string
+          error?: string | null
+          id?: number
+          latency_ms?: number | null
+          service: Database["public"]["Enums"]["health_service"]
+          status: Database["public"]["Enums"]["health_status"]
+        }
+        Update: {
+          checked_at?: string
+          error?: string | null
+          id?: number
+          latency_ms?: number | null
+          service?: Database["public"]["Enums"]["health_service"]
+          status?: Database["public"]["Enums"]["health_status"]
+        }
+        Relationships: []
       }
       invitations: {
         Row: {
@@ -1145,6 +1222,19 @@ export type Database = {
       }
     }
     Views: {
+      daily_uptime: {
+        Row: {
+          avg_latency_ms: number | null
+          day: string | null
+          degraded_checks: number | null
+          down_checks: number | null
+          ok_checks: number | null
+          service: Database["public"]["Enums"]["health_service"] | null
+          total_checks: number | null
+          uptime_pct: number | null
+        }
+        Relationships: []
+      }
       organization_members_view: {
         Row: {
           email: string | null
@@ -1224,6 +1314,8 @@ export type Database = {
         | "pipeline.purge"
       audit_severity: "info" | "warning" | "critical"
       billing_mode: "maison" | "byok"
+      health_service: "db" | "minio" | "llm" | "apify"
+      health_status: "ok" | "degraded" | "down"
       llm_task: "scraping" | "scoring" | "monitoring"
       org_plan: "solo" | "pro" | "enterprise"
       org_role: "owner" | "admin" | "member" | "viewer"
@@ -1395,6 +1487,8 @@ export const Constants = {
       ],
       audit_severity: ["info", "warning", "critical"],
       billing_mode: ["maison", "byok"],
+      health_service: ["db", "minio", "llm", "apify"],
+      health_status: ["ok", "degraded", "down"],
       llm_task: ["scraping", "scoring", "monitoring"],
       org_plan: ["solo", "pro", "enterprise"],
       org_role: ["owner", "admin", "member", "viewer"],

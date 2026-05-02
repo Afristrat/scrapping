@@ -134,9 +134,14 @@ export function MarketingLayout(): React.ReactElement {
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-slate-900">
+                  <Link to="/blog" className="hover:text-slate-900">
                     Blog
-                  </a>
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/case-studies" className="hover:text-slate-900">
+                    Case studies
+                  </Link>
                 </li>
                 <li>
                   <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-slate-900">
