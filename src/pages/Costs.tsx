@@ -13,6 +13,7 @@ import {
   useLLMCostsRecent,
   type LLMTask,
 } from '@/hooks/useLLMCosts'
+import { useFormatCost } from '@/hooks/useFormatCost'
 import { useProviderModels } from '@/hooks/useProviderModels'
 import { useSettings } from '@/hooks/useSettings'
 import { useTokensSummary } from '@/hooks/useTokensSummary'
@@ -33,6 +34,7 @@ export default function Costs() {
   const { data: recent, isLoading } = useLLMCostsRecent(period)
   const { data: tokensSummary } = useTokensSummary(period)
   const { data: providerModels } = useProviderModels()
+  const formatCost = useFormatCost()
 
   const totals = useMemo(() => (recent ? computeTotals(recent) : null), [recent])
   const breakdown = useMemo(
@@ -149,8 +151,8 @@ export default function Costs() {
         <div className="border-tertiary-fixed-dim bg-tertiary-fixed text-on-tertiary-fixed flex items-center gap-2 rounded-xl border p-4 text-sm shadow-sm">
           <AlertTriangle className="text-tertiary h-4 w-4 shrink-0" />
           <span>
-            Depense moyenne quotidienne (${avgDaily.toFixed(4)}) depasse le budget de $
-            {dailyBudget.toFixed(2)}/jour de plus de 10%.
+            Depense moyenne quotidienne ({formatCost(avgDaily)}) depasse le budget de{' '}
+            {formatCost(dailyBudget, 2)}/jour de plus de 10%.
           </span>
         </div>
       )}
@@ -172,7 +174,7 @@ export default function Costs() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-on-surface capitalize">{task}</span>
                   <span className="text-on-surface-variant font-mono text-xs">
-                    ${costByTask[task].toFixed(5)}
+                    {formatCost(costByTask[task], 5)}
                   </span>
                 </div>
                 <div className="bg-surface-variant h-3 overflow-hidden rounded-full">
@@ -190,7 +192,7 @@ export default function Costs() {
             )
           })}
           <p className="text-on-surface-variant pt-1 text-right text-xs">
-            Budget quotidien : ${dailyBudget.toFixed(2)}
+            Budget quotidien : {formatCost(dailyBudget, 2)}
           </p>
         </CardContent>
       </Card>
@@ -227,7 +229,7 @@ export default function Costs() {
                         {row.completion_tokens.toLocaleString()}
                       </td>
                       <td className="text-primary px-4 py-3 text-right font-mono text-xs font-semibold">
-                        ${row.total_cost.toFixed(5)}
+                        {formatCost(row.total_cost, 5)}
                       </td>
                     </tr>
                   ))}
@@ -246,8 +248,8 @@ export default function Costs() {
               Tarifs par modele
             </CardTitle>
             <p className="text-on-surface-variant text-xs">
-              Prix unitaires (USD / 1M tokens) tires de provider_models. Actualises via Reglages
-              -&gt; Modeles.
+              Prix unitaires par 1M tokens — tires de provider_models, convertis depuis USD vers
+              votre devise via les taux ECB du jour. Actualises via Reglages -&gt; Modeles.
             </p>
           </CardHeader>
           <CardContent>
@@ -258,8 +260,8 @@ export default function Costs() {
                     <th className="px-4 py-3">Provider</th>
                     <th className="px-4 py-3">Modele</th>
                     <th className="px-4 py-3 text-right">Context</th>
-                    <th className="px-4 py-3 text-right">Input ($/1M)</th>
-                    <th className="px-4 py-3 text-right">Output ($/1M)</th>
+                    <th className="px-4 py-3 text-right">Input / 1M</th>
+                    <th className="px-4 py-3 text-right">Output / 1M</th>
                   </tr>
                 </thead>
                 <tbody className="divide-outline-variant/40 divide-y">
@@ -279,12 +281,12 @@ export default function Costs() {
                       </td>
                       <td className="text-on-surface px-4 py-3 text-right font-mono text-xs">
                         {row.pricing_input_per_1m != null
-                          ? `$${row.pricing_input_per_1m.toFixed(4)}`
+                          ? formatCost(row.pricing_input_per_1m, 4)
                           : '—'}
                       </td>
                       <td className="text-on-surface px-4 py-3 text-right font-mono text-xs">
                         {row.pricing_output_per_1m != null
-                          ? `$${row.pricing_output_per_1m.toFixed(4)}`
+                          ? formatCost(row.pricing_output_per_1m, 4)
                           : '—'}
                       </td>
                     </tr>

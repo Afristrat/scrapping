@@ -1,10 +1,12 @@
 import type { BreakdownRow } from '@/hooks/useLLMCosts'
+import { useFormatCost } from '@/hooks/useFormatCost'
 
 interface Props {
   rows: BreakdownRow[]
 }
 
 export function CostBreakdown({ rows }: Props) {
+  const formatCost = useFormatCost()
   if (rows.length === 0) return null
   return (
     <div className="border-outline-variant bg-surface-container-lowest overflow-hidden rounded-xl border shadow-md">
@@ -28,7 +30,7 @@ export function CostBreakdown({ rows }: Props) {
                 {r.prompt_tokens.toLocaleString()} / {r.completion_tokens.toLocaleString()}
               </td>
               <td className="text-primary px-4 py-3 text-right font-mono text-xs font-semibold">
-                ${r.cost.toFixed(5)}
+                {formatCost(r.cost, 5)}
               </td>
             </tr>
           ))}
