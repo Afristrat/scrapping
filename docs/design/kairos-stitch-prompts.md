@@ -1,12 +1,12 @@
 # Kairos — Prompts Stitch (collection non-monolithique)
 
-> **Outil cible** : [Google Stitch](https://stitch.withgoogle.com) (Gemini 2.5 Flash/Pro, 350 générations/mois Standard, export Figma ou HTML/CSS).
->
-> **Usage** : copier-coller chaque prompt UN À UN dans Stitch. Ne jamais coller plusieurs prompts en bloc — Stitch dilue la qualité au-delà de ~2 000 tokens. Itérer chaque écran indépendamment, exporter, intégrer dans le repo en suivant les conventions React 19 + Vite + TS strict + Tailwind v4 + shadcn/ui.
->
-> **13 prompts** : 7 pour la landing publique, 5 pour les pages auth-protected, 1 pour l'onboarding.
+>   **Outil cible** : [Google Stitch](https://stitch.withgoogle.com) (Gemini 2.5 Flash/Pro, 350 générations/mois Standard, export Figma ou HTML/CSS).
 
----
+>   **Usage** : copier-coller chaque prompt UN À UN dans Stitch. Ne jamais coller plusieurs prompts en bloc — Stitch dilue la qualité au-delà de \~2 000 tokens. Itérer chaque écran indépendamment, exporter, intégrer dans le repo en suivant les conventions React 19 + Vite + TS strict + Tailwind v4 + shadcn/ui.
+
+>   **13 prompts** : 7 pour la landing publique, 5 pour les pages auth-protected, 1 pour l'onboarding.
+
+***
 
 ## Préambule — Système de design Kairos (à inclure dans chaque prompt)
 
@@ -53,7 +53,7 @@ Accessibilité :
 Localisation : tout le contenu textuel est en français, accents inclus (jamais "a" pour "à", jamais "ou" pour "où", etc.). Les chiffres avec espace insécable + symbole € (ex. « 599 € / siège / mois »).
 ```
 
----
+***
 
 ## P01 — Landing Hero
 
@@ -118,7 +118,7 @@ OUTPUT
 Composant React TypeScript fonctionnel, sans dépendance externe autre que lucide-react et react-router-dom (Link). Code strict, pas de "any". Exporter en default ou nommé Hero.
 ```
 
----
+***
 
 ## P02 — Landing Problem + Solution (3 étapes)
 
@@ -192,7 +192,7 @@ OUTPUT
 2 composants React TypeScript : ProblemSection.tsx et SolutionSteps.tsx. Exports nommés.
 ```
 
----
+***
 
 ## P03 — Landing Moats (4 différenciateurs)
 
@@ -266,7 +266,7 @@ OUTPUT
 Composant React TypeScript MoatsSection.tsx, export nommé.
 ```
 
----
+***
 
 ## P04 — Landing Personas (6 cartes par segment)
 
@@ -369,7 +369,7 @@ OUTPUT
 Composant React TypeScript PersonasSection.tsx, export nommé.
 ```
 
----
+***
 
 ## P05 — Landing Pricing Configurator (toggle Maison/BYOK + slider seats dégressif)
 
@@ -501,7 +501,7 @@ OUTPUT
 Composant React TypeScript PricingTable.tsx, complet, autonome (pas de fetch externe). Utiliser shadcn Tabs + Slider + Card + Badge + Button.
 ```
 
----
+***
 
 ## P06 — Landing FAQ
 
@@ -564,7 +564,7 @@ OUTPUT
 Composant React TypeScript FAQSection.tsx, données dans un array, exporté nommé. Pas de framework accordion lourd : <details> natif suffit.
 ```
 
----
+***
 
 ## P07 — Dashboard / Signaux (table avec scoring + tooltips + sticky bar bulk actions)
 
@@ -664,7 +664,7 @@ OUTPUT
 Composant React TypeScript SignalTable.tsx + Dashboard.tsx + ScoreCell.tsx (3 fichiers). Utiliser shadcn Tabs / Card / AlertDialog / HoverCard / Checkbox / Button / Dialog. Utiliser TanStack Query hooks (useSignals, useDeleteSignal, useDeleteSignalsBulk, useRescoreSignal, useRescoreSignalsBulk).
 ```
 
----
+***
 
 ## P08 — Settings (6 onglets : Modèles BYOK, Rubriques, Sources, Clés API, Admin prompts, Branding)
 
@@ -761,7 +761,7 @@ OUTPUT
 Composant React TypeScript Settings.tsx + 6 sous-composants (ModelsTab, RubricsTab, SourcesTab, ApiKeysTab, AdminPromptsTab, BrandingTab). Utiliser shadcn Tabs / Card / Input / Select / Label / Slider / Button / Dialog / AlertDialog.
 ```
 
----
+***
 
 ## P09 — Topics / 4 sections trend (Émergents · Déclin · Stables · Calibrage)
 
@@ -830,7 +830,7 @@ OUTPUT
 Composant React TypeScript Topics.tsx + TopicCard.tsx + Sparkline.tsx (utiliser Recharts). Données mockées au format { name, zScore, volume, avgScore, sparkline: number[], firstSeen, sampleSize }.
 ```
 
----
+***
 
 ## P10 — Digest / Brief 80/20 multi-langue
 
@@ -897,7 +897,7 @@ OUTPUT
 Composant React TypeScript Digest.tsx, utiliser react-markdown + remark-gfm + shadcn Card / Button / Slider / Select. Hook useGenerateDigest pour la mutation.
 ```
 
----
+***
 
 ## P11 — Costs / Coûts par jour, modèle, tâche
 
@@ -966,7 +966,7 @@ OUTPUT
 Composant React TypeScript Costs.tsx, utiliser Recharts (LineChart, PieChart, BarChart, Tooltip, ResponsiveContainer). Hook useCosts.
 ```
 
----
+***
 
 ## P12 — Logs / Activité avec bouton Copier par log
 
@@ -1034,7 +1034,7 @@ OUTPUT
 Composant React TypeScript Logs.tsx + LogEntry.tsx. Hook useLogs (TanStack Query, refetch toutes les 30 s). Pas de Prism : utiliser simple <pre>{JSON.stringify(payload, null, 2)}</pre> dans un code block.
 ```
 
----
+***
 
 ## P13 — Onboarding flow (signup → configurateur segment/seats/Maison-BYOK → first-run)
 
@@ -1126,31 +1126,31 @@ OUTPUT
 4 composants React TypeScript : OnboardingSignup.tsx, OnboardingProfile.tsx, OnboardingConfigurator.tsx, OnboardingFirstRun.tsx + un wrapper OnboardingFlow.tsx avec stepper et state machine simple. Routes /onboarding/{profile|configurator|first-run}.
 ```
 
----
+***
 
 ## Récap & ordre conseillé d'utilisation
 
-1. **Commencez par P05 (Pricing Configurator)** — c'est la pièce maîtresse, et toutes les sections landing dépendent de la cohérence pricing.
-2. **Puis P01 → P02 → P03 → P04 → P06** — landing complète dans l'ordre de scroll.
-3. **Puis P07 → P08** — dashboard et settings (pages les plus visitées).
-4. **Puis P09 → P10 → P11 → P12** — pages secondaires.
-5. **Enfin P13** — onboarding (à itérer après avoir vu le dashboard final pour cohérence visuelle).
+1.  **Commencez par P05 (Pricing Configurator)** — c'est la pièce maîtresse, et toutes les sections landing dépendent de la cohérence pricing.
+2.  **Puis P01 → P02 → P03 → P04 → P06** — landing complète dans l'ordre de scroll.
+3.  **Puis P07 → P08** — dashboard et settings (pages les plus visitées).
+4.  **Puis P09 → P10 → P11 → P12** — pages secondaires.
+5.  **Enfin P13** — onboarding (à itérer après avoir vu le dashboard final pour cohérence visuelle).
 
 Chaque prompt est conçu pour être **autonome** : si vous itérez sur P05, vous n'avez pas besoin de regenerer P01. Stitch garde le design system cohérent grâce au préambule.
 
 ## Workflow Stitch suggéré
 
-1. Ouvrir https://stitch.withgoogle.com (compte Google requis, 350 générations/mois Standard).
-2. Coller le **préambule complet + 1 prompt** (jamais 2 ensemble).
-3. Générer, comparer 2-3 variantes.
-4. Choisir la meilleure variante.
-5. Soit « Paste to Figma » pour itérer côté design, soit « Export Code » pour HTML/CSS.
-6. Adapter le code exporté à React 19 + TS strict + Tailwind v4 + shadcn (déjà dans le repo).
-7. Commit dans `src/components/features/landing/` ou page concernée.
+1.  Ouvrir https://stitch.withgoogle.com (compte Google requis, 350 générations/mois Standard).
+2.  Coller le **préambule complet + 1 prompt** (jamais 2 ensemble).
+3.  Générer, comparer 2-3 variantes.
+4.  Choisir la meilleure variante.
+5.  Soit « Paste to Figma » pour itérer côté design, soit « Export Code » pour HTML/CSS.
+6.  Adapter le code exporté à React 19 + TS strict + Tailwind v4 + shadcn (déjà dans le repo).
+7.  Commit dans `src/components/features/landing/` ou page concernée.
 
 ## Notes finales
 
-- Stitch n'a pas d'API. Tous les prompts sont à coller manuellement.
-- Quota : 350 gen/mois en Standard, plus en Pro. Itérer prudemment.
-- Si une génération est mal cadrée, **réduire le prompt** (enlever les états variantes) plutôt que ré-écrire.
-- Garder les fichiers exportés (HTML/CSS Stitch + screenshots) dans `docs/design/exports/` pour traçabilité.
+-   Stitch n'a pas d'API. Tous les prompts sont à coller manuellement.
+-   Quota : 350 gen/mois en Standard, plus en Pro. Itérer prudemment.
+-   Si une génération est mal cadrée, **réduire le prompt** (enlever les états variantes) plutôt que ré-écrire.
+-   Garder les fichiers exportés (HTML/CSS Stitch + screenshots) dans `docs/design/exports/` pour traçabilité.
