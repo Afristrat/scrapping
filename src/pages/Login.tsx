@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { looseEmailRegex, normalizeEmail } from '@/lib/email-utils'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 
@@ -21,12 +22,12 @@ import { useAuthStore } from '@/stores/auth'
 // =============================================================================
 
 const magicSchema = z.object({
-  email: z.string().email('Adresse email invalide'),
+  email: z.string().min(3, 'Adresse email invalide').regex(looseEmailRegex, 'Adresse email invalide'),
 })
 type MagicValues = z.infer<typeof magicSchema>
 
 const passwordSchema = z.object({
-  email: z.string().email('Adresse email invalide'),
+  email: z.string().min(3, 'Adresse email invalide').regex(looseEmailRegex, 'Adresse email invalide'),
   password: z.string().min(8, 'Au moins 8 caractères'),
 })
 type PasswordValues = z.infer<typeof passwordSchema>
@@ -82,8 +83,9 @@ export default function Login(): React.ReactElement {
   const redirectUrl = `${window.location.origin}${nextPath}`
 
   async function onMagicSubmit(values: MagicValues): Promise<void> {
+    const email = normalizeEmail(values.email)
     const { error } = await supabase.auth.signInWithOtp({
-      email: values.email,
+      email,
       options: { emailRedirectTo: redirectUrl },
     })
     if (error) {
@@ -95,8 +97,9 @@ export default function Login(): React.ReactElement {
   }
 
   async function onPasswordSubmit(values: PasswordValues): Promise<void> {
+    const email = normalizeEmail(values.email)
     const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
+      email,
       password: values.password,
     })
     if (error) {
