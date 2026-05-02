@@ -68,6 +68,11 @@ export const useOrgStore = create<OrgState>()(
     {
       name: 'kairos-org',
       partialize: (s) => ({ currentOrgId: s.currentOrgId }),
+      // Bump à chaque fois qu'on veut invalider tous les localStorage `kairos-org`
+      // existants (ex. après une migration de schéma multi-tenant). Zustand
+      // ignore alors le payload persisté et ré-init `currentOrgId = null`
+      // → le bootstrap `useOrganizations` re-pick la 1re org propre.
+      version: 2,
     },
   ),
 )
