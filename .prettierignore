@@ -6,3 +6,17 @@ supabase/.temp
 supabase/.branches
 *.lock
 bun.lock
+deno.lock
+
+# Fichiers générés (régénérés via Supabase CLI) — ne pas formater
+src/types/database.ts
+
+# Fichiers volumineux qui font OOM prettier sur OneDrive sync (sécurité)
+docs/design/kairos-stitch-prompts.md
+
+# Stripe price catalogs (générés par scripts/stripe-bootstrap.ts)
+stripe-prices.test.json
+stripe-prices.live.json
+
+# Migrations SQL : gérées par Supabase, pas prettier
+supabase/migrations/*.sql

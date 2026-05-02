@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { MarketingLayout } from '@/components/layout/MarketingLayout'
+import AuditLog from '@/pages/AuditLog'
 import Costs from '@/pages/Costs'
 import Dashboard from '@/pages/Dashboard'
 import Digest from '@/pages/Digest'
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
           { path: '/topics', element: <Topics /> },
           { path: '/costs', element: <Costs /> },
           { path: '/settings', element: <Settings /> },
+          { path: '/settings/audit', element: <AuditLog /> },
           { path: '/logs', element: <Logs /> },
           { path: '/monitoring', element: <Navigate to="/costs" replace /> },
         ],
