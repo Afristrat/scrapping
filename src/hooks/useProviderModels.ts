@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 import type { LLMProviderId } from '@/lib/providers'
 
 export interface ProviderModel {
@@ -16,12 +17,15 @@ export interface ProviderModel {
 }
 
 export function useProviderModels() {
+  const orgId = useCurrentOrgId()
   return useQuery<ProviderModel[]>({
-    queryKey: ['provider_models'],
+    queryKey: ['provider_models', orgId],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('provider_models')
         .select('*')
+        .eq('org_id', orgId ?? '')
         .order('provider')
         .order('model_id')
       if (error) throw error

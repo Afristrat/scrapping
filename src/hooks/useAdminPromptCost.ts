@@ -25,6 +25,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useSettings } from '@/hooks/useSettings'
 import { useProviderModels, type ProviderModel } from '@/hooks/useProviderModels'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 import type { AdminPrompt } from '@/hooks/useAdminPrompts'
 
 export const DEFAULT_COMPLETION_TOKENS = 2500
@@ -58,7 +59,8 @@ export function estimateRunCost(
   completionTokens: number
   pricingFound: boolean
 } {
-  const totalChars = (prompt.system_prompt?.length ?? 0) + (prompt.user_prompt_template?.length ?? 0)
+  const totalChars =
+    (prompt.system_prompt?.length ?? 0) + (prompt.user_prompt_template?.length ?? 0)
   const promptTokens = Math.ceil(totalChars / CHARS_PER_TOKEN)
   const completionTokens = DEFAULT_COMPLETION_TOKENS
 
@@ -101,9 +103,8 @@ export function useEstimateRunCost(prompt: AdminPrompt | null): CostEstimate | n
 
     const pricing =
       provider && model
-        ? (providerModels ?? []).find(
-            (pm) => pm.provider === provider && pm.model_id === model,
-          ) ?? null
+        ? ((providerModels ?? []).find((pm) => pm.provider === provider && pm.model_id === model) ??
+          null)
         : null
 
     const { estimatedCost, promptTokens, completionTokens, pricingFound } = estimateRunCost(
@@ -130,12 +131,15 @@ export function useEstimateRunCost(prompt: AdminPrompt | null): CostEstimate | n
 }
 
 /**
- * Total cost depense par l'utilisateur courant aujourd'hui (UTC).
- * RLS s'assure qu'on ne lit que ses propres lignes.
+ * Total cost depense par l'org courante aujourd'hui (UTC).
+ * RLS + filtre explicite `org_id` garantissent qu'on ne lit que les lignes
+ * de l'org active.
  */
 function useTodayLLMCost() {
+  const orgId = useCurrentOrgId()
   return useQuery<number>({
-    queryKey: ['llm_costs', 'today'],
+    queryKey: ['llm_costs', 'today', orgId],
+    enabled: !!orgId,
     staleTime: 60_000,
     queryFn: async () => {
       const start = new Date()
@@ -143,6 +147,7 @@ function useTodayLLMCost() {
       const { data, error } = await supabase
         .from('llm_costs')
         .select('cost')
+        .eq('org_id', orgId ?? '')
         .gte('ts', start.toISOString())
       if (error) throw error
       const rows = (data ?? []) as Array<{ cost: number | string | null }>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 
 export type DigestLanguage = 'fr' | 'en' | 'es'
 
@@ -103,14 +104,17 @@ const HISTORY_LIMIT = 10
  * triés par `generated_at` desc.
  */
 export function useDigests(): ReturnType<typeof useQuery<DigestRow[]>> {
+  const orgId = useCurrentOrgId()
   return useQuery<DigestRow[]>({
-    queryKey: ['digests', 'list'],
+    queryKey: ['digests', 'list', orgId],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('digests')
         .select(
           'id, user_id, generated_at, language, signal_count, min_score, window_hours, content, model_used, cost',
         )
+        .eq('org_id', orgId ?? '')
         .order('generated_at', { ascending: false })
         .limit(HISTORY_LIMIT)
       if (error) throw error
@@ -201,7 +205,6 @@ export function useDeleteDigest(): ReturnType<typeof useMutation<string, Error, 
       toast.success('Brief supprimé')
       qc.invalidateQueries({ queryKey: ['digests'] })
     },
-    onError: (err) =>
-      toast.error('Échec suppression', { description: err.message.slice(0, 240) }),
+    onError: (err) => toast.error('Échec suppression', { description: err.message.slice(0, 240) }),
   })
 }

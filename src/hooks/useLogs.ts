@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 
 export interface LogRow {
   id: number
@@ -11,12 +12,15 @@ export interface LogRow {
 }
 
 export function useLogs() {
+  const orgId = useCurrentOrgId()
   return useQuery<LogRow[]>({
-    queryKey: ['logs'],
+    queryKey: ['logs', orgId],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('logs')
         .select('*')
+        .eq('org_id', orgId ?? '')
         .order('ts', { ascending: false })
         .limit(500)
       if (error) throw error

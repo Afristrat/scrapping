@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 import type { SignalSource } from '@/lib/source-meta'
 
 export type PeriodKey = '24h' | '7j' | '30j' | 'all'
@@ -55,12 +56,15 @@ interface RawSignal {
 }
 
 export function useSignals(filters: SignalFilters) {
+  const orgId = useCurrentOrgId()
   return useQuery<SignalRow[]>({
-    queryKey: ['signals', filters],
+    queryKey: ['signals', orgId, filters],
+    enabled: !!orgId,
     queryFn: async () => {
       let q = supabase
         .from('signals')
         .select('*, scores(score, reasoning, model_used, cost, scored_at)')
+        .eq('org_id', orgId ?? '')
 
       if (filters.sources.length > 0) {
         q = q.in('source', filters.sources)

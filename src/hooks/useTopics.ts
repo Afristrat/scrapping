@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 
 export interface TopicRow {
   id: string
@@ -39,12 +40,15 @@ function computeZ(latestCount: number, mean: number, m2: number, n: number): num
 
 export function useTopics(opts?: { runsLimit?: number }) {
   const runsLimit = opts?.runsLimit ?? 30
+  const orgId = useCurrentOrgId()
   return useQuery<TopicWithRuns[]>({
-    queryKey: ['topics', { runsLimit }],
+    queryKey: ['topics', orgId, { runsLimit }],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data: topics, error: tErr } = await supabase
         .from('topics')
         .select('*')
+        .eq('org_id', orgId ?? '')
         .order('last_seen_at', { ascending: false })
       if (tErr) throw tErr
       if (!topics || topics.length === 0) return []
@@ -52,7 +56,11 @@ export function useTopics(opts?: { runsLimit?: number }) {
       const { data: runs, error: rErr } = await supabase
         .from('topic_runs')
         .select('*')
-        .in('topic_id', topics.map((t: { id: string }) => t.id))
+        .eq('org_id', orgId ?? '')
+        .in(
+          'topic_id',
+          topics.map((t: { id: string }) => t.id),
+        )
         .order('run_at', { ascending: false })
       if (rErr) throw rErr
 
