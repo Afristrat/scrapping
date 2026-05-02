@@ -6,11 +6,17 @@ import { useAdminPrompts } from './useAdminPrompts'
 
 const mockOrder = vi.fn()
 
+vi.mock('@/hooks/useCurrentOrgId', () => ({
+  useCurrentOrgId: () => 'test-org-id',
+}))
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
       select: () => ({
-        order: (...args: unknown[]) => mockOrder(...args),
+        eq: () => ({
+          order: (...args: unknown[]) => mockOrder(...args),
+        }),
       }),
     }),
   },
@@ -24,9 +30,7 @@ function wrapper({ children }: { children: ReactNode }) {
 describe('useAdminPrompts', () => {
   it('fetches admin prompts ordered by display_order', async () => {
     mockOrder.mockResolvedValue({
-      data: [
-        { id: '1', name: 'Reddit', task_kind: 'reddit', is_seed: true, display_order: 10 },
-      ],
+      data: [{ id: '1', name: 'Reddit', task_kind: 'reddit', is_seed: true, display_order: 10 }],
       error: null,
     })
 

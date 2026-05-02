@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 
 export type AdminPromptTaskKind = 'reddit' | 'arxiv' | 'x' | 'synthesis' | 'custom'
 
@@ -47,12 +48,15 @@ export interface AdminPromptUpsertInput {
 }
 
 export function useAdminPrompts() {
+  const orgId = useCurrentOrgId()
   return useQuery<AdminPrompt[]>({
-    queryKey: ['admin_prompts'],
+    queryKey: ['admin_prompts', orgId],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('admin_prompts')
         .select('*')
+        .eq('org_id', orgId ?? '')
         .order('display_order', { ascending: true })
       if (error) throw error
       return (data ?? []) as unknown as AdminPrompt[]
@@ -61,14 +65,16 @@ export function useAdminPrompts() {
 }
 
 export function useAdminPromptRuns(promptId: string | null, limit = 20) {
+  const orgId = useCurrentOrgId()
   return useQuery<AdminPromptRun[]>({
-    queryKey: ['admin_prompt_runs', promptId, limit],
-    enabled: !!promptId,
+    queryKey: ['admin_prompt_runs', orgId, promptId, limit],
+    enabled: !!promptId && !!orgId,
     queryFn: async () => {
       if (!promptId) return []
       const { data, error } = await supabase
         .from('admin_prompt_runs')
         .select('*')
+        .eq('org_id', orgId ?? '')
         .eq('prompt_id', promptId)
         .order('executed_at', { ascending: false })
         .limit(limit)
@@ -83,15 +89,17 @@ export function useAdminPromptRuns(promptId: string | null, limit = 20) {
  * Utilise pour afficher "History (N)" sans charger les outputs.
  */
 export function useAdminPromptRunsCount(promptId: string | null) {
+  const orgId = useCurrentOrgId()
   return useQuery<number>({
-    queryKey: ['admin_prompt_runs_count', promptId],
-    enabled: !!promptId,
+    queryKey: ['admin_prompt_runs_count', orgId, promptId],
+    enabled: !!promptId && !!orgId,
     staleTime: 30_000,
     queryFn: async () => {
       if (!promptId) return 0
       const { count, error } = await supabase
         .from('admin_prompt_runs')
         .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId ?? '')
         .eq('prompt_id', promptId)
       if (error) throw error
       return count ?? 0
@@ -101,13 +109,16 @@ export function useAdminPromptRunsCount(promptId: string | null) {
 
 export function useUpsertAdminPrompt() {
   const qc = useQueryClient()
+  const orgId = useCurrentOrgId()
   return useMutation<AdminPrompt, Error, AdminPromptUpsertInput>({
     mutationFn: async (input) => {
       const userId = useAuthStore.getState().user?.id
       if (!userId) throw new Error('not_authenticated')
+      if (!orgId) throw new Error('no_org_selected')
       const payload = {
         ...(input.id ? { id: input.id } : {}),
         user_id: userId,
+        org_id: orgId,
         name: input.name,
         description: input.description ?? null,
         task_kind: input.task_kind,

@@ -1,8 +1,14 @@
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { BrandedHeader } from './BrandedHeader'
+import { useOrganizations } from '@/hooks/useOrganizations'
 
 export function AppLayout() {
+  // Bootstrap : fetch the user's organizations on every mount of an
+  // auth-protected layout. The hook syncs the result into `useOrgStore`
+  // so all data hooks downstream can read `currentOrgId` reactively.
+  useOrganizations()
+
   return (
     <div className="flex h-screen bg-white">
       <Sidebar />
