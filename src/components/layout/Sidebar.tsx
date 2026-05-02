@@ -34,7 +34,7 @@ export function Sidebar() {
   const { data: isAdmin = false } = useIsAppAdmin()
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-slate-50">
+    <aside className="bg-surface-container-low border-outline-variant flex h-screen w-64 flex-col border-r">
       <nav className="flex-1 space-y-1 p-4">
         {NAV.map(({ to, label, icon: Icon }) => {
           const active = pathname === to
@@ -43,10 +43,10 @@ export function Sidebar() {
               key={to}
               to={to}
               className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 active
-                  ? 'bg-slate-200 font-medium text-slate-900'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                  ? 'bg-primary-fixed text-on-primary-fixed border-primary border-r-2'
+                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface',
               )}
               aria-current={active ? 'page' : undefined}
             >
@@ -58,14 +58,14 @@ export function Sidebar() {
 
         {isAdmin && (
           <>
-            <div className="my-3 border-t border-slate-200" aria-hidden="true" />
+            <div className="border-outline-variant my-3 border-t" aria-hidden="true" />
             <Link
               to="/admin"
               className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 pathname === '/admin'
-                  ? 'bg-emerald-100 font-medium text-emerald-900'
-                  : 'text-emerald-700 hover:bg-emerald-50',
+                  ? 'bg-primary-fixed text-on-primary-fixed border-primary border-r-2'
+                  : 'text-primary hover:bg-primary-fixed/40',
               )}
               aria-current={pathname === '/admin' ? 'page' : undefined}
               title="Réservé aux administrateurs Kairos"
@@ -77,14 +77,14 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="border-t border-slate-200 p-4">
-        <p className="mb-2 truncate text-xs text-slate-500" title={user?.email ?? ''}>
+      <div className="border-outline-variant border-t p-4">
+        <p className="text-on-surface-variant mb-2 truncate text-xs" title={user?.email ?? ''}>
           {user?.email ?? ''}
         </p>
         <Button
           variant="outline"
           size="sm"
-          className="w-full justify-start gap-2"
+          className="border-outline-variant text-on-surface w-full justify-start gap-2"
           onClick={() => signOut()}
         >
           <LogOut className="h-4 w-4" />

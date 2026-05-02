@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
+import { Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -21,6 +21,20 @@ import {
   settingsSchema,
   type SettingsFormValues,
 } from '@/lib/schemas/settings-schema'
+
+const TASK_LABELS: Record<'scoring' | 'scraping' | 'monitoring' | 'digest', string> = {
+  scoring: 'Scoring',
+  scraping: 'Scraping',
+  monitoring: 'Monitoring',
+  digest: 'Digest',
+}
+
+const TASK_DESCRIPTIONS: Record<'scoring' | 'scraping' | 'monitoring' | 'digest', string> = {
+  scoring: 'Évaluation pertinence des signaux',
+  scraping: 'Filtre intelligent sur les flux',
+  monitoring: 'Détection de tendances émergentes',
+  digest: 'Synthèse stratégique 80/20',
+}
 
 export default function Settings() {
   const { data: settings } = useSettings()
@@ -69,36 +83,73 @@ export default function Settings() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-6">
-      <h1 className="text-2xl font-semibold">Parametres</h1>
+    <div className="bg-surface min-h-full">
+      <div className="mx-auto max-w-5xl px-6 py-8">
+        <header className="mb-8">
+          <h1 className="text-on-surface text-3xl font-bold tracking-tight md:text-4xl">
+            Paramètres
+          </h1>
+          <p className="text-on-surface-variant mt-2 text-base">
+            Configurez Kairos selon vos besoins.
+          </p>
+        </header>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <Tabs defaultValue="models">
-          <TabsList className="w-full">
-            <TabsTrigger value="models">Modeles</TabsTrigger>
-            <TabsTrigger value="rubrics">Grilles</TabsTrigger>
-            <TabsTrigger value="sources">Sources</TabsTrigger>
-            <TabsTrigger value="api-keys">Cles API</TabsTrigger>
-            <TabsTrigger value="branding">Branding</TabsTrigger>
-            <TabsTrigger value="admin">Admin</TabsTrigger>
-          </TabsList>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          <Tabs defaultValue="models" className="gap-0">
+            {/* Onglets — style underline Stitch (border-b primary sur active) */}
+            <TabsList className="border-outline-variant flex h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0">
+              {[
+                { value: 'models', label: 'Modèles' },
+                { value: 'rubrics', label: 'Rubriques' },
+                { value: 'sources', label: 'Sources' },
+                { value: 'api-keys', label: 'Clés API' },
+                { value: 'admin', label: 'Prompts Admin' },
+                { value: 'branding', label: 'Branding' },
+              ].map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="text-on-surface-variant hover:text-on-surface data-[state=active]:text-primary data-[state=active]:border-primary -mb-px h-auto rounded-none border-b-2 border-transparent bg-transparent px-1 py-4 text-sm font-medium whitespace-nowrap shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                >
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {/* Onglet 1 : Modeles */}
-          <TabsContent value="models" className="space-y-4 pt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Modèles par tâche (BYOK)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground text-xs">
-                  Choisis un provider puis un modèle pour chaque tâche. Les modèles sont chargés
-                  depuis l'onglet "Clés API" via "Refresh models" pour chaque provider configuré.
-                </p>
+            {/* Onglet 1 : Modèles — grille de cartes par tâche */}
+            <TabsContent value="models" className="space-y-6 pt-8">
+              <SectionHeader
+                title="Modèles par tâche (BYOK)"
+                description="Définissez les modèles d'intelligence artificielle utilisés pour chaque étape du traitement Kairos. Les modèles sont chargés depuis l'onglet « Clés API » via « Modèles » pour chaque provider configuré."
+              />
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {(['scoring', 'scraping', 'monitoring', 'digest'] as const).map((task) => {
                   const cur = (watchedModelConfig ?? {})[task] ?? null
+                  const isActive = !!cur?.provider && !!cur?.model
                   return (
-                    <div key={task} className="space-y-1">
-                      <p className="text-xs font-medium capitalize">{task}</p>
+                    <div
+                      key={task}
+                      className="bg-surface-container-lowest border-outline-variant rounded-xl border p-6 shadow-sm"
+                    >
+                      <div className="mb-4 flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-on-surface text-lg font-semibold">
+                            {TASK_LABELS[task]}
+                          </h3>
+                          <p className="text-on-surface-variant mt-0.5 text-xs">
+                            {TASK_DESCRIPTIONS[task]}
+                          </p>
+                        </div>
+                        <span
+                          className={
+                            isActive
+                              ? 'bg-primary-fixed text-on-primary-fixed inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium'
+                              : 'bg-surface-container-high text-on-surface-variant inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium'
+                          }
+                        >
+                          {isActive ? 'Actif' : 'Non configuré'}
+                        </span>
+                      </div>
                       <ModelCascadeSelect
                         value={(cur as ModelChoice | null) ?? null}
                         onChange={(next) => {
@@ -113,188 +164,256 @@ export default function Settings() {
                     </div>
                   )
                 })}
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
+            </TabsContent>
 
-          {/* Onglet 2 : Grilles de scoring */}
-          <TabsContent value="rubrics" className="space-y-4 pt-4">
-            <RubricsManager activeRubricId={settings?.active_rubric_id ?? null} />
-          </TabsContent>
+            {/* Onglet 2 : Rubriques de scoring */}
+            <TabsContent value="rubrics" className="space-y-6 pt-8">
+              <SectionHeader
+                title="Rubriques de scoring"
+                description="Crée et active les grilles de critères utilisées par le LLM pour évaluer chaque signal."
+              />
+              <SectionCard>
+                <RubricsManager activeRubricId={settings?.active_rubric_id ?? null} />
+              </SectionCard>
+            </TabsContent>
 
-          {/* Onglet 3 : Sources */}
-          <TabsContent value="sources" className="space-y-4 pt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sources de donnees</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label>Subreddits Reddit</Label>
-                  <TagInput
-                    value={settings?.reddit_subs ?? []}
-                    onChange={(next) => setValue('reddit_subs', next, { shouldDirty: true })}
-                    placeholder="ex: MachineLearning"
-                  />
-                  {errors.reddit_subs && (
-                    <p className="text-xs text-red-500">{errors.reddit_subs.message}</p>
-                  )}
+            {/* Onglet 3 : Sources */}
+            <TabsContent value="sources" className="space-y-6 pt-8">
+              <SectionHeader
+                title="Sources de donnees"
+                description="Gérez les flux d'informations alimentant votre moteur d'IA Kairos."
+              />
+
+              <SectionCard>
+                <div className="space-y-5">
+                  <FieldGroup
+                    label="Subreddits Reddit"
+                    error={errors.reddit_subs?.message}
+                    help="Liste de subreddits scrapés via Apify."
+                  >
+                    <TagInput
+                      value={settings?.reddit_subs ?? []}
+                      onChange={(next) => setValue('reddit_subs', next, { shouldDirty: true })}
+                      placeholder="ex : MachineLearning"
+                    />
+                  </FieldGroup>
+
+                  <FieldGroup
+                    label="Catégories arXiv"
+                    error={errors.arxiv_categories?.message}
+                    help="Catégories arXiv (ex : cs.AI, cs.CL) interrogées via l'API officielle."
+                  >
+                    <TagInput
+                      value={settings?.arxiv_categories ?? []}
+                      onChange={(next) => setValue('arxiv_categories', next, { shouldDirty: true })}
+                      placeholder="ex : cs.AI"
+                    />
+                  </FieldGroup>
+
+                  <FieldGroup
+                    label="Requêtes X / Twitter"
+                    error={errors.x_queries?.message}
+                    help="Hashtags ou requêtes injectées dans le scraper Apify."
+                  >
+                    <TagInput
+                      value={settings?.x_queries ?? []}
+                      onChange={(next) => setValue('x_queries', next, { shouldDirty: true })}
+                      placeholder="ex : #LLM"
+                    />
+                  </FieldGroup>
+
+                  <FieldGroup
+                    label="Topic seeds"
+                    error={errors.topic_seeds?.message}
+                    help="Liste de topics de référence utilisée par le classifier. Le LLM peut aussi proposer des topics émergents en plus."
+                  >
+                    <TagInput
+                      value={settings?.topic_seeds ?? []}
+                      onChange={(next) => setValue('topic_seeds', next, { shouldDirty: true })}
+                      placeholder="ex : Embeddings & Vector DB"
+                    />
+                  </FieldGroup>
                 </div>
+              </SectionCard>
 
-                <div className="space-y-1.5">
-                  <Label>Categories Arxiv</Label>
-                  <TagInput
-                    value={settings?.arxiv_categories ?? []}
-                    onChange={(next) => setValue('arxiv_categories', next, { shouldDirty: true })}
-                    placeholder="ex: cs.AI"
-                  />
-                  {errors.arxiv_categories && (
-                    <p className="text-xs text-red-500">{errors.arxiv_categories.message}</p>
-                  )}
-                </div>
+              <ApifyConfigForm
+                value={apifyConfig ?? DEFAULT_APIFY_CONFIG}
+                onChange={(next) => setValue('apify_config', next, { shouldDirty: true })}
+              />
 
-                <div className="space-y-1.5">
-                  <Label>Requetes X / Twitter</Label>
-                  <TagInput
-                    value={settings?.x_queries ?? []}
-                    onChange={(next) => setValue('x_queries', next, { shouldDirty: true })}
-                    placeholder="ex: #LLM"
-                  />
-                  {errors.x_queries && (
-                    <p className="text-xs text-red-500">{errors.x_queries.message}</p>
-                  )}
-                </div>
+              <SourcePrioritySliders
+                value={sourcePriority ?? DEFAULT_SOURCE_PRIORITY}
+                onChange={(next) => setValue('source_priority', next, { shouldDirty: true })}
+              />
+            </TabsContent>
 
-                <div className="space-y-1.5">
-                  <Label>Topic seeds</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Liste de topics de référence utilisée par le classifier. Le LLM peut aussi
-                    proposer des topics émergents en plus.
-                  </p>
-                  <TagInput
-                    value={settings?.topic_seeds ?? []}
-                    onChange={(next) => setValue('topic_seeds', next, { shouldDirty: true })}
-                    placeholder="ex: Embeddings & Vector DB"
-                  />
-                  {errors.topic_seeds && (
-                    <p className="text-xs text-red-500">{errors.topic_seeds.message}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Onglet 4 : Clés API */}
+            <TabsContent value="api-keys" className="space-y-6 pt-8">
+              <SectionHeader
+                title="Clés API"
+                description="Apportez vos propres clés (BYOK) pour les 10 providers LLM et Apify. Validation automatique à la sauvegarde, fallback Maison transparent en cas d'invalidité."
+              />
+              <ApiKeysConfig />
+            </TabsContent>
 
-            <ApifyConfigForm
-              value={apifyConfig ?? DEFAULT_APIFY_CONFIG}
-              onChange={(next) => setValue('apify_config', next, { shouldDirty: true })}
-            />
-
-            <SourcePrioritySliders
-              value={sourcePriority ?? DEFAULT_SOURCE_PRIORITY}
-              onChange={(next) => setValue('source_priority', next, { shouldDirty: true })}
-            />
-          </TabsContent>
-
-          {/* Onglet 4 : Cles API */}
-          <TabsContent value="api-keys" className="space-y-4 pt-4">
-            <ApiKeysConfig />
-          </TabsContent>
-
-          {/* Onglet 5 : Branding & Budget */}
-          <TabsContent value="branding" className="space-y-4 pt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Branding</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BrandingForm control={control} setValue={setValue} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Langue du brief</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1.5">
-                <Label htmlFor="language">Langue de la synthèse LLM</Label>
-                <select
-                  id="language"
-                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                  {...register('language')}
-                >
-                  <option value="fr">Français</option>
-                  <option value="en">English</option>
-                  <option value="es">Español</option>
-                </select>
-                <p className="text-xs text-slate-500">
-                  Langue utilisée par le brief de veille (page Brief).
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Budget quotidien</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1.5">
-                <Label htmlFor="daily-budget">Budget max par jour (USD)</Label>
-                <Input
-                  id="daily-budget"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1000"
-                  {...register('daily_budget_usd', { valueAsNumber: true })}
-                />
-                {errors.daily_budget_usd && (
-                  <p className="text-xs text-red-500">{errors.daily_budget_usd.message}</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance scoring</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1.5">
-                <Label htmlFor="score-concurrency">Appels OpenRouter parallèles (scoring)</Label>
-                <Input
-                  id="score-concurrency"
-                  type="number"
-                  step="1"
-                  min="1"
-                  max="100"
-                  {...register('score_concurrency', { valueAsNumber: true })}
-                />
-                <p className="text-xs text-slate-500">
-                  Nombre d'appels OpenRouter simultanés pendant le scoring. Règle OpenRouter
-                  pay-as-you-go : <strong>$1 de solde = 1 RPS</strong> (max 500). Default 20 (safe
-                  avec $20+ de solde). Augmente si ton solde est plus élevé pour un pipeline plus
-                  rapide.
-                </p>
-                {errors.score_concurrency && (
-                  <p className="text-xs text-red-500">{errors.score_concurrency.message}</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Onglet 6 : Admin — Prompts d'analyse */}
-          <TabsContent value="admin" className="space-y-4 pt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Admin — Prompts d'analyse</CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Onglet 5 : Prompts Admin */}
+            <TabsContent value="admin" className="space-y-6 pt-8">
+              <SectionHeader
+                title="Prompts d'analyse"
+                description="Bibliothèque de prompts d'analyse stratégique exécutables sur ton corpus de signaux. Quatre seeds pré-installés et tes prompts personnalisés."
+              />
+              <SectionCard>
                 <AdminPromptsConfig />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </SectionCard>
+            </TabsContent>
 
-        <Button type="submit" disabled={!isDirty || updateMutation.isPending} className="w-full">
-          {updateMutation.isPending ? 'Sauvegarde...' : 'Enregistrer'}
-        </Button>
-      </form>
-    </main>
+            {/* Onglet 6 : Branding & Budget & Performance */}
+            <TabsContent value="branding" className="space-y-6 pt-8">
+              <SectionHeader
+                title="Branding & préférences"
+                description="Personnalisez l'apparence de Kairos et les paramètres globaux du pipeline."
+              />
+
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <SectionCard title="Identité visuelle">
+                  <BrandingForm control={control} setValue={setValue} />
+                </SectionCard>
+
+                <SectionCard title="Langue du brief">
+                  <FieldGroup
+                    label="Langue de la synthèse LLM"
+                    htmlFor="language"
+                    help="Langue utilisée par le brief de veille (page Brief)."
+                  >
+                    <select
+                      id="language"
+                      className="border-outline-variant bg-surface text-on-surface focus-visible:ring-primary/40 focus-visible:border-primary h-9 w-full rounded-md border px-3 text-sm shadow-sm focus-visible:ring-2 focus-visible:outline-none"
+                      {...register('language')}
+                    >
+                      <option value="fr">Français</option>
+                      <option value="en">English</option>
+                      <option value="es">Español</option>
+                    </select>
+                  </FieldGroup>
+                </SectionCard>
+
+                <SectionCard title="Budget quotidien">
+                  <FieldGroup
+                    label="Budget max par jour (USD)"
+                    htmlFor="daily-budget"
+                    error={errors.daily_budget_usd?.message}
+                    help="Plafond journalier appliqué par le Cost Guard avant d'exécuter un run."
+                  >
+                    <Input
+                      id="daily-budget"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="1000"
+                      {...register('daily_budget_usd', { valueAsNumber: true })}
+                    />
+                  </FieldGroup>
+                </SectionCard>
+
+                <SectionCard title="Performance scoring">
+                  <FieldGroup
+                    label="Appels OpenRouter parallèles"
+                    htmlFor="score-concurrency"
+                    error={errors.score_concurrency?.message}
+                  >
+                    <Input
+                      id="score-concurrency"
+                      type="number"
+                      step="1"
+                      min="1"
+                      max="100"
+                      {...register('score_concurrency', { valueAsNumber: true })}
+                    />
+                    <p className="text-on-surface-variant mt-2 text-xs leading-relaxed">
+                      Nombre d'appels OpenRouter simultanés pendant le scoring. Règle OpenRouter
+                      pay-as-you-go : <strong>$1 de solde = 1 RPS</strong> (max 500). Default 20
+                      (safe avec $20+ de solde). Augmente si ton solde est plus élevé pour un
+                      pipeline plus rapide.
+                    </p>
+                  </FieldGroup>
+                </SectionCard>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {/* Sticky save bar */}
+          <div className="bg-surface-container-lowest border-outline-variant sticky bottom-0 -mx-6 mt-8 flex items-center justify-end gap-3 border-t px-6 py-4">
+            <p className="text-on-surface-variant mr-auto text-sm">
+              {isDirty
+                ? 'Modifications non enregistrées'
+                : 'Toutes les modifications sont sauvegardées.'}
+            </p>
+            <Button
+              type="submit"
+              disabled={!isDirty || updateMutation.isPending}
+              className="bg-primary text-on-primary hover:bg-primary/90 gap-2 rounded-lg px-5"
+            >
+              <Save className="h-4 w-4" />
+              {updateMutation.isPending ? 'Sauvegarde…' : 'Enregistrer'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Helpers visuels — purement présentation, sans logique                       */
+/* -------------------------------------------------------------------------- */
+
+function SectionHeader({ title, description }: { title: string; description?: string }) {
+  return (
+    <div>
+      <h2 className="text-on-surface text-xl font-semibold tracking-tight md:text-2xl">{title}</h2>
+      {description && (
+        <p className="text-on-surface-variant mt-1.5 text-sm leading-relaxed">{description}</p>
+      )}
+    </div>
+  )
+}
+
+function SectionCard({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <section className="bg-surface-container-lowest border-outline-variant rounded-xl border p-6 shadow-sm">
+      {title && (
+        <h3 className="text-on-surface mb-5 text-lg font-semibold tracking-tight">{title}</h3>
+      )}
+      {children}
+    </section>
+  )
+}
+
+function FieldGroup({
+  label,
+  htmlFor,
+  help,
+  error,
+  children,
+}: {
+  label: string
+  htmlFor?: string
+  help?: string
+  error?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label
+        htmlFor={htmlFor}
+        className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
+      >
+        {label}
+      </Label>
+      {children}
+      {help && <p className="text-on-surface-variant text-xs leading-relaxed">{help}</p>}
+      {error && <p className="text-error text-xs">{error}</p>}
+    </div>
   )
 }

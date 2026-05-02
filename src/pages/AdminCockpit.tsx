@@ -24,6 +24,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -47,16 +48,8 @@ import { useIsAppAdmin } from '@/hooks/useIsAppAdmin'
 import { cn } from '@/lib/utils'
 
 // =============================================================================
-// Wave 6 — Sub-wave 6.4 — Story S6-AdminCockpit
-//
-// Page /admin réservée aux super-admins Kairos (app_admins). Offre un
-// panorama opérationnel cross-tenant : COG, marge brute, MRR/ARR par
-// segment, alertes outliers / low-margin / invitations expirées.
-//
-// Sécurité : double gate (cf. CLAUDE.md règle fondamentale).
-//   1. Hook `useIsAppAdmin()` côté frontend → cache l'UI aux non-admins.
-//   2. Edge fn `admin-metrics` re-vérifie `is_app_admin()` → 403 si bypass.
-// Le frontend n'est JAMAIS source de vérité — il reste une UX layer.
+// Wave 7.5 — Refonte design Material You / Stitch Kairos.
+// Sécurité (gates frontend + edge fn) inchangée. Re-skin uniquement.
 // =============================================================================
 
 const SEGMENT_LABELS: Record<OrgSegment, string> = {
@@ -68,13 +61,14 @@ const SEGMENT_LABELS: Record<OrgSegment, string> = {
   solo: 'Solo',
 }
 
+// Palette Recharts alignée Material You — tokens primaires/secondaires/tertiaires
 const SEGMENT_COLORS: Record<OrgSegment, string> = {
-  vc_pe: '#10b981',
-  legal: '#6366f1',
-  newsletter: '#f59e0b',
-  brand: '#ec4899',
-  cto_sme: '#3b82f6',
-  solo: '#64748b',
+  vc_pe: '#006948',
+  legal: '#0051d5',
+  newsletter: '#9b3e3b',
+  brand: '#ba5551',
+  cto_sme: '#316bf3',
+  solo: '#3d4a42',
 }
 
 const ALERT_META: Record<
@@ -84,17 +78,17 @@ const ALERT_META: Record<
   outlier_consumption: {
     label: 'Consommation outlier',
     icon: AlertTriangle,
-    toneClasses: 'border-amber-200 bg-amber-50 text-amber-900',
+    toneClasses: 'border-tertiary-fixed bg-tertiary-fixed/40 text-on-tertiary-fixed-variant',
   },
   low_margin: {
     label: 'Marge faible',
     icon: AlertOctagon,
-    toneClasses: 'border-red-200 bg-red-50 text-red-900',
+    toneClasses: 'border-error/40 bg-error-container text-on-error-container',
   },
   expired_invitation: {
     label: 'Invitation en attente',
     icon: Clock,
-    toneClasses: 'border-slate-200 bg-slate-50 text-slate-700',
+    toneClasses: 'border-outline-variant bg-surface-container-low text-on-surface-variant',
   },
 }
 
@@ -121,8 +115,6 @@ export default function AdminCockpit(): React.ReactElement {
   const { data: isAdmin, isLoading: isAdminLoading } = useIsAppAdmin()
   const metricsQuery = useAdminMetrics()
 
-  // Hooks d'état toujours appelés (avant tout return conditionnel) afin de
-  // respecter les règles des hooks React.
   const [sort, setSort] = useState<SortState>({ key: 'revenue_30d', dir: 'desc' })
   const [selectedAlert, setSelectedAlert] = useState<AdminAlert | null>(null)
   const [selectedTenant, setSelectedTenant] = useState<TenantMetrics | null>(null)
@@ -142,7 +134,6 @@ export default function AdminCockpit(): React.ReactElement {
     return items
   }, [metricsQuery.data, sort])
 
-  // ---- Gate frontend ----
   if (isAdminLoading) {
     return (
       <div className="space-y-4">
@@ -162,16 +153,16 @@ export default function AdminCockpit(): React.ReactElement {
       return <AccessDeniedView />
     }
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+      <div className="border-error/40 bg-error-container text-on-error-container rounded-xl border p-6 text-sm">
         <div className="flex items-start gap-3">
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+          <ShieldAlert className="text-error mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <div>
-            <p className="font-medium">Échec du chargement des métriques admin.</p>
-            <p className="mt-1 text-xs text-red-700">{metricsQuery.error.message}</p>
+            <p className="font-semibold">Échec du chargement des métriques admin.</p>
+            <p className="mt-1 text-xs">{metricsQuery.error.message}</p>
             <Button
               size="sm"
               variant="outline"
-              className="mt-3"
+              className="border-outline-variant text-on-surface mt-3"
               onClick={() => metricsQuery.refetch()}
             >
               Réessayer
@@ -201,15 +192,17 @@ export default function AdminCockpit(): React.ReactElement {
   const { kpis, alerts, generated_at } = metricsQuery.data
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <header className="flex items-start justify-between">
+    <div className="mx-auto w-full max-w-[80rem] space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Cockpit admin Kairos</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-on-surface text-2xl font-semibold tracking-[-0.01em]">
+            Cockpit admin Kairos
+          </h1>
+          <p className="text-on-surface-variant mt-1 text-sm">
             Vue cross-tenant — réservée aux super-admins de la plateforme.
           </p>
         </div>
-        <p className="text-xs text-slate-400">
+        <p className="text-on-surface-variant text-xs">
           Mis à jour : {new Date(generated_at).toLocaleTimeString('fr-FR')}
         </p>
       </header>
@@ -219,19 +212,19 @@ export default function AdminCockpit(): React.ReactElement {
         <KpiCard
           label="MRR total"
           value={`€${kpis.total_revenue_30d.toLocaleString('fr-FR')}`}
-          tone="emerald"
+          tone="primary"
           hint={`${kpis.total_active_subs} abonnements actifs`}
         />
         <KpiCard
           label="ARR projeté"
           value={`€${kpis.arr_projected.toLocaleString('fr-FR')}`}
-          tone="indigo"
+          tone="secondary"
           hint="MRR × 12"
         />
         <KpiCard
           label="Tenants actifs"
           value={String(kpis.total_tenants)}
-          tone="slate"
+          tone="neutral"
           hint={`${kpis.total_active_subs} avec sub`}
         />
         <KpiCard
@@ -239,10 +232,10 @@ export default function AdminCockpit(): React.ReactElement {
           value={`${kpis.gross_margin_30d_pct.toFixed(1)} %`}
           tone={
             kpis.gross_margin_30d_pct >= 90
-              ? 'emerald'
+              ? 'primary'
               : kpis.gross_margin_30d_pct >= 75
-                ? 'amber'
-                : 'red'
+                ? 'tertiary'
+                : 'error'
           }
           hint={`COG : €${kpis.total_cog_30d.toLocaleString('fr-FR')}`}
           tooltip="Marge brute = (Revenue − Apify − LLM) / Revenue. Calculée sur les 30 derniers jours."
@@ -250,13 +243,15 @@ export default function AdminCockpit(): React.ReactElement {
       </section>
 
       {/* B. Alertes */}
-      <Card>
+      <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
         <CardHeader>
-          <CardTitle className="text-base">Alertes ({alerts.length})</CardTitle>
+          <CardTitle className="text-on-surface text-base font-semibold">
+            Alertes ({alerts.length})
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {alerts.length === 0 && (
-            <p className="text-sm text-slate-500">
+            <p className="text-on-surface-variant text-sm">
               Aucune alerte en cours. Tout est sous contrôle.
             </p>
           )}
@@ -272,13 +267,18 @@ export default function AdminCockpit(): React.ReactElement {
                 )}
               >
                 <div className="flex items-start gap-2">
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <div>
-                    <p className="font-medium">{meta.label}</p>
+                    <p className="font-semibold">{meta.label}</p>
                     <p className="mt-0.5 text-xs">{alert.msg}</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setSelectedAlert(alert)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedAlert(alert)}
+                  className="border-outline-variant text-on-surface bg-surface-container-lowest"
+                >
                   Action
                 </Button>
               </div>
@@ -288,14 +288,16 @@ export default function AdminCockpit(): React.ReactElement {
       </Card>
 
       {/* C. Tableau Tenants */}
-      <Card>
+      <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
         <CardHeader>
-          <CardTitle className="text-base">Tenants ({tenantsSorted.length})</CardTitle>
+          <CardTitle className="text-on-surface text-base font-semibold">
+            Tenants ({tenantsSorted.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <div className="border-outline-variant overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
+              <thead className="bg-surface-container-low text-on-surface-variant text-left text-xs font-semibold tracking-[0.05em] uppercase">
                 <tr>
                   <SortHeader sort={sort} setSort={setSort} colKey="org_name">
                     Organisation
@@ -330,42 +332,47 @@ export default function AdminCockpit(): React.ReactElement {
                   <th className="px-3 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-outline-variant divide-y">
                 {tenantsSorted.map((t) => (
                   <tr
                     key={t.org_id}
                     className={cn(
-                      'cursor-pointer transition-colors hover:bg-slate-50',
+                      'hover:bg-surface-container-low cursor-pointer transition-colors',
                       marginRowClass(t.margin_pct),
                     )}
                     onClick={() => setSelectedTenant(t)}
                   >
-                    <td className="px-3 py-2 font-medium text-slate-900">{t.org_name}</td>
-                    <td className="px-3 py-2 text-xs text-slate-600">
+                    <td className="text-on-surface px-3 py-2 font-medium">{t.org_name}</td>
+                    <td className="text-on-surface-variant px-3 py-2 text-xs">
                       {SEGMENT_LABELS[t.segment]}
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-700 uppercase">{t.plan}</td>
-                    <td className="px-3 py-2 text-xs text-slate-600 uppercase">{t.billing_mode}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">{t.members}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">
+                    <td className="text-on-surface px-3 py-2 text-xs uppercase">{t.plan}</td>
+                    <td className="text-on-surface-variant px-3 py-2 text-xs uppercase">
+                      {t.billing_mode}
+                    </td>
+                    <td className="text-on-surface px-3 py-2 text-right font-mono text-xs">
+                      {t.members}
+                    </td>
+                    <td className="text-on-surface px-3 py-2 text-right font-mono text-xs">
                       {t.signals_30d.toLocaleString('fr-FR')}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">
+                    <td className="text-on-surface px-3 py-2 text-right font-mono text-xs">
                       {t.apify_cost_30d.toFixed(2)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">
+                    <td className="text-on-surface px-3 py-2 text-right font-mono text-xs">
                       {t.llm_cost_30d.toFixed(2)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-xs font-medium">
+                    <td className="text-on-surface px-3 py-2 text-right font-mono text-xs font-medium">
                       {t.revenue_30d.toFixed(2)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-xs font-medium">
+                    <td className="text-on-surface px-3 py-2 text-right font-mono text-xs font-medium">
                       {t.margin_pct.toFixed(1)} %
                     </td>
                     <td className="px-3 py-2 text-right">
                       <Button
                         size="sm"
                         variant="ghost"
+                        className="text-on-surface-variant hover:text-on-surface"
                         onClick={(e) => {
                           e.stopPropagation()
                           setSelectedTenant(t)
@@ -378,7 +385,10 @@ export default function AdminCockpit(): React.ReactElement {
                 ))}
                 {tenantsSorted.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-3 py-8 text-center text-sm text-slate-500">
+                    <td
+                      colSpan={11}
+                      className="text-on-surface-variant px-3 py-8 text-center text-sm"
+                    >
                       Aucun tenant à afficher.
                     </td>
                   </tr>
@@ -391,17 +401,21 @@ export default function AdminCockpit(): React.ReactElement {
 
       {/* D. Charts */}
       <section className="grid gap-6 md:grid-cols-2">
-        <Card>
+        <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">MRR par segment</CardTitle>
+            <CardTitle className="text-on-surface text-base font-semibold">
+              MRR par segment
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <MrrSegmentChart kpis={kpis} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Répartition ARR</CardTitle>
+            <CardTitle className="text-on-surface text-base font-semibold">
+              Répartition ARR
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ArrPieChart kpis={kpis} />
@@ -418,9 +432,9 @@ export default function AdminCockpit(): React.ReactElement {
                 <DialogTitle>{ALERT_META[selectedAlert.type].label}</DialogTitle>
                 <DialogDescription>{selectedAlert.msg}</DialogDescription>
               </DialogHeader>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              <div className="border-outline-variant bg-surface-container-low text-on-surface-variant rounded-lg border p-3 text-xs">
                 <p>
-                  <span className="font-medium text-slate-700">Tenant : </span>
+                  <span className="text-on-surface font-medium">Tenant : </span>
                   <code>{selectedAlert.org_id}</code>
                 </p>
                 <p className="mt-2">
@@ -441,8 +455,8 @@ export default function AdminCockpit(): React.ReactElement {
                     `[Kairos] ${ALERT_META[selectedAlert.type].label}`,
                   )}`}
                 >
-                  <Button>
-                    <Mail className="mr-2 h-4 w-4" /> Contacter le CSM
+                  <Button className="bg-primary text-on-primary hover:bg-primary-container">
+                    <Mail className="mr-2 h-4 w-4" aria-hidden="true" /> Contacter le CSM
                   </Button>
                 </a>
               </DialogFooter>
@@ -509,13 +523,18 @@ export default function AdminCockpit(): React.ReactElement {
 function AccessDeniedView(): React.ReactElement {
   return (
     <div className="mx-auto max-w-md py-16 text-center">
-      <ShieldAlert className="mx-auto h-12 w-12 text-slate-400" />
-      <h1 className="mt-4 text-xl font-semibold text-slate-900">Accès refusé</h1>
-      <p className="mt-2 text-sm text-slate-600">
-        Cette page est réservée aux administrateurs de la plateforme Kairos.
+      <div className="bg-error-container text-on-error-container mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full">
+        <ShieldAlert className="h-7 w-7" aria-hidden="true" />
+      </div>
+      <h1 className="text-on-surface mt-4 text-xl font-semibold tracking-[-0.01em]">
+        Accès refusé
+      </h1>
+      <p className="text-on-surface-variant mt-2 text-sm">
+        Cette page est réservée aux administrateurs de la plateforme Kairos. Si vous pensez avoir
+        besoin d’y accéder, contactez votre référent Kairos.
       </p>
       <Link to="/dashboard">
-        <Button className="mt-6" variant="default">
+        <Button className="bg-primary text-on-primary hover:bg-primary-container mt-6 h-11 rounded-lg">
           Retour au dashboard
         </Button>
       </Link>
@@ -527,30 +546,38 @@ interface KpiCardProps {
   label: string
   value: string
   hint?: string
-  tone: 'emerald' | 'indigo' | 'amber' | 'red' | 'slate'
+  tone: 'primary' | 'secondary' | 'tertiary' | 'error' | 'neutral'
   tooltip?: string
 }
 
 function KpiCard({ label, value, hint, tone, tooltip }: KpiCardProps): React.ReactElement {
   const toneClasses: Record<KpiCardProps['tone'], string> = {
-    emerald: 'text-emerald-600',
-    indigo: 'text-indigo-600',
-    amber: 'text-amber-600',
-    red: 'text-red-600',
-    slate: 'text-slate-700',
+    primary: 'text-primary',
+    secondary: 'text-secondary-container',
+    tertiary: 'text-tertiary',
+    error: 'text-error',
+    neutral: 'text-on-surface',
   }
-  const Icon = tone === 'red' || tone === 'amber' ? TrendingDown : TrendingUp
+  const Icon = tone === 'error' || tone === 'tertiary' ? TrendingDown : TrendingUp
   return (
-    <Card>
+    <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</p>
-          <Icon className={cn('h-4 w-4', toneClasses[tone])} />
+          <p className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase">
+            {label}
+          </p>
+          <Icon className={cn('h-4 w-4', toneClasses[tone])} aria-hidden="true" />
         </div>
-        <p className={cn('mt-2 text-2xl font-semibold', toneClasses[tone])} title={tooltip}>
+        <p
+          className={cn(
+            'mt-2 text-2xl font-semibold tracking-[-0.01em] tabular-nums',
+            toneClasses[tone],
+          )}
+          title={tooltip}
+        >
           {value}
         </p>
-        {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+        {hint && <p className="text-on-surface-variant mt-1 text-xs">{hint}</p>}
       </CardContent>
     </Card>
   )
@@ -576,7 +603,7 @@ function SortHeader({
   return (
     <th
       className={cn(
-        'cursor-pointer px-3 py-2.5 select-none hover:bg-slate-100',
+        'hover:bg-surface-container cursor-pointer px-3 py-2.5 select-none',
         align === 'right' ? 'text-right' : 'text-left',
       )}
       onClick={() => {
@@ -589,17 +616,17 @@ function SortHeader({
     >
       <span className="inline-flex items-center gap-1">
         {children}
-        {active && <Arrow className="h-3 w-3" />}
+        {active && <Arrow className="h-3 w-3" aria-hidden="true" />}
       </span>
     </th>
   )
 }
 
 function marginRowClass(marginPct: number): string {
-  if (marginPct >= 90) return 'bg-emerald-50/40'
+  if (marginPct >= 90) return 'bg-primary-fixed/10'
   if (marginPct >= 75) return ''
-  if (marginPct >= 50) return 'bg-amber-50/60'
-  return 'bg-red-50/70'
+  if (marginPct >= 50) return 'bg-tertiary-fixed/30'
+  return 'bg-error-container/40'
 }
 
 function DetailRow({
@@ -610,9 +637,9 @@ function DetailRow({
   value: React.ReactNode
 }): React.ReactElement {
   return (
-    <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-0.5 font-medium text-slate-900">{value}</p>
+    <div className="border-outline-variant bg-surface-container-low rounded-lg border px-3 py-2">
+      <p className="text-on-surface-variant text-xs">{label}</p>
+      <p className="text-on-surface mt-0.5 font-medium">{value}</p>
     </div>
   )
 }
@@ -622,10 +649,6 @@ interface MrrChartProps {
 }
 
 function MrrSegmentChart({ kpis }: MrrChartProps): React.ReactElement {
-  // Pas d'historique disponible côté backend pour cette story (on n'a que le
-  // snapshot courant). On simule donc une projection 12 mois en plat — quand
-  // un historique sera disponible (Wave 6.5), on pourra hydrater de vraies
-  // séries temporelles.
   const segments = Object.keys(kpis.mrr_by_segment) as OrgSegment[]
   const months = ['M-5', 'M-4', 'M-3', 'M-2', 'M-1', 'M0']
   const data = months.map((m) => {
@@ -638,9 +661,9 @@ function MrrSegmentChart({ kpis }: MrrChartProps): React.ReactElement {
   return (
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `€${v}`} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#bccac0" />
+        <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#3d4a42' }} />
+        <YAxis tick={{ fontSize: 11, fill: '#3d4a42' }} tickFormatter={(v) => `€${v}`} />
         <Tooltip formatter={(v) => `€${Number(v).toFixed(0)}`} />
         <Legend />
         {segments.map((seg) => (
@@ -667,7 +690,7 @@ function ArrPieChart({ kpis }: MrrChartProps): React.ReactElement {
 
   if (data.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-slate-500">
+      <p className="text-on-surface-variant py-8 text-center text-sm">
         Aucun ARR à afficher (aucun abonnement actif).
       </p>
     )

@@ -26,19 +26,27 @@ export default function Home(): React.ReactElement {
       <PricingTable />
       <FAQSection />
 
-      {/* Final CTA */}
-      <section className="bg-slate-900 text-white">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-4 py-16 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      {/* Final CTA — bandeau emerald sombre */}
+      <section className="bg-inverse-surface text-inverse-on-surface relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-900/40 via-transparent to-transparent"
+          aria-hidden
+        />
+        <div className="relative mx-auto flex w-full max-w-[72rem] flex-col items-start gap-6 px-6 py-20 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-2xl">
-            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Prêt à donner à votre équipe une longueur d'avance ?
+            <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl">
+              Prêt à donner à votre équipe une longueur d'avance&nbsp;?
             </h2>
-            <p className="mt-2 text-slate-300">
+            <p className="mt-3 text-base text-white/70 sm:text-lg">
               Démarrez en quelques minutes — branchez vos sources, votre clé LLM (ou prenez la
               nôtre), lancez le premier run.
             </p>
           </div>
-          <Button asChild size="lg" variant="secondary" className="gap-2">
+          <Button
+            asChild
+            size="lg"
+            className="bg-primary text-on-primary hover:bg-primary-container gap-2 rounded-2xl px-6 py-3 shadow-xl"
+          >
             <Link to="/signup">
               Démarrer (essai 14 j)
               <ArrowRight className="h-4 w-4" aria-hidden="true" />

@@ -5,13 +5,20 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
+import { KairosLogo } from '@/components/icons/KairosLogo'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+
+// =============================================================================
+// Wave 7.5 — Refonte design Material You / Stitch Kairos
+// Re-skin uniquement : la logique d'authentification (3 méthodes : Google,
+// magic link, mot de passe) est conservée à l'identique. Les noms d'éléments
+// (labels, ids, role) sont préservés afin de ne pas casser Login.test.tsx.
+// =============================================================================
 
 const magicSchema = z.object({
   email: z.string().email('Adresse email invalide'),
@@ -24,7 +31,7 @@ const passwordSchema = z.object({
 })
 type PasswordValues = z.infer<typeof passwordSchema>
 
-function GoogleIcon() {
+function GoogleIcon(): React.ReactElement {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
       <path
@@ -54,7 +61,7 @@ function sanitizeNext(raw: string | null): string {
   return raw
 }
 
-export default function Login() {
+export default function Login(): React.ReactElement {
   const session = useAuthStore((s) => s.session)
   const [searchParams] = useSearchParams()
   const nextPath = sanitizeNext(searchParams.get('next'))
@@ -74,7 +81,7 @@ export default function Login() {
 
   const redirectUrl = `${window.location.origin}${nextPath}`
 
-  async function onMagicSubmit(values: MagicValues) {
+  async function onMagicSubmit(values: MagicValues): Promise<void> {
     const { error } = await supabase.auth.signInWithOtp({
       email: values.email,
       options: { emailRedirectTo: redirectUrl },
@@ -87,7 +94,7 @@ export default function Login() {
     toast.success('Lien envoyé. Vérifie ta boîte mail.')
   }
 
-  async function onPasswordSubmit(values: PasswordValues) {
+  async function onPasswordSubmit(values: PasswordValues): Promise<void> {
     const { error } = await supabase.auth.signInWithPassword({
       email: values.email,
       password: values.password,
@@ -99,7 +106,7 @@ export default function Login() {
     toast.success('Connecté.')
   }
 
-  async function onGoogle() {
+  async function onGoogle(): Promise<void> {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: redirectUrl },
@@ -109,131 +116,179 @@ export default function Login() {
     }
   }
 
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Kairos</CardTitle>
-          <CardDescription>
-            Connectez-vous pour accéder à votre dashboard de veille IA.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            type="button"
-            variant="outline"
-            className="mb-4 w-full justify-center gap-2"
-            onClick={onGoogle}
-          >
-            <GoogleIcon />
-            Continuer avec Google
-          </Button>
+  const signupHref = `/signup${searchParams.get('next') ? `?next=${encodeURIComponent(nextPath)}` : ''}`
 
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-2 text-xs text-slate-500">ou</span>
-            </div>
+  return (
+    <main className="bg-surface text-on-surface flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="bg-surface-container-lowest border-outline-variant rounded-xl border p-8 shadow-xl">
+          <div className="mb-6 flex flex-col items-center gap-3">
+            <KairosLogo className="h-10 w-10" />
+            <span className="text-on-surface text-xl font-bold tracking-tight">Kairos</span>
           </div>
 
-          <Tabs defaultValue="password">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="password">Mot de passe</TabsTrigger>
-              <TabsTrigger value="magic">Lien magique</TabsTrigger>
-            </TabsList>
+          <h1 className="text-on-surface text-center text-2xl font-semibold tracking-[-0.01em]">
+            Connectez-vous
+          </h1>
+          <p className="text-on-surface-variant mt-2 text-center text-sm">
+            Accédez à votre dashboard de veille IA.
+          </p>
 
-            <TabsContent value="password" className="mt-4">
-              <form
-                noValidate
-                onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
-                className="flex flex-col gap-3"
-              >
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="pwd-email">Email</Label>
-                  <Input
-                    id="pwd-email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="toi@example.com"
-                    {...passwordForm.register('email')}
-                  />
-                  {passwordForm.formState.errors.email && (
-                    <p className="text-sm text-red-600">
-                      {passwordForm.formState.errors.email.message}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="pwd-password">Mot de passe</Label>
-                  <Input
-                    id="pwd-password"
-                    type="password"
-                    autoComplete="current-password"
-                    {...passwordForm.register('password')}
-                  />
-                  {passwordForm.formState.errors.password && (
-                    <p className="text-sm text-red-600">
-                      {passwordForm.formState.errors.password.message}
-                    </p>
-                  )}
-                </div>
-                <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
-                  {passwordForm.formState.isSubmitting ? 'Connexion…' : 'Se connecter'}
-                </Button>
-                <p className="text-center text-xs text-slate-500">
-                  Pas encore de compte ?{' '}
-                  <Link
-                    to={`/signup${searchParams.get('next') ? `?next=${encodeURIComponent(nextPath)}` : ''}`}
-                    className="text-primary hover:underline"
-                  >
-                    Créer un compte
-                  </Link>
-                </p>
-              </form>
-            </TabsContent>
+          <div className="mt-8">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low h-11 w-full justify-center gap-2 rounded-lg"
+              onClick={onGoogle}
+            >
+              <GoogleIcon />
+              Continuer avec Google
+            </Button>
 
-            <TabsContent value="magic" className="mt-4">
-              {!magicSent ? (
+            <div className="relative my-5">
+              <div className="absolute inset-0 flex items-center">
+                <span className="border-outline-variant w-full border-t" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-surface-container-lowest text-on-surface-variant px-3 text-xs tracking-wide uppercase">
+                  ou
+                </span>
+              </div>
+            </div>
+
+            <Tabs defaultValue="password">
+              <TabsList className="bg-surface-container-low grid w-full grid-cols-2">
+                <TabsTrigger value="password">Mot de passe</TabsTrigger>
+                <TabsTrigger value="magic">Lien magique</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="password" className="mt-5">
                 <form
                   noValidate
-                  onSubmit={magicForm.handleSubmit(onMagicSubmit)}
-                  className="flex flex-col gap-3"
+                  onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
+                  className="flex flex-col gap-4"
                 >
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="magic-email">Email</Label>
+                  <div className="flex flex-col gap-1.5">
+                    <Label
+                      htmlFor="pwd-email"
+                      className="text-on-surface-variant text-xs font-medium"
+                    >
+                      Email
+                    </Label>
                     <Input
-                      id="magic-email"
+                      id="pwd-email"
                       type="email"
                       autoComplete="email"
-                      placeholder="toi@example.com"
-                      {...magicForm.register('email')}
+                      placeholder="prenom@entreprise.com"
+                      className="border-outline-variant bg-surface-container-lowest h-11 rounded-lg"
+                      {...passwordForm.register('email')}
                     />
-                    {magicForm.formState.errors.email && (
-                      <p className="text-sm text-red-600">
-                        {magicForm.formState.errors.email.message}
+                    {passwordForm.formState.errors.email && (
+                      <p className="text-error text-xs">
+                        {passwordForm.formState.errors.email.message}
                       </p>
                     )}
                   </div>
-                  <Button type="submit" disabled={magicForm.formState.isSubmitting}>
-                    {magicForm.formState.isSubmitting ? 'Envoi…' : 'Envoyer le lien magique'}
+                  <div className="flex flex-col gap-1.5">
+                    <Label
+                      htmlFor="pwd-password"
+                      className="text-on-surface-variant text-xs font-medium"
+                    >
+                      Mot de passe
+                    </Label>
+                    <Input
+                      id="pwd-password"
+                      type="password"
+                      autoComplete="current-password"
+                      className="border-outline-variant bg-surface-container-lowest h-11 rounded-lg"
+                      {...passwordForm.register('password')}
+                    />
+                    {passwordForm.formState.errors.password && (
+                      <p className="text-error text-xs">
+                        {passwordForm.formState.errors.password.message}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={passwordForm.formState.isSubmitting}
+                    className="bg-primary text-on-primary hover:bg-primary-container h-11 rounded-lg font-medium"
+                  >
+                    {passwordForm.formState.isSubmitting ? 'Connexion…' : 'Se connecter'}
                   </Button>
                 </form>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm text-slate-600">
-                    Lien envoyé. Clique le lien reçu par mail pour te connecter.
-                  </p>
-                  <Button variant="outline" onClick={() => setMagicSent(false)}>
-                    Renvoyer un nouveau lien
-                  </Button>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+              </TabsContent>
+
+              <TabsContent value="magic" className="mt-5">
+                {!magicSent ? (
+                  <form
+                    noValidate
+                    onSubmit={magicForm.handleSubmit(onMagicSubmit)}
+                    className="flex flex-col gap-4"
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <Label
+                        htmlFor="magic-email"
+                        className="text-on-surface-variant text-xs font-medium"
+                      >
+                        Email
+                      </Label>
+                      <Input
+                        id="magic-email"
+                        type="email"
+                        autoComplete="email"
+                        placeholder="prenom@entreprise.com"
+                        className="border-outline-variant bg-surface-container-lowest h-11 rounded-lg"
+                        {...magicForm.register('email')}
+                      />
+                      {magicForm.formState.errors.email && (
+                        <p className="text-error text-xs">
+                          {magicForm.formState.errors.email.message}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={magicForm.formState.isSubmitting}
+                      className="bg-primary text-on-primary hover:bg-primary-container h-11 rounded-lg font-medium"
+                    >
+                      {magicForm.formState.isSubmitting ? 'Envoi…' : 'Envoyer le lien magique'}
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="border-primary-fixed bg-primary-fixed/30 text-on-primary-fixed-variant rounded-lg border p-4 text-sm">
+                      <p className="font-medium">Lien envoyé.</p>
+                      <p className="mt-1 text-xs">
+                        Cliquez le lien reçu par mail pour vous connecter.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setMagicSent(false)}
+                      className="border-outline-variant text-on-surface h-11 rounded-lg"
+                    >
+                      Renvoyer un nouveau lien
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <p className="text-on-surface-variant mt-6 text-center text-sm">
+            Pas encore de compte ?{' '}
+            <Link to={signupHref} className="text-primary font-medium hover:underline">
+              Créer un compte
+            </Link>
+          </p>
+        </div>
+
+        <p className="text-on-surface-variant mt-6 text-center text-xs">
+          En vous connectant, vous acceptez nos conditions d’utilisation. Vos données sont hébergées
+          en Europe et conformes RGPD.
+        </p>
+      </div>
     </main>
   )
 }

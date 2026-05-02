@@ -16,6 +16,11 @@ import Digest from '@/pages/Digest'
 import Home from '@/pages/Home'
 import Login from '@/pages/Login'
 import Logs from '@/pages/Logs'
+import NotFound from '@/pages/NotFound'
+import OnboardingConfigurator from '@/pages/onboarding/OnboardingConfigurator'
+import OnboardingFirstRun from '@/pages/onboarding/OnboardingFirstRun'
+import OnboardingFlow from '@/pages/onboarding/OnboardingFlow'
+import OnboardingProfile from '@/pages/onboarding/OnboardingProfile'
 import PricingPublic from '@/pages/PricingPublic'
 import Settings from '@/pages/Settings'
 import Signup from '@/pages/Signup'
@@ -41,6 +46,22 @@ export const router = createBrowserRouter([
   { path: '/signup', element: <Signup /> },
   // Public invitation acceptance (auth gate handled inside the page)
   { path: '/accept-invitation/:token', element: <AcceptInvitation /> },
+  // Auth-protected onboarding flow (post-signup wizard)
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: '/onboarding',
+        element: <OnboardingFlow />,
+        children: [
+          { index: true, element: <Navigate to="/onboarding/profile" replace /> },
+          { path: 'profile', element: <OnboardingProfile /> },
+          { path: 'configurator', element: <OnboardingConfigurator /> },
+          { path: 'first-run', element: <OnboardingFirstRun /> },
+        ],
+      },
+    ],
+  },
   // Auth-protected app routes
   {
     element: <ProtectedRoute />,
@@ -63,5 +84,5 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  { path: '*', element: <Navigate to="/" replace /> },
+  { path: '*', element: <NotFound /> },
 ])

@@ -38,13 +38,13 @@ export default function Logs() {
   }, [data, actionFilter, statusFilter])
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">Logs</h2>
-        <p className="text-sm text-slate-500">
+    <div className="space-y-6">
+      <header>
+        <h2 className="text-on-surface text-3xl font-bold tracking-tight">Logs</h2>
+        <p className="text-on-surface-variant mt-1 text-sm">
           Actions recentes du pipeline. Auto-refresh 30s. Purges automatiquement apres 24h.
         </p>
-      </div>
+      </header>
 
       <Tabs defaultValue="activity">
         <TabsList>
@@ -55,9 +55,9 @@ export default function Logs() {
         {/* Onglet Activite */}
         <TabsContent value="activity" className="space-y-4 pt-4">
           {/* Filtres */}
-          <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white p-3">
+          <div className="border-outline-variant bg-surface-container-lowest flex flex-wrap items-center gap-4 rounded-xl border p-4 shadow-sm">
             <div>
-              <p className="mb-1 text-xs font-medium tracking-wide text-slate-500 uppercase">
+              <p className="text-on-surface-variant mb-2 text-xs font-semibold tracking-[0.05em] uppercase">
                 Action
               </p>
               <div className="flex flex-wrap gap-1">
@@ -76,7 +76,7 @@ export default function Logs() {
               </div>
             </div>
             <div>
-              <p className="mb-1 text-xs font-medium tracking-wide text-slate-500 uppercase">
+              <p className="text-on-surface-variant mb-2 text-xs font-semibold tracking-[0.05em] uppercase">
                 Statut
               </p>
               <div className="flex flex-wrap gap-1">
@@ -101,7 +101,7 @@ export default function Logs() {
 
         {/* Onglet OpenRouter */}
         <TabsContent value="openrouter" className="pt-4">
-          <p className="mb-3 text-sm text-slate-500">
+          <p className="text-on-surface-variant mb-3 text-sm">
             Derniers appels LLM via OpenRouter. Auto-refresh 30s.
           </p>
           <LLMCostsTable rows={llmCosts} isLoading={costsLoading} />

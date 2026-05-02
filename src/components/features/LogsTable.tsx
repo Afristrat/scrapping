@@ -11,11 +11,11 @@ import { cn } from '@/lib/utils'
 import type { LogRow } from '@/hooks/useLogs'
 
 const STATUS_CLASS: Record<string, string> = {
-  ok: 'bg-emerald-100 text-emerald-800',
-  error: 'bg-red-100 text-red-800',
-  degraded: 'bg-amber-100 text-amber-800',
-  start: 'bg-slate-100 text-slate-700',
-  info: 'bg-blue-100 text-blue-800',
+  ok: 'bg-primary-fixed text-on-primary-fixed',
+  error: 'bg-error-container text-on-error-container',
+  degraded: 'bg-tertiary-fixed text-on-tertiary-fixed',
+  start: 'bg-surface-variant text-on-surface-variant',
+  info: 'bg-secondary-fixed text-on-secondary-fixed',
 }
 
 interface Props {
@@ -107,51 +107,62 @@ export function LogsTable({ rows, isLoading }: Props) {
     )
   if (!rows || rows.length === 0)
     return (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+      <div className="border-outline-variant bg-surface-container-low text-on-surface-variant rounded-xl border border-dashed p-8 text-center text-sm">
         Pas de logs (purgés &lt; 24h)
       </div>
     )
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-        <p className="text-xs text-slate-500">
-          <span className="font-medium text-slate-700">{rows.length}</span> log
+      <div className="border-outline-variant bg-surface-container-lowest flex items-center justify-between gap-2 rounded-xl border px-4 py-2 shadow-sm">
+        <p className="text-on-surface-variant text-xs">
+          <span className="text-on-surface font-semibold">{rows.length}</span> log
           {rows.length > 1 ? 's' : ''} visible
           {rows.length > 1 ? 's' : ''}
         </p>
         <CopyButton text={serializeAll(rows)} label={`Copier les ${rows.length} logs`} />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="border-outline-variant bg-surface-container-lowest overflow-hidden rounded-xl border shadow-md">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
+          <thead className="bg-surface-container text-on-surface-variant border-outline-variant border-b text-left text-xs font-semibold tracking-[0.05em] uppercase">
             <tr>
-              <th className="w-32 px-4 py-2.5">Quand</th>
-              <th className="w-40 px-4 py-2.5">Action</th>
-              <th className="w-24 px-4 py-2.5">Statut</th>
-              <th className="px-4 py-2.5">Payload</th>
-              <th className="w-24 px-4 py-2.5 text-right">Actions</th>
+              <th className="w-32 px-4 py-3">Quand</th>
+              <th className="w-40 px-4 py-3">Action</th>
+              <th className="w-24 px-4 py-3">Statut</th>
+              <th className="px-4 py-3">Payload</th>
+              <th className="w-24 px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-outline-variant/40 divide-y">
             {rows.map((r) => {
               const preview = errorPreview(r.payload)
               const isError = r.status === 'error'
               return (
-                <tr key={r.id} className={cn('align-top', isError && 'bg-red-50/50')}>
+                <tr
+                  key={r.id}
+                  className={cn(
+                    'align-top transition-colors',
+                    isError
+                      ? 'bg-error-container/40 border-l-error border-l-4'
+                      : 'even:bg-surface-container-low/40',
+                  )}
+                >
                   <td
-                    className="px-4 py-3 text-xs text-slate-500"
+                    className="text-on-surface-variant px-4 py-3 text-xs"
                     title={format(new Date(r.ts), 'yyyy-MM-dd HH:mm:ss')}
                   >
                     {formatDistanceToNow(new Date(r.ts), { addSuffix: true, locale: fr })}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-700">{r.action}</td>
+                  <td className="bg-surface-container/40 text-on-surface-variant px-4 py-3 font-mono text-xs">
+                    {r.action}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge
                       className={cn(
-                        'font-normal',
-                        STATUS_CLASS[r.status ?? ''] ?? 'bg-slate-100 text-slate-600',
+                        'rounded-full border-transparent px-2 py-0.5 text-[10px] font-semibold',
+                        STATUS_CLASS[r.status ?? ''] ??
+                          'bg-surface-variant text-on-surface-variant',
                       )}
                     >
                       {r.status ?? '—'}
@@ -162,7 +173,7 @@ export function LogsTable({ rows, isLoading }: Props) {
                       <p
                         className={cn(
                           'mb-1 line-clamp-2 text-xs',
-                          isError ? 'font-medium text-red-700' : 'text-slate-700',
+                          isError ? 'text-on-error-container font-semibold' : 'text-on-surface',
                         )}
                         title={preview}
                       >
@@ -171,15 +182,15 @@ export function LogsTable({ rows, isLoading }: Props) {
                     )}
                     {r.payload ? (
                       <details>
-                        <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-900">
+                        <summary className="text-on-surface-variant hover:text-on-surface cursor-pointer text-xs">
                           {preview ? 'voir le payload complet' : 'voir le payload'}
                         </summary>
-                        <pre className="mt-1 max-h-72 overflow-auto rounded bg-slate-50 p-2 text-xs break-all whitespace-pre-wrap">
+                        <pre className="bg-inverse-surface text-inverse-on-surface mt-2 max-h-72 overflow-auto rounded-lg p-3 font-mono text-xs break-all whitespace-pre-wrap">
                           {JSON.stringify(r.payload, null, 2)}
                         </pre>
                       </details>
                     ) : (
-                      <span className="text-xs text-slate-400">—</span>
+                      <span className="text-outline text-xs">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">

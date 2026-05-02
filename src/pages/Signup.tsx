@@ -2,17 +2,23 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
+import { KairosLogo } from '@/components/icons/KairosLogo'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useCheckout } from '@/hooks/useCheckout'
 import { ADDONS, type AddonId, type BillingMode, BASE_PRICES, type Segment } from '@/lib/pricing'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+
+// =============================================================================
+// Wave 7.5 — Refonte design Material You / Stitch Kairos
+// Re-skin uniquement : la logique de signup + auto-checkout est conservée.
+// =============================================================================
 
 const schema = z
   .object({
@@ -81,7 +87,7 @@ function parsePendingCheckout(params: URLSearchParams): PendingCheckout | null {
   }
 }
 
-export default function Signup() {
+export default function Signup(): React.ReactElement {
   const session = useAuthStore((s) => s.session)
   const [searchParams] = useSearchParams()
   const nextPath = sanitizeNext(searchParams.get('next'))
@@ -97,22 +103,12 @@ export default function Signup() {
     defaultValues: { email: '', password: '', confirm: '' },
   })
 
-  // Si une session est active ET qu'on a des query params pricing, on
-  // déclenche le checkout au lieu de naviguer vers `nextPath`. Cas typique :
-  // - User arrive depuis /pricing → s'inscrit → session immédiate → checkout
-  // - User déjà loggé arrive directement sur /signup avec query params
   useEffect(() => {
     if (!session || !pendingCheckout || checkoutTriggered) return
     if (checkout.isPending) return
 
     let cancelled = false
-    async function triggerCheckout() {
-      // Récupère la 1re org du user où il est owner. Le trigger
-      // create_default_org_for_user crée automatiquement une org au signup,
-      // donc cette query renvoie au moins 1 ligne pour un nouvel inscrit.
-      // Defensive : si le user a plusieurs orgs (cas existant), on prend
-      // la 1re owner — l'utilisateur peut toujours utiliser le configurateur
-      // depuis le dashboard pour cibler une autre org.
+    async function triggerCheckout(): Promise<void> {
       const userId = session?.user?.id
       if (!userId) return
       const { data, error } = await supabase
@@ -131,7 +127,6 @@ export default function Signup() {
         })
         return
       }
-      // Si pendingCheckout a été invalidé entre-temps (cleanup), on abandonne.
       if (!pendingCheckout) return
 
       setCheckoutTriggered(true)
@@ -149,12 +144,11 @@ export default function Signup() {
     }
   }, [session, pendingCheckout, checkoutTriggered, checkout])
 
-  // Redirection finale uniquement si pas de checkout en cours.
   if (session && !hasPendingCheckout) {
     return <Navigate to={nextPath} replace />
   }
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues): Promise<void> {
     const { error } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
@@ -168,93 +162,136 @@ export default function Signup() {
     toast.success('Compte créé. Vérifie ta boîte mail pour confirmer.')
   }
 
+  const loginHref = `/login${searchParams.get('next') ? `?next=${encodeURIComponent(nextPath)}` : ''}`
+
+  const description = sent
+    ? 'Compte créé. Confirmez votre email puis revenez vous connecter.'
+    : hasPendingCheckout
+      ? 'Inscrivez-vous pour finaliser votre abonnement Kairos.'
+      : 'Démarrez votre essai 14 jours, sans carte bancaire.'
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Créer un compte</CardTitle>
-          <CardDescription>
-            {sent
-              ? 'Compte créé. Confirme ton email puis reviens te connecter.'
-              : hasPendingCheckout
-                ? 'Inscris-toi pour finaliser ton abonnement Kairos.'
-                : 'Inscris-toi avec email et mot de passe.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {session && hasPendingCheckout ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-slate-600">
-                Redirection vers le paiement Stripe en cours&nbsp;…
-              </p>
-            </div>
-          ) : !sent ? (
-            <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="signup-email">Email</Label>
-                <Input
-                  id="signup-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="toi@example.com"
-                  {...form.register('email')}
-                />
-                {form.formState.errors.email && (
-                  <p className="text-sm text-red-600">{form.formState.errors.email.message}</p>
-                )}
+    <main className="bg-surface text-on-surface flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="bg-surface-container-lowest border-outline-variant rounded-xl border p-8 shadow-xl">
+          <div className="mb-6 flex flex-col items-center gap-3">
+            <KairosLogo className="h-10 w-10" />
+            <span className="text-on-surface text-xl font-bold tracking-tight">Kairos</span>
+          </div>
+
+          <h1 className="text-on-surface text-center text-2xl font-semibold tracking-[-0.01em]">
+            Créez votre compte Kairos
+          </h1>
+          <p className="text-on-surface-variant mt-2 text-center text-sm">{description}</p>
+
+          <div className="mt-8">
+            {session && hasPendingCheckout ? (
+              <div className="border-outline-variant bg-surface-container-low text-on-surface-variant flex items-center gap-3 rounded-lg border p-4 text-sm">
+                <Loader2 className="text-primary h-5 w-5 shrink-0 animate-spin" />
+                <span>Redirection vers le paiement Stripe en cours&nbsp;…</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="signup-password">Mot de passe</Label>
-                <Input
-                  id="signup-password"
-                  type="password"
-                  autoComplete="new-password"
-                  {...form.register('password')}
-                />
-                {form.formState.errors.password && (
-                  <p className="text-sm text-red-600">{form.formState.errors.password.message}</p>
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="signup-confirm">Confirmer le mot de passe</Label>
-                <Input
-                  id="signup-confirm"
-                  type="password"
-                  autoComplete="new-password"
-                  {...form.register('confirm')}
-                />
-                {form.formState.errors.confirm && (
-                  <p className="text-sm text-red-600">{form.formState.errors.confirm.message}</p>
-                )}
-              </div>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Création…' : 'Créer le compte'}
-              </Button>
-              <p className="text-center text-xs text-slate-500">
-                Déjà inscrit ?{' '}
-                <Link
-                  to={`/login${searchParams.get('next') ? `?next=${encodeURIComponent(nextPath)}` : ''}`}
-                  className="text-primary hover:underline"
+            ) : !sent ? (
+              <form
+                noValidate
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="flex flex-col gap-4"
+              >
+                <div className="flex flex-col gap-1.5">
+                  <Label
+                    htmlFor="signup-email"
+                    className="text-on-surface-variant text-xs font-medium"
+                  >
+                    Email
+                  </Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="prenom@entreprise.com"
+                    className="border-outline-variant bg-surface-container-lowest h-11 rounded-lg"
+                    {...form.register('email')}
+                  />
+                  {form.formState.errors.email && (
+                    <p className="text-error text-xs">{form.formState.errors.email.message}</p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label
+                    htmlFor="signup-password"
+                    className="text-on-surface-variant text-xs font-medium"
+                  >
+                    Mot de passe
+                  </Label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    autoComplete="new-password"
+                    className="border-outline-variant bg-surface-container-lowest h-11 rounded-lg"
+                    {...form.register('password')}
+                  />
+                  {form.formState.errors.password && (
+                    <p className="text-error text-xs">{form.formState.errors.password.message}</p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label
+                    htmlFor="signup-confirm"
+                    className="text-on-surface-variant text-xs font-medium"
+                  >
+                    Confirmer le mot de passe
+                  </Label>
+                  <Input
+                    id="signup-confirm"
+                    type="password"
+                    autoComplete="new-password"
+                    className="border-outline-variant bg-surface-container-lowest h-11 rounded-lg"
+                    {...form.register('confirm')}
+                  />
+                  {form.formState.errors.confirm && (
+                    <p className="text-error text-xs">{form.formState.errors.confirm.message}</p>
+                  )}
+                </div>
+                <Button
+                  type="submit"
+                  disabled={form.formState.isSubmitting}
+                  className="bg-primary text-on-primary hover:bg-primary-container h-11 rounded-lg font-medium"
                 >
-                  Se connecter
-                </Link>
-              </p>
-            </form>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-slate-600">
-                Un email de confirmation a été envoyé à ton adresse. Clique le lien dedans, puis
-                connecte-toi.
-              </p>
-              <Link to="/login">
-                <Button variant="outline" className="w-full">
-                  Aller à la page de connexion
+                  {form.formState.isSubmitting ? 'Création…' : 'Créer le compte'}
                 </Button>
+              </form>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <div className="border-primary-fixed bg-primary-fixed/30 text-on-primary-fixed-variant rounded-lg border p-4 text-sm">
+                  <p className="font-medium">Email de confirmation envoyé.</p>
+                  <p className="mt-1 text-xs">Cliquez le lien reçu par mail puis connectez-vous.</p>
+                </div>
+                <Link to="/login">
+                  <Button
+                    variant="outline"
+                    className="border-outline-variant text-on-surface h-11 w-full rounded-lg"
+                  >
+                    Aller à la page de connexion
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {!sent && !(session && hasPendingCheckout) && (
+            <p className="text-on-surface-variant mt-6 text-center text-sm">
+              Déjà un compte ?{' '}
+              <Link to={loginHref} className="text-primary font-medium hover:underline">
+                Connectez-vous
               </Link>
-            </div>
+            </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        <p className="text-on-surface-variant mt-6 text-center text-xs">
+          En créant un compte, vous acceptez nos CGU et notre politique de confidentialité (RGPD).
+          Données hébergées en Europe.
+        </p>
+      </div>
     </main>
   )
 }

@@ -7,10 +7,11 @@ interface FaqItem {
 
 const FAQ: FaqItem[] = [
   {
-    q: 'Pourquoi Maison vs BYOK ?',
+    q: 'Pourquoi BYOK est-il plus cher que Maison ?',
     a: (
       <>
         <p>
+          La différence de prix s'explique par le contrôle et la souveraineté.{' '}
           <span className="font-semibold">Mode Maison</span> = simplicité. Notre Sonnet est inclus,
           vous ne gérez ni clés ni quotas. Idéal pour démarrer vite et garder une expérience
           intégrée.
@@ -28,10 +29,10 @@ const FAQ: FaqItem[] = [
     q: 'Pourquoi pas Feedly, Inoreader ou un agrégateur RSS ?',
     a: (
       <p>
-        Feedly agrège, mais ne score pas selon VOS critères. Kairos n'est pas un agrégateur : c'est
-        un scoreur LLM custom + cascade transversale + topic memory 90 jours. Vous gardez le flux
-        brut, mais vous obtenez un classement aligné sur vos rubriques d'investissement, de veille
-        techno ou de conformité.
+        Feedly et Inoreader agrègent et affichent des flux d'information de manière chronologique.
+        Kairos va beaucoup plus loin : c'est un scoreur LLM custom + cascade transversale + topic
+        memory 90 jours. Vous gardez le flux brut, mais vous obtenez un classement aligné sur vos
+        rubriques d'investissement, de veille techno ou de conformité.
       </p>
     ),
   },
@@ -71,31 +72,33 @@ const FAQ: FaqItem[] = [
 
 function FaqEntry({ q, a }: FaqItem): React.ReactElement {
   return (
-    <details className="group rounded-xl border border-slate-200 bg-white p-5 open:shadow-sm">
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-base font-semibold text-slate-900">
+    <details className="group border-outline-variant hover:bg-surface-container-low rounded-xl border-b p-2 transition-colors duration-150">
+      <summary className="text-on-surface group-open:text-primary flex cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-3 text-lg font-semibold tracking-[-0.01em] focus:outline-none">
         <span>{q}</span>
         <ChevronDown
-          className="mt-1 h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180"
+          className="text-outline h-5 w-5 shrink-0 transition-transform duration-300 group-open:rotate-180"
           aria-hidden
         />
       </summary>
-      <div className="mt-3 text-sm leading-relaxed text-slate-600">{a}</div>
+      <div className="text-on-surface-variant px-2 py-4 text-base leading-relaxed">{a}</div>
     </details>
   )
 }
 
 export function FAQSection(): React.ReactElement {
   return (
-    <section id="faq" className="border-b border-slate-100">
-      <div className="mx-auto w-full max-w-4xl px-4 py-20 sm:px-6">
-        <div className="mb-10">
-          <p className="text-sm font-semibold tracking-wider text-slate-500 uppercase">FAQ</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-            Les questions qu'on nous pose avant signature.
+    <section id="faq" className="bg-surface-container-lowest border-outline-variant border-b py-24">
+      <div className="mx-auto w-full max-w-3xl px-6">
+        <div className="mb-12 text-center">
+          <p className="text-outline mb-3 text-xs font-semibold tracking-[0.05em] uppercase">
+            Foire aux questions
+          </p>
+          <h2 className="text-on-surface text-3xl font-bold tracking-[-0.02em] sm:text-4xl">
+            Les 5 questions qu'on nous pose.
           </h2>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="space-y-4">
           {FAQ.map((item) => (
             <FaqEntry key={item.q} q={item.q} a={item.a} />
           ))}

@@ -125,7 +125,7 @@ export function AdminPromptsConfig() {
   const runMutation = useRunAdminPrompt()
   const deleteMutation = useDeleteAdminPrompt()
 
-  if (isLoading) return <div className="text-muted-foreground text-xs">Chargement…</div>
+  if (isLoading) return <div className="text-on-surface-variant text-xs">Chargement…</div>
 
   const executeRun = async (p: AdminPrompt, options?: RunOptions): Promise<void> => {
     setRunning({ prompt: p, output: null, status: 'pending' })
@@ -182,12 +182,18 @@ export function AdminPromptsConfig() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-xs">
-          Bibliothèque de prompts d'analyse stratégique, exécutables sur ton corpus de signaux. 4
-          seeds pré-installés + tes prompts custom.
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-on-surface-variant text-xs">
+          Quatre seeds pré-installés et tes prompts personnalisés. Compose des chaînes via{' '}
+          <code className="bg-surface-container-high rounded px-1 py-0.5 text-[10px]">{`{{run:<kind>}}`}</code>
+          .
         </p>
-        <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setCreating(true)}
+          className="border-outline-variant gap-1"
+        >
           <Plus className="h-3 w-3" /> Nouveau prompt
         </Button>
       </div>
@@ -309,18 +315,22 @@ function PromptRow({
   const costLabel = estimate != null ? `Run (~${formatCostUsd(estimate.estimatedCost)})` : 'Run'
 
   return (
-    <Card className="p-3">
+    <Card className="bg-surface-container-low border-outline-variant p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2">
-            <span className={cn('rounded px-2 py-0.5 text-[10px] font-semibold', badge.cls)}>
+            <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', badge.cls)}>
               {badge.label}
             </span>
-            {p.is_seed && <span className="text-muted-foreground text-[10px]">seed</span>}
-            <h3 className="text-sm font-semibold">{p.name}</h3>
+            {p.is_seed && (
+              <span className="bg-surface-container-high text-on-surface-variant rounded-full px-2 py-0.5 text-[10px]">
+                seed
+              </span>
+            )}
+            <h3 className="text-on-surface text-sm font-semibold">{p.name}</h3>
           </div>
           {p.description && (
-            <p className="text-muted-foreground line-clamp-2 text-xs">{p.description}</p>
+            <p className="text-on-surface-variant line-clamp-2 text-xs">{p.description}</p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">

@@ -10,12 +10,14 @@ export function AppLayout() {
   useOrganizations()
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="bg-surface text-on-surface flex h-screen">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <BrandedHeader />
-        <main className="flex-1 overflow-auto p-6">
-          <Outlet />
+        <main className="bg-surface flex-1 overflow-auto px-6 py-8">
+          <div className="mx-auto w-full max-w-[80rem]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
