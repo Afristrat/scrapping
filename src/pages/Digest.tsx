@@ -21,6 +21,7 @@ import {
   DigestError,
   type DigestRow,
 } from '@/hooks/useDigest'
+import { useFormatCost } from '@/hooks/useFormatCost'
 
 const WINDOW_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 24, label: '24 h' },
@@ -39,6 +40,7 @@ export default function Digest(): React.ReactElement {
   const digestsQuery = useDigests()
   const generate = useGenerateDigest()
   const remove = useDeleteDigest()
+  const formatCost = useFormatCost()
 
   const digests = useMemo<DigestRow[]>(() => digestsQuery.data ?? [], [digestsQuery.data])
   const selected = useMemo<DigestRow | null>(() => {
@@ -369,7 +371,7 @@ export default function Digest(): React.ReactElement {
                 <span className="font-mono">{selected.model_used ?? '—'}</span>
                 <span>·</span>
                 <span className="text-primary font-mono font-semibold">
-                  ${Number(selected.cost ?? 0).toFixed(5)}
+                  {formatCost(Number(selected.cost ?? 0), 5)}
                 </span>
               </footer>
             </article>
