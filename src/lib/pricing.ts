@@ -9,6 +9,8 @@
  * `/signup` ou `create-checkout-session`.
  */
 
+import type { CurrencyCode } from '@/stores/currency'
+
 export type Segment = 'vc_pe' | 'legal' | 'newsletter' | 'brand' | 'cto_sme' | 'solo'
 export type BillingMode = 'maison' | 'byok'
 
@@ -188,4 +190,58 @@ export function formatEuro(amount: number, opts?: { decimals?: number }): string
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(amount)
+}
+
+// ---------------------------------------------------------------------------
+// Wave 8.A — Conversion devises pour l'affichage public.
+//
+// Les prix sont stockés et facturés en EUR (Stripe). Les helpers ci-dessous
+// servent UNIQUEMENT pour la présentation : on convertit à la volée les
+// montants EUR vers la devise choisie par le visiteur, en utilisant les taux
+// récupérés depuis Frankfurter (cf. `useExchangeRates`).
+// ---------------------------------------------------------------------------
+
+export type ExchangeRates = Record<CurrencyCode, number>
+
+/**
+ * Convertit un montant EUR vers la devise cible. Si le taux est absent, on
+ * tombe sur 1 (= EUR) pour éviter un NaN à l'affichage.
+ */
+export function convertFromEur(
+  amountEur: number,
+  targetCurrency: CurrencyCode,
+  rates: ExchangeRates,
+): number {
+  const rate = rates[targetCurrency] ?? 1
+  return amountEur * rate
+}
+
+/**
+ * Formate un montant déjà converti dans une devise. Le yen japonais n'utilise
+ * pas de décimales — toutes les autres devises supportées sont arrondies à
+ * l'entier (cohérent avec `formatEuro`).
+ */
+export function formatPrice(amount: number, currency: CurrencyCode, locale = 'fr-FR'): string {
+  const decimals = currency === 'JPY' ? 0 : 0
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(amount)
+}
+
+/**
+ * Wrapper pratique : convertit `amountEur` vers `currency` en utilisant
+ * `rates`, puis formate dans la locale fournie. Permet d'écrire
+ * `priceInCurrency(49, 'USD', rates)` directement dans le JSX.
+ */
+export function priceInCurrency(
+  amountEur: number,
+  currency: CurrencyCode,
+  rates: ExchangeRates,
+  locale = 'fr-FR',
+): string {
+  const converted = convertFromEur(amountEur, currency, rates)
+  return formatPrice(converted, currency, locale)
 }

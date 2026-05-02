@@ -14,9 +14,11 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useContactEmail } from '@/hooks/useAppSettings'
+import { FALLBACK_RATES, useExchangeRates } from '@/hooks/useExchangeRates'
+import { type ExchangeRates, priceInCurrency } from '@/lib/pricing'
+import { CURRENCIES, type CurrencyCode, useCurrencyStore } from '@/stores/currency'
 import { cn } from '@/lib/utils'
-
-const CONTACT_EMAIL = 'hello@kairos.ai-mpower.com'
 
 type PricingMode = 'maison' | 'byok'
 
@@ -36,13 +38,22 @@ interface PlanContent {
   recommended?: boolean
   name: string
   pitch: string
-  priceLabel: string
+  /** Prix de base en EUR. Si null → label texte (ex. « Sur devis »). */
+  priceEur: number | null
+  /** Préfixe optionnel inséré devant le prix formaté (ex. « à partir de »). */
+  pricePrefix?: string
+  /** Label brut alternatif si `priceEur` est null. */
+  priceLabel?: string
   priceSuffix?: string
   description?: string
   features: string[]
   ctaLabel: string
   ctaTo?: string
-  ctaHref?: string
+  /**
+   * Sujet (URL-encodé) du mailto: contact ventes. L'email cible est résolu
+   * dynamiquement via `useContactEmail()` (paramètre admin `app_domain`).
+   */
+  ctaSubject?: string
   ctaVariant?: 'default' | 'outline' | 'secondary'
 }
 
@@ -57,7 +68,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
     solo: {
       name: 'Solo',
       pitch: "Pour découvrir l'outil en autonomie.",
-      priceLabel: '49 €',
+      priceEur: 49,
       priceSuffix: '/mois',
       description: 'LLM Maison Haiku inclus. Essai 14 j sans carte bancaire.',
       features: [
@@ -77,7 +88,8 @@ const PRICING: Record<PricingMode, PricingByMode> = {
       pitch: 'Toutes les équipes — VC, avocats, éditeurs, brand, CTO.',
       recommended: true,
       badge: 'Recommandé',
-      priceLabel: 'à partir de 399 €',
+      priceEur: 399,
+      pricePrefix: 'à partir de ',
       priceSuffix: '/mois',
       description: '5 seats inclus. LLM Maison Sonnet inclus. Configurez selon votre profil.',
       features: [
@@ -102,6 +114,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
     enterprise: {
       name: 'Enterprise',
       pitch: 'Pour les organisations qui exigent souveraineté et SLA.',
+      priceEur: null,
       priceLabel: 'Sur devis',
       priceSuffix: '',
       description: "À partir d'environ 6 000 €/mois selon usage et seats.",
@@ -115,7 +128,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
         'SLA 99,9 %',
       ],
       ctaLabel: 'Contacter les ventes',
-      ctaHref: `mailto:${CONTACT_EMAIL}?subject=Kairos%20Enterprise`,
+      ctaSubject: 'Kairos%20Enterprise',
       ctaVariant: 'outline',
     },
   },
@@ -123,7 +136,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
     solo: {
       name: 'Solo',
       pitch: 'Vos clés, votre choix de modèle.',
-      priceLabel: '99 €',
+      priceEur: 99,
       priceSuffix: '/mois',
       description: 'BYOK 10 providers. Vous payez votre conso LLM directement à votre provider.',
       features: [
@@ -143,7 +156,8 @@ const PRICING: Record<PricingMode, PricingByMode> = {
       pitch: 'Souveraineté + équipe — VC, avocats, éditeurs, brand.',
       recommended: true,
       badge: 'Recommandé',
-      priceLabel: 'à partir de 699 €',
+      priceEur: 699,
+      pricePrefix: 'à partir de ',
       priceSuffix: '/mois',
       description: '5 seats inclus. BYOK Sonnet / Opus selon votre stack.',
       features: [
@@ -169,6 +183,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
     enterprise: {
       name: 'Enterprise',
       pitch: 'BYOK enterprise + tenant isolé ou self-host.',
+      priceEur: null,
       priceLabel: 'Sur devis',
       priceSuffix: '',
       description: "À partir d'environ 6 000 €/mois selon usage et seats.",
@@ -182,7 +197,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
         'SLA 99,9 %',
       ],
       ctaLabel: 'Contacter les ventes',
-      ctaHref: `mailto:${CONTACT_EMAIL}?subject=Kairos%20Enterprise%20BYOK`,
+      ctaSubject: 'Kairos%20Enterprise%20BYOK',
       ctaVariant: 'outline',
     },
   },
@@ -191,12 +206,8 @@ const PRICING: Record<PricingMode, PricingByMode> = {
 const MIN_SEATS = 5
 const MAX_SEATS = 25
 
-function formatEuro(amount: number): string {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(Math.round(amount))
+function getLocaleForCurrency(code: CurrencyCode): string {
+  return CURRENCIES.find((c) => c.code === code)?.locale ?? 'fr-FR'
 }
 
 function computeProTotal(seats: number, seatPricing: SeatPricing): number {
@@ -213,6 +224,9 @@ interface PlanCardProps {
   icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
   variant?: 'standard' | 'recommended' | 'inverse'
   children?: React.ReactNode
+  currency: CurrencyCode
+  rates: ExchangeRates
+  contactEmail: string
 }
 
 function PlanCard({
@@ -220,7 +234,16 @@ function PlanCard({
   icon: Icon,
   variant = 'standard',
   children,
+  currency,
+  rates,
+  contactEmail,
 }: PlanCardProps): React.ReactElement {
+  const ctaHref = plan.ctaSubject ? `mailto:${contactEmail}?subject=${plan.ctaSubject}` : undefined
+  const locale = getLocaleForCurrency(currency)
+  const renderedPrice =
+    plan.priceEur !== null
+      ? `${plan.pricePrefix ?? ''}${priceInCurrency(plan.priceEur, currency, rates, locale)}`
+      : (plan.priceLabel ?? '')
   const ctaVariant = plan.ctaVariant ?? 'default'
   const recommended = variant === 'recommended'
   const inverse = variant === 'inverse'
@@ -282,7 +305,7 @@ function PlanCard({
       <div className="relative z-10">
         <p className="flex items-baseline gap-1.5">
           <span className={cn('text-3xl font-bold tracking-[-0.02em] sm:text-4xl', priceClasses)}>
-            {plan.priceLabel}
+            {renderedPrice}
           </span>
           {plan.priceSuffix ? (
             <span className={cn('text-sm', pitchClasses)}>{plan.priceSuffix}</span>
@@ -327,7 +350,7 @@ function PlanCard({
             </Link>
           </Button>
         ) : null}
-        {plan.ctaHref !== undefined ? (
+        {ctaHref !== undefined ? (
           <Button
             asChild
             size="lg"
@@ -339,7 +362,7 @@ function PlanCard({
               !inverse && ctaVariant === 'outline' && 'border-outline text-on-surface',
             )}
           >
-            <a href={plan.ctaHref}>
+            <a href={ctaHref}>
               <Mail className="h-4 w-4" aria-hidden />
               {plan.ctaLabel}
             </a>
@@ -353,16 +376,22 @@ function PlanCard({
 interface ProSeatConfiguratorProps {
   seats: number
   onChange: (seats: number) => void
-  total: number
+  /** Total mensuel exprimé en EUR (converti à l'affichage). */
+  totalEur: number
   discountLabel: string
+  currency: CurrencyCode
+  rates: ExchangeRates
 }
 
 function ProSeatConfigurator({
   seats,
   onChange,
-  total,
+  totalEur,
   discountLabel,
+  currency,
+  rates,
 }: ProSeatConfiguratorProps): React.ReactElement {
+  const locale = getLocaleForCurrency(currency)
   return (
     <div className="bg-surface-container-low border-outline-variant flex flex-col gap-3 rounded-lg border p-4">
       <div className="flex items-center justify-between">
@@ -391,7 +420,8 @@ function ProSeatConfigurator({
       <div className="bg-primary-container/10 mt-1 flex items-center justify-between gap-3 rounded p-2">
         <span className="text-primary inline-flex items-center gap-1.5 text-sm font-semibold">
           <BadgeCheck className="h-4 w-4" aria-hidden />
-          {formatEuro(total)} <span className="font-normal opacity-70">/mois</span>
+          {priceInCurrency(totalEur, currency, rates, locale)}{' '}
+          <span className="font-normal opacity-70">/mois</span>
         </span>
         <span className="text-on-surface-variant text-[11px]">{discountLabel}</span>
       </div>
@@ -403,6 +433,12 @@ export function PricingTable(): React.ReactElement {
   const [mode, setMode] = useState<PricingMode>('maison')
   const [seats, setSeats] = useState<number>(MIN_SEATS)
 
+  const currency = useCurrencyStore((s) => s.currency)
+  const { data: rates } = useExchangeRates()
+  const safeRates = rates ?? FALLBACK_RATES
+  const locale = getLocaleForCurrency(currency)
+  const contactEmail = useContactEmail()
+
   const proPlan = PRICING[mode].pro
   const proTotal = useMemo(
     () => computeProTotal(seats, proPlan.seatPricing),
@@ -411,12 +447,13 @@ export function PricingTable(): React.ReactElement {
 
   const proPlanWithComputedPrice: PlanContent = {
     ...proPlan,
-    priceLabel: formatEuro(proTotal),
+    priceEur: proTotal,
+    pricePrefix: '',
     priceSuffix: '/mois',
     description:
       seats === MIN_SEATS
         ? proPlan.description
-        : `${seats} seats configurés · base ${formatEuro(proPlan.seatPricing.base)} + ${seats - MIN_SEATS} seat${seats - MIN_SEATS > 1 ? 's' : ''} additionnel${seats - MIN_SEATS > 1 ? 's' : ''} avec dégressivité.`,
+        : `${seats} seats configurés · base ${priceInCurrency(proPlan.seatPricing.base, currency, safeRates, locale)} + ${seats - MIN_SEATS} seat${seats - MIN_SEATS > 1 ? 's' : ''} additionnel${seats - MIN_SEATS > 1 ? 's' : ''} avec dégressivité.`,
   }
 
   return (
@@ -473,20 +510,43 @@ export function PricingTable(): React.ReactElement {
         </Tabs>
 
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-          <PlanCard plan={PRICING[mode].solo} icon={Sparkles} variant="standard" />
-          <PlanCard plan={proPlanWithComputedPrice} icon={Users} variant="recommended">
+          <PlanCard
+            plan={PRICING[mode].solo}
+            icon={Sparkles}
+            variant="standard"
+            currency={currency}
+            rates={safeRates}
+            contactEmail={contactEmail}
+          />
+          <PlanCard
+            plan={proPlanWithComputedPrice}
+            icon={Users}
+            variant="recommended"
+            currency={currency}
+            rates={safeRates}
+            contactEmail={contactEmail}
+          >
             <ProSeatConfigurator
               seats={seats}
               onChange={setSeats}
-              total={proTotal}
+              totalEur={proTotal}
               discountLabel={proPlan.seatPricing.discountLabel}
+              currency={currency}
+              rates={safeRates}
             />
             <p className="text-on-surface-variant -mt-1 text-xs">
               Adapté à VC, avocats, newsletters, brands, CTOs — configurez selon votre profil après
               inscription.
             </p>
           </PlanCard>
-          <PlanCard plan={PRICING[mode].enterprise} icon={Building2} variant="inverse" />
+          <PlanCard
+            plan={PRICING[mode].enterprise}
+            icon={Building2}
+            variant="inverse"
+            currency={currency}
+            rates={safeRates}
+            contactEmail={contactEmail}
+          />
         </div>
 
         <div className="bg-surface-container-lowest border-outline-variant mt-12 flex flex-col items-center gap-4 rounded-2xl border p-6 text-center sm:flex-row sm:justify-between sm:text-left">
@@ -513,7 +573,7 @@ export function PricingTable(): React.ReactElement {
               variant="outline"
               className="border-outline text-on-surface bg-surface-container-high hover:bg-surface-container-highest gap-2 rounded-xl"
             >
-              <a href={`mailto:${CONTACT_EMAIL}?subject=Kairos%20-%20Demande%20de%20d%C3%A9mo`}>
+              <a href={`mailto:${contactEmail}?subject=Kairos%20-%20Demande%20de%20d%C3%A9mo`}>
                 <Mail className="h-4 w-4" aria-hidden />
                 Contactez-nous
               </a>

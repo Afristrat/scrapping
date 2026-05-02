@@ -18,18 +18,20 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useContactEmail } from '@/hooks/useAppSettings'
+import { FALLBACK_RATES, useExchangeRates } from '@/hooks/useExchangeRates'
 import {
   ADDONS,
   type AddonId,
   BASE_PRICES,
   type BillingMode,
   computePricing,
-  formatEuro,
+  type ExchangeRates,
+  priceInCurrency,
   type Segment,
 } from '@/lib/pricing'
+import { CURRENCIES, type CurrencyCode, useCurrencyStore } from '@/stores/currency'
 import { cn } from '@/lib/utils'
-
-const CONTACT_EMAIL = 'hello@kairos.ai-mpower.com'
 
 interface SegmentDef {
   id: Segment
@@ -95,46 +97,56 @@ const ADDONS_DISPLAY: AddonDisplay[] = [
   { id: 'reputation_api', description: 'Score de crédibilité par auteur.', comingSoon: true },
 ]
 
-const TWELVE_SKUS: Array<{
+interface SkuRow {
   segment: string
-  maison: string
-  byok: string
+  maisonEur: number
+  byokEur: number
+  /** Suffixe (ex. « /seat/mois », « /mois (3 éditeurs) »). */
+  suffix: string
   argument: string
-}> = [
+}
+
+const TWELVE_SKUS: SkuRow[] = [
   {
     segment: 'VC / PE IA',
-    maison: '599 €/seat/mois',
-    byok: '999 €/seat/mois',
+    maisonEur: 599,
+    byokEur: 999,
+    suffix: '/seat/mois',
     argument: 'Vos deals, votre Opus, votre tenant.',
   },
   {
     segment: "Cabinet d'avocats IA Act",
-    maison: '399 €/seat/mois',
-    byok: '699 €/seat/mois',
+    maisonEur: 399,
+    byokEur: 699,
+    suffix: '/seat/mois',
     argument: 'Vos requêtes confidentielles, traçabilité complète.',
   },
   {
     segment: 'Newsletter / éditeurs',
-    maison: '499 €/mois (3 éditeurs)',
-    byok: '799 €/mois (3 éditeurs)',
+    maisonEur: 499,
+    byokEur: 799,
+    suffix: '/mois (3 éditeurs)',
     argument: 'Votre rédacteur en chef LLM.',
   },
   {
     segment: 'Brand / Marketing IA',
-    maison: '499 €/seat/mois',
-    byok: '799 €/seat/mois',
+    maisonEur: 499,
+    byokEur: 799,
+    suffix: '/seat/mois',
     argument: 'Vos conversations brand restent chez vous.',
   },
   {
     segment: 'CTO / Tech Lead PME',
-    maison: '149 €/seat/mois',
-    byok: '249 €/seat/mois',
+    maisonEur: 149,
+    byokEur: 249,
+    suffix: '/seat/mois',
     argument: 'Votre infra LLM, notre intelligence de filtrage.',
   },
   {
     segment: 'Solo créateur',
-    maison: '49 €/mois',
-    byok: '99 €/mois',
+    maisonEur: 49,
+    byokEur: 99,
+    suffix: '/mois',
     argument: 'Funnel SEO. Upsell vers Team à 30 j.',
   },
 ]
@@ -205,6 +217,9 @@ interface AddonCardProps {
   description: string
   comingSoon?: boolean
   onToggle: (id: AddonId, next: boolean) => void
+  currency: CurrencyCode
+  rates: ExchangeRates
+  locale: string
 }
 
 function AddonCard({
@@ -213,9 +228,13 @@ function AddonCard({
   description,
   comingSoon,
   onToggle,
+  currency,
+  rates,
+  locale,
 }: AddonCardProps): React.ReactElement {
   const def = ADDONS[id]
   const periodLabel = def.period === 'monthly' ? '/mois' : '/an'
+  const formattedPrice = priceInCurrency(def.price, currency, rates, locale)
   return (
     <button
       type="button"
@@ -251,7 +270,7 @@ function AddonCard({
       </div>
       <p className="text-xs text-slate-500">{description}</p>
       <div className="mt-auto flex items-baseline gap-1 pt-2">
-        <span className="text-base font-semibold text-slate-900">+{def.price} €</span>
+        <span className="text-base font-semibold text-slate-900">+{formattedPrice}</span>
         <span className="text-xs text-slate-500">{periodLabel}</span>
       </div>
       {comingSoon === true ? (
@@ -266,6 +285,10 @@ function AddonCard({
 function defaultSeatsFor(segment: Segment): number {
   if (segment === 'solo') return 1
   return BASE_PRICES[segment].default_seats
+}
+
+function getLocaleForCurrency(code: CurrencyCode): string {
+  return CURRENCIES.find((c) => c.code === code)?.locale ?? 'fr-FR'
 }
 
 function buildSignupUrl(
@@ -290,6 +313,13 @@ export default function PricingPublic(): React.ReactElement {
   const [seats, setSeats] = useState<number>(defaultSeatsFor('cto_sme'))
   const [addons, setAddons] = useState<AddonId[]>([])
   const [showSkus, setShowSkus] = useState(false)
+
+  const currency = useCurrencyStore((s) => s.currency)
+  const { data: rates } = useExchangeRates()
+  const safeRates = rates ?? FALLBACK_RATES
+  const locale = getLocaleForCurrency(currency)
+  const formatAmount = (eur: number): string => priceInCurrency(eur, currency, safeRates, locale)
+  const contactEmail = useContactEmail()
 
   const breakdown = useMemo(
     () => computePricing({ segment, seats, mode, addons }),
@@ -424,7 +454,7 @@ export default function PricingPublic(): React.ReactElement {
                   <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
                     Plus de 25 sièges ?{' '}
                     <a
-                      href={`mailto:${CONTACT_EMAIL}?subject=Kairos%20-%20Volume%20%3E%2025%20si%C3%A8ges`}
+                      href={`mailto:${contactEmail}?subject=Kairos%20-%20Volume%20%3E%2025%20si%C3%A8ges`}
                       className="font-medium underline underline-offset-2"
                     >
                       Contactez-nous
@@ -496,6 +526,9 @@ export default function PricingPublic(): React.ReactElement {
                     description={a.description}
                     comingSoon={a.comingSoon}
                     onToggle={toggleAddon}
+                    currency={currency}
+                    rates={safeRates}
+                    locale={locale}
                   />
                 ))}
               </div>
@@ -537,8 +570,14 @@ export default function PricingPublic(): React.ReactElement {
                       {TWELVE_SKUS.map((row) => (
                         <tr key={row.segment} className="border-b border-slate-100 last:border-0">
                           <td className="px-4 py-3 font-medium text-slate-900">{row.segment}</td>
-                          <td className="px-4 py-3 text-slate-700">{row.maison}</td>
-                          <td className="px-4 py-3 text-slate-700">{row.byok}</td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {formatAmount(row.maisonEur)}
+                            {row.suffix}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {formatAmount(row.byokEur)}
+                            {row.suffix}
+                          </td>
                           <td className="px-4 py-3 text-slate-500">{row.argument}</td>
                         </tr>
                       ))}
@@ -587,7 +626,7 @@ export default function PricingPublic(): React.ReactElement {
                       >
                         <span className="text-slate-700">{line.label}</span>
                         <span className="shrink-0 font-medium text-slate-900">
-                          {formatEuro(line.amount)}
+                          {formatAmount(line.amount)}
                         </span>
                       </li>
                     ))}
@@ -595,7 +634,7 @@ export default function PricingPublic(): React.ReactElement {
                   <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-slate-100 pt-3">
                     <span className="text-sm font-semibold text-slate-900">Total mensuel</span>
                     <span className="text-xl font-semibold text-slate-900">
-                      {formatEuro(breakdown.total_monthly)}
+                      {formatAmount(breakdown.total_monthly)}
                     </span>
                   </div>
                 </div>
@@ -613,7 +652,7 @@ export default function PricingPublic(): React.ReactElement {
                         >
                           <span className="text-slate-700">{line.label}</span>
                           <span className="shrink-0 font-medium text-slate-900">
-                            {formatEuro(line.amount)}/an
+                            {formatAmount(line.amount)}/an
                           </span>
                         </li>
                       ))}
@@ -625,7 +664,7 @@ export default function PricingPublic(): React.ReactElement {
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-sm text-slate-600">Total annualisé</span>
                     <span className="text-base font-semibold text-emerald-700">
-                      {formatEuro(breakdown.total_annualized)}/an
+                      {formatAmount(breakdown.total_annualized)}/an
                     </span>
                   </div>
                 </div>
@@ -650,7 +689,7 @@ export default function PricingPublic(): React.ReactElement {
                 <p className="text-xs text-slate-500">
                   Besoin d'un setup sur-mesure ?{' '}
                   <a
-                    href={`mailto:${CONTACT_EMAIL}?subject=Kairos%20Enterprise`}
+                    href={`mailto:${contactEmail}?subject=Kairos%20Enterprise`}
                     className="inline-flex items-center gap-1 font-medium text-slate-700 hover:text-slate-900"
                   >
                     <Mail className="h-3 w-3" aria-hidden />

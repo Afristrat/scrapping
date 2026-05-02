@@ -4,13 +4,15 @@ import { ArrowLeft, KeyRound, Server } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { FALLBACK_RATES, useExchangeRates } from '@/hooks/useExchangeRates'
 import {
   BASE_PRICES,
   type BillingMode,
   computePricing,
-  formatEuro,
+  priceInCurrency,
   type Segment,
 } from '@/lib/pricing'
+import { CURRENCIES, type CurrencyCode, useCurrencyStore } from '@/stores/currency'
 import { cn } from '@/lib/utils'
 
 // =============================================================================
@@ -33,6 +35,10 @@ function isValidSegment(value: string | null): value is Segment {
   return value !== null && value in BASE_PRICES
 }
 
+function getLocaleForCurrency(code: CurrencyCode): string {
+  return CURRENCIES.find((c) => c.code === code)?.locale ?? 'fr-FR'
+}
+
 export default function OnboardingConfigurator(): React.ReactElement {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -42,6 +48,12 @@ export default function OnboardingConfigurator(): React.ReactElement {
   const segmentPricing = BASE_PRICES[segment]
   const [seats, setSeats] = useState<number>(segmentPricing.default_seats)
   const [mode, setMode] = useState<BillingMode>('maison')
+
+  const currency = useCurrencyStore((s) => s.currency)
+  const { data: rates } = useExchangeRates()
+  const safeRates = rates ?? FALLBACK_RATES
+  const locale = getLocaleForCurrency(currency)
+  const formatAmount = (eur: number): string => priceInCurrency(eur, currency, safeRates, locale)
 
   const breakdown = useMemo(
     () => computePricing({ segment, seats, mode, addons: [] }),
@@ -125,7 +137,7 @@ export default function OnboardingConfigurator(): React.ReactElement {
               <ModeCard
                 icon={Server}
                 title="Maison"
-                price={segmentPricing.maison}
+                priceLabel={formatAmount(segmentPricing.maison)}
                 hint="LLM gérés par Kairos"
                 active={mode === 'maison'}
                 onSelect={() => setMode('maison')}
@@ -133,7 +145,7 @@ export default function OnboardingConfigurator(): React.ReactElement {
               <ModeCard
                 icon={KeyRound}
                 title="BYOK"
-                price={segmentPricing.byok}
+                priceLabel={formatAmount(segmentPricing.byok)}
                 hint="Vos propres clés API"
                 active={mode === 'byok'}
                 onSelect={() => setMode('byok')}
@@ -151,18 +163,18 @@ export default function OnboardingConfigurator(): React.ReactElement {
             Récapitulatif
           </h2>
           <p className="text-on-surface mt-3 text-3xl font-semibold tabular-nums">
-            {formatEuro(breakdown.total_monthly)}
+            {formatAmount(breakdown.total_monthly)}
             <span className="text-on-surface-variant ml-1 text-sm font-normal">/ mois</span>
           </p>
           <p className="text-on-surface-variant mt-1 text-xs">
-            Soit {formatEuro(breakdown.total_annualized)} sur 12 mois.
+            Soit {formatAmount(breakdown.total_annualized)} sur 12 mois.
           </p>
           <ul className="border-outline-variant mt-5 space-y-2 border-t pt-4 text-xs">
             {breakdown.lines.map((line, idx) => (
               <li key={idx} className="flex justify-between gap-3">
                 <span className="text-on-surface-variant">{line.label}</span>
                 <span className="text-on-surface tabular-nums">
-                  {formatEuro(line.amount)}
+                  {formatAmount(line.amount)}
                   <span className="text-on-surface-variant">
                     {line.period === 'monthly' ? ' /mo' : ' /an'}
                   </span>
@@ -172,7 +184,7 @@ export default function OnboardingConfigurator(): React.ReactElement {
             {breakdown.seats_discount_pct > 0 && (
               <li className="text-primary flex justify-between gap-3 font-medium">
                 <span>Remise sièges</span>
-                <span className="tabular-nums">-{formatEuro(breakdown.seats_discount_eur)}</span>
+                <span className="tabular-nums">-{formatAmount(breakdown.seats_discount_eur)}</span>
               </li>
             )}
           </ul>
@@ -205,7 +217,8 @@ export default function OnboardingConfigurator(): React.ReactElement {
 interface ModeCardProps {
   icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
   title: string
-  price: number
+  /** Prix déjà formaté dans la devise utilisateur. */
+  priceLabel: string
   hint: string
   active: boolean
   onSelect: () => void
@@ -214,7 +227,7 @@ interface ModeCardProps {
 function ModeCard({
   icon: Icon,
   title,
-  price,
+  priceLabel,
   hint,
   active,
   onSelect,
@@ -242,7 +255,7 @@ function ModeCard({
       <span className="text-on-surface text-sm font-semibold">{title}</span>
       <span className="text-on-surface-variant text-xs">{hint}</span>
       <span className="text-on-surface mt-1 text-base font-semibold tabular-nums">
-        {formatEuro(price)}
+        {priceLabel}
         <span className="text-on-surface-variant text-xs font-normal"> / mois</span>
       </span>
     </button>

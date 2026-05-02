@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react'
 import { useEffect } from 'react'
 import { DEFAULT_BRANDING, useSettings } from '@/hooks/useSettings'
+import { CurrencyPicker } from './CurrencyPicker'
 import { OrgSelector } from './OrgSelector'
 
 export function BrandedHeader() {
@@ -35,6 +36,7 @@ export function BrandedHeader() {
       <OrgSelector />
 
       <div className="flex-1" />
+      <CurrencyPicker />
     </header>
   )
 }

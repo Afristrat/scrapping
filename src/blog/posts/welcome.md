@@ -23,7 +23,7 @@ Cet article inaugure notre blog. Dans les prochaines semaines, nous publierons :
 2. Des post-mortems techniques (pourquoi nous avons choisi Vite plutôt que Next.js, comment nous gérons la concurrence à 8 dans les Edge Functions).
 3. Des analyses de tendances IA tirées directement des signaux que Kairos remonte.
 
-Vous voulez tester ? L'essai 14 jours est gratuit, sans carte bancaire. Vous voulez parler à un humain avant ? Écrivez à `hello@kairos.ai-mpower.com`.
+Vous voulez tester ? L'essai 14 jours est gratuit, sans carte bancaire. Vous voulez parler à un humain avant ? Écrivez à `labs@kairos.ai-mpower.com`.
 
 À très vite,
 L'équipe Kairos.

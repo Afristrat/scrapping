@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { MarketingLayout } from '@/components/layout/MarketingLayout'
 import AcceptInvitation from '@/pages/AcceptInvitation'
 import AdminCockpit from '@/pages/AdminCockpit'
+import AppSettings from '@/pages/admin/AppSettings'
 import CSMOnboarding from '@/pages/admin/CSMOnboarding'
 import AuditLog from '@/pages/AuditLog'
 import Blog from '@/pages/Blog'
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
           { path: '/logs', element: <Logs /> },
           { path: '/admin', element: <AdminCockpit /> },
           { path: '/admin/csm', element: <CSMOnboarding /> },
+          { path: '/admin/settings', element: <AppSettings /> },
           { path: '/monitoring', element: <Navigate to="/costs" replace /> },
         ],
       },

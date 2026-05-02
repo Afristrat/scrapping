@@ -9,6 +9,7 @@ import {
   Users,
   ShieldCheck,
   Crown,
+  Sliders,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -72,6 +73,20 @@ export function Sidebar() {
             >
               <Crown className="h-4 w-4" />
               Admin Kairos
+            </Link>
+            <Link
+              to="/admin/settings"
+              className={cn(
+                'ml-9 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                pathname === '/admin/settings'
+                  ? 'bg-primary-fixed text-on-primary-fixed border-primary border-r-2'
+                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/30',
+              )}
+              aria-current={pathname === '/admin/settings' ? 'page' : undefined}
+              title="Paramètres globaux de l'application"
+            >
+              <Sliders className="h-3.5 w-3.5" />
+              Paramètres app
             </Link>
           </>
         )}

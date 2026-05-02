@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { ADDONS, BASE_PRICES, computePricing, formatEuro, getBaseLabel } from './pricing'
+import {
+  ADDONS,
+  BASE_PRICES,
+  computePricing,
+  convertFromEur,
+  type ExchangeRates,
+  formatEuro,
+  formatPrice,
+  getBaseLabel,
+  priceInCurrency,
+} from './pricing'
 
 describe('computePricing — segments forfaitaires (per_seat=false)', () => {
   it('Solo Maison = 49 €', () => {
@@ -260,5 +270,100 @@ describe('Constantes pricing', () => {
     expect(ADDONS.csm_dedicated.period).toBe('yearly')
     expect(ADDONS.webhooks.period).toBe('monthly')
     expect(ADDONS.api_public.period).toBe('monthly')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Wave 8.A — Conversion devises
+// ---------------------------------------------------------------------------
+
+const TEST_RATES: ExchangeRates = {
+  EUR: 1,
+  USD: 1.05,
+  GBP: 0.86,
+  CHF: 0.95,
+  CAD: 1.45,
+  AUD: 1.62,
+  JPY: 160,
+}
+
+describe('convertFromEur', () => {
+  it('Renvoie le même montant si devise = EUR', () => {
+    expect(convertFromEur(49, 'EUR', TEST_RATES)).toBe(49)
+  })
+
+  it('Convertit 49 € en USD avec taux 1.05', () => {
+    expect(convertFromEur(49, 'USD', TEST_RATES)).toBeCloseTo(51.45, 2)
+  })
+
+  it('Convertit 100 € en GBP avec taux 0.86', () => {
+    expect(convertFromEur(100, 'GBP', TEST_RATES)).toBeCloseTo(86, 2)
+  })
+
+  it('Convertit 200 € en CHF avec taux 0.95', () => {
+    expect(convertFromEur(200, 'CHF', TEST_RATES)).toBeCloseTo(190, 2)
+  })
+
+  it('Convertit 1000 € en JPY avec taux 160', () => {
+    expect(convertFromEur(1000, 'JPY', TEST_RATES)).toBe(160000)
+  })
+
+  it('Fallback à 1 (= EUR) si taux manquant', () => {
+    const partial = { EUR: 1 } as unknown as ExchangeRates
+    expect(convertFromEur(49, 'USD', partial)).toBe(49)
+  })
+})
+
+describe('formatPrice', () => {
+  it('Formate USD en locale en-US sans décimales', () => {
+    const formatted = formatPrice(51.45, 'USD', 'en-US')
+    expect(formatted).toContain('$')
+    expect(formatted).toContain('51')
+  })
+
+  it('Formate GBP en locale en-GB', () => {
+    const formatted = formatPrice(86, 'GBP', 'en-GB')
+    expect(formatted).toContain('£')
+    expect(formatted).toContain('86')
+  })
+
+  it('JPY sans décimales (devise sans subdivision)', () => {
+    const formatted = formatPrice(160, 'JPY', 'ja-JP')
+    expect(formatted).toContain('160')
+    expect(formatted).not.toContain('.0')
+    expect(formatted).not.toContain(',0')
+  })
+
+  it('CHF formate en locale suisse', () => {
+    const formatted = formatPrice(190, 'CHF', 'fr-CH')
+    expect(formatted).toContain('190')
+  })
+})
+
+describe('priceInCurrency', () => {
+  it('Solo Maison 49 € ≈ $51 USD avec taux 1.05', () => {
+    const result = priceInCurrency(49, 'USD', TEST_RATES, 'en-US')
+    expect(result).toContain('$')
+    // 49 × 1.05 = 51.45 → arrondi à 51
+    expect(result).toMatch(/51/)
+  })
+
+  it('CTO PME 149 € ≈ £128 GBP avec taux 0.86', () => {
+    const result = priceInCurrency(149, 'GBP', TEST_RATES, 'en-GB')
+    // 149 × 0.86 = 128.14 → arrondi 128
+    expect(result).toContain('£')
+    expect(result).toMatch(/128/)
+  })
+
+  it('VC 599 € ≈ ¥95 840 JPY avec taux 160', () => {
+    const result = priceInCurrency(599, 'JPY', TEST_RATES, 'ja-JP')
+    // 599 × 160 = 95 840
+    expect(result).toMatch(/95.?840/)
+  })
+
+  it('EUR reste identique au montant source (rate 1)', () => {
+    const result = priceInCurrency(499, 'EUR', TEST_RATES, 'fr-FR')
+    expect(result).toContain('499')
+    expect(result).toContain('€')
   })
 })
