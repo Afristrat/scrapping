@@ -30,7 +30,7 @@ export function LLMCostsTable({ rows, isLoading }: Props) {
   if (!rows || rows.length === 0) {
     return (
       <div className="border-outline-variant bg-surface-container-low text-on-surface-variant rounded-xl border border-dashed p-8 text-center text-sm">
-        Pas de donnees de couts OpenRouter.
+        Pas de données de coûts OpenRouter.
       </div>
     )
   }
@@ -41,11 +41,11 @@ export function LLMCostsTable({ rows, isLoading }: Props) {
         <thead className="bg-surface-container text-on-surface-variant border-outline-variant border-b text-left text-xs font-semibold tracking-[0.05em] uppercase">
           <tr>
             <th className="w-32 px-4 py-3">Quand</th>
-            <th className="w-24 px-4 py-3">Tache</th>
-            <th className="px-4 py-3">Modele</th>
+            <th className="w-24 px-4 py-3">Tâche</th>
+            <th className="px-4 py-3">Modèle</th>
             <th className="px-4 py-3 text-right">Tokens in</th>
             <th className="px-4 py-3 text-right">Tokens out</th>
-            <th className="px-4 py-3 text-right">Cout</th>
+            <th className="px-4 py-3 text-right">Coût</th>
           </tr>
         </thead>
         <tbody className="divide-outline-variant/40 divide-y">

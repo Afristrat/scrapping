@@ -126,7 +126,7 @@ export default function Costs() {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-on-surface text-3xl font-bold tracking-tight">Couts</h2>
+          <h2 className="text-on-surface text-3xl font-bold tracking-tight">Coûts</h2>
           <p className="text-on-surface-variant mt-1 text-sm">
             Tracez chaque euro depense en LLM et scraping.
           </p>
@@ -151,8 +151,8 @@ export default function Costs() {
         <div className="border-tertiary-fixed-dim bg-tertiary-fixed text-on-tertiary-fixed flex items-center gap-2 rounded-xl border p-4 text-sm shadow-sm">
           <AlertTriangle className="text-tertiary h-4 w-4 shrink-0" />
           <span>
-            Depense moyenne quotidienne ({formatCost(avgDaily)}) depasse le budget de{' '}
-            {formatCost(dailyBudget, 2)}/jour de plus de 10%.
+            Dépense moyenne quotidienne ({formatCost(avgDaily)}) dépasse le budget de{' '}
+            {formatCost(dailyBudget, 2)}/jour de plus de 10 %.
           </span>
         </div>
       )}
@@ -164,7 +164,7 @@ export default function Costs() {
       {/* Cost by task */}
       <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-md">
         <CardHeader>
-          <CardTitle className="text-on-surface text-lg font-semibold">Cout par tache</CardTitle>
+          <CardTitle className="text-on-surface text-lg font-semibold">Coût par tâche</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {(['scraping', 'scoring', 'monitoring'] as const).map((task) => {
@@ -201,18 +201,18 @@ export default function Costs() {
       {modelSummary.length > 0 && (
         <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-md">
           <CardHeader>
-            <CardTitle className="text-on-surface text-lg font-semibold">Cout par modele</CardTitle>
+            <CardTitle className="text-on-surface text-lg font-semibold">Coût par modèle</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="border-outline-variant overflow-hidden rounded-xl border">
               <table className="w-full text-sm">
                 <thead className="bg-surface-container text-on-surface-variant border-outline-variant border-b text-left text-xs font-semibold tracking-[0.05em] uppercase">
                   <tr>
-                    <th className="px-4 py-3">Modele</th>
+                    <th className="px-4 py-3">Modèle</th>
                     <th className="px-4 py-3 text-right">Calls</th>
                     <th className="px-4 py-3 text-right">Tokens in</th>
                     <th className="px-4 py-3 text-right">Tokens out</th>
-                    <th className="px-4 py-3 text-right">Cout</th>
+                    <th className="px-4 py-3 text-right">Coût</th>
                   </tr>
                 </thead>
                 <tbody className="divide-outline-variant/40 divide-y">
@@ -240,16 +240,16 @@ export default function Costs() {
         </Card>
       )}
 
-      {/* Tarifs par modele (catalogue) */}
+      {/* Tarifs par modèle (catalogue) */}
       {pricingTable.length > 0 && (
         <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-md">
           <CardHeader>
             <CardTitle className="text-on-surface text-lg font-semibold">
-              Tarifs par modele
+              Tarifs par modèle
             </CardTitle>
             <p className="text-on-surface-variant text-xs">
-              Prix unitaires par 1M tokens — tires de provider_models, convertis depuis USD vers
-              votre devise via les taux ECB du jour. Actualises via Reglages -&gt; Modeles.
+              Prix unitaires par 1M tokens — tirés de provider_models, convertis depuis USD vers
+              votre devise via les taux ECB du jour. Actualisés via Réglages -&gt; Modèles.
             </p>
           </CardHeader>
           <CardContent>
@@ -258,7 +258,7 @@ export default function Costs() {
                 <thead className="bg-surface-container text-on-surface-variant border-outline-variant border-b text-left text-xs font-semibold tracking-[0.05em] uppercase">
                   <tr>
                     <th className="px-4 py-3">Provider</th>
-                    <th className="px-4 py-3">Modele</th>
+                    <th className="px-4 py-3">Modèle</th>
                     <th className="px-4 py-3 text-right">Context</th>
                     <th className="px-4 py-3 text-right">Input / 1M</th>
                     <th className="px-4 py-3 text-right">Output / 1M</th>
