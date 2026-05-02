@@ -137,6 +137,21 @@ async function scoreInBackground(opts: {
   }
 
   const scoreMs = Date.now() - t0
+
+  // Topic classification (fire-and-forget — non-bloquant)
+  if (ids.length > 0) {
+    fetch(`${base}/functions/v1/topic-classifier`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        signal_ids: ids,
+        run_at: new Date().toISOString(),
+      }),
+    }).catch(() => {
+      // Erreurs déjà loggées par topic-classifier
+    })
+  }
+
   await supabase.from('logs').insert({
     user_id: userId,
     action: 'pipeline:run',

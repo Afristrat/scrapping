@@ -13,9 +13,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    exclude: ['node_modules', 'dist', 'supabase/functions/**'],
     coverage: {
       provider: 'v8',
-      exclude: ['node_modules', 'dist', 'src/test', '**/*.config.*'],
+      exclude: ['node_modules', 'dist', 'src/test', '**/*.config.*', 'supabase/**'],
     },
   },
 })

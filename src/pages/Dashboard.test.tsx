@@ -1,9 +1,18 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import Dashboard from './Dashboard'
 import type { SignalRow } from '@/hooks/useSignals'
+
+vi.mock('@/hooks/useCurrentOrgId', () => ({
+  useCurrentOrgId: () => 'test-org-id',
+}))
+
+vi.mock('@/hooks/useTopics', () => ({
+  useTopics: () => ({ data: [], isLoading: false }),
+}))
 
 const NOW = new Date('2026-04-30T10:00:00Z').toISOString()
 
@@ -54,7 +63,9 @@ function renderDashboard() {
   const qc = new QueryClient()
   return render(
     <QueryClientProvider client={qc}>
-      <Dashboard />
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }

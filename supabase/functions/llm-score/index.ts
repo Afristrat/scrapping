@@ -1,18 +1,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import OpenAI from 'npm:openai@4'
-import { getUserApiKey } from '../_shared/api-keys.ts'
-import { retryWithBackoff } from '../_shared/retry.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
-const PRICE_FALLBACK_PER_1K: Record<string, { in: number; out: number }> = {
-  'anthropic/claude-haiku-4.5': { in: 0.001, out: 0.005 },
-  'openrouter/auto': { in: 0.002, out: 0.006 },
 }
 
 interface RequestBody {
@@ -24,6 +15,15 @@ interface ScoringCriterion {
   weight: number
 }
 
+interface DispatchResponse {
+  ok: boolean
+  error?: string
+  content?: string
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number }
+  model_used?: string
+  provider_used?: string
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -31,7 +31,13 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization')
   if (!auth) return json({ error: 'missing_authorization' }, 401)
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return json({ error: 'supabase_env_missing' }, 500)
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
   })
 
@@ -39,14 +45,6 @@ Deno.serve(async (req) => {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return json({ error: 'invalid_token' }, 401)
-
-  // OpenRouter key: user key > env fallback > error
-  const apiKey = await getUserApiKey(supabase, user.id, 'openrouter')
-  if (!apiKey)
-    return json(
-      { error: 'missing_openrouter_key', detail: 'No OpenRouter key in user_api_keys or env' },
-      500,
-    )
 
   let body: RequestBody
   try {
@@ -99,47 +97,54 @@ Payload: ${JSON.stringify(signal.raw_payload).slice(0, 4000)}
 
 Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
 
-  const client = new OpenAI({
-    baseURL: OPENROUTER_BASE,
-    apiKey,
-    defaultHeaders: {
-      'HTTP-Referer': 'https://zlatan-scrap.local',
-      'X-Title': 'zlatan-scrap',
-    },
-  })
-
-  let completion
+  let dispatchResult: DispatchResponse
   try {
-    completion = await retryWithBackoff(
-      () =>
-        client.chat.completions.create({
-          model: settings.model_scoring,
-          messages: [{ role: 'user', content: prompt }],
-          response_format: { type: 'json_object' },
+    const dispatchRes = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
+      method: 'POST',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        task: 'scoring',
+        messages: [{ role: 'user', content: prompt }],
+        options: {
           max_tokens: 200,
-        }),
-      { maxAttempts: 5, baseDelayMs: 1500 },
-    )
+          response_format: { type: 'json_object' },
+        },
+      }),
+    })
+    dispatchResult = (await dispatchRes.json()) as DispatchResponse
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     await supabase.from('logs').insert({
       user_id: user.id,
       action: 'llm:score',
       status: 'error',
-      payload: { signal_id: body.signal_id, error: reason },
+      payload: { signal_id: body.signal_id, error: reason, stage: 'dispatch_fetch' },
     })
-    return json({ error: 'openrouter_failed', detail: reason }, 502)
+    return json({ error: 'dispatch_unreachable', detail: reason }, 502)
   }
 
-  const raw = completion.choices[0]?.message?.content ?? '{}'
+  if (!dispatchResult.ok) {
+    const reason = dispatchResult.error ?? 'dispatch_failed'
+    await supabase.from('logs').insert({
+      user_id: user.id,
+      action: 'llm:score',
+      status: 'error',
+      payload: { signal_id: body.signal_id, error: reason },
+    })
+    return json({ error: 'llm_failed', detail: reason }, 502)
+  }
+
+  const raw = dispatchResult.content ?? '{}'
   const { score, reasoning } = parseScoreResponse(raw)
 
-  const usage = completion.usage as
-    | { prompt_tokens?: number; completion_tokens?: number; cost?: number }
-    | undefined
+  const usage = dispatchResult.usage
   const promptTokens = usage?.prompt_tokens ?? 0
   const completionTokens = usage?.completion_tokens ?? 0
-  const cost = usage?.cost ?? estimateCost(settings.model_scoring, promptTokens, completionTokens)
+  const cost = usage?.cost ?? 0
+  const modelUsed = dispatchResult.model_used ?? 'unknown'
 
   const [scoreInsert, costInsert] = await Promise.all([
     supabase.from('scores').upsert(
@@ -148,7 +153,7 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
         user_id: user.id,
         score,
         reasoning,
-        model_used: settings.model_scoring,
+        model_used: modelUsed,
         cost,
       },
       { onConflict: 'signal_id,user_id' },
@@ -156,7 +161,7 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
     supabase.from('llm_costs').insert({
       user_id: user.id,
       task: 'scoring',
-      model: settings.model_scoring,
+      model: modelUsed,
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
       cost,
@@ -190,12 +195,6 @@ function parseScoreResponse(raw: string): { score: number; reasoning: string } {
   } catch {
     return { score: 0, reasoning: '(invalid LLM output)' }
   }
-}
-
-function estimateCost(model: string, promptTokens: number, completionTokens: number): number {
-  const price = PRICE_FALLBACK_PER_1K[model]
-  if (!price) return 0
-  return (promptTokens * price.in + completionTokens * price.out) / 1000
 }
 
 function json(body: unknown, status: number): Response {

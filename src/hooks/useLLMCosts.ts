@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 
 export type LLMTask = 'scraping' | 'scoring' | 'monitoring'
 
@@ -28,8 +29,10 @@ export interface BreakdownRow {
 }
 
 export function useCostsByDay(days = 7) {
+  const orgId = useCurrentOrgId()
   return useQuery<CostByDayRow[]>({
-    queryKey: ['costs_by_day', days],
+    queryKey: ['costs_by_day', orgId, days],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('costs_by_day', { days })
       if (error) throw error
@@ -39,13 +42,16 @@ export function useCostsByDay(days = 7) {
 }
 
 export function useLLMCostsRecent(days = 14) {
+  const orgId = useCurrentOrgId()
   return useQuery<CostRow[]>({
-    queryKey: ['llm_costs', 'recent', days],
+    queryKey: ['llm_costs', 'recent', orgId, days],
+    enabled: !!orgId,
     queryFn: async () => {
       const sinceIso = new Date(Date.now() - days * 86_400_000).toISOString()
       const { data, error } = await supabase
         .from('llm_costs')
         .select('task, model, prompt_tokens, completion_tokens, cost, ts')
+        .eq('org_id', orgId ?? '')
         .gte('ts', sinceIso)
         .order('ts', { ascending: false })
       if (error) throw error

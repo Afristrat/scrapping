@@ -114,7 +114,7 @@ sequenceDiagram
     U->>FE: clic Générer (24h/7j/30j)
     FE->>DG: POST {period_days: 7}
     DG->>DB: SELECT top 50 signaux scorés (period)
-    DG->>DB: SELECT settings (language, model_digest, active_rubric)
+    DG->>DB: SELECT settings (language, model_config.digest, active_rubric)
     DG->>OR: chat completion (prompt structuré FR/EN/ES)
     OR-->>DG: digest markdown
     DG->>DB: INSERT digests

@@ -31,9 +31,11 @@ export function Filters({ value, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-6 rounded-lg border border-slate-200 bg-white p-4">
+    <div className="border-outline-variant bg-surface-container-lowest flex flex-wrap items-end gap-6 rounded-xl border p-4 shadow-sm">
       <div>
-        <p className="mb-2 text-xs font-medium tracking-wide text-slate-500 uppercase">Sources</p>
+        <p className="text-on-surface-variant mb-2 text-xs font-semibold tracking-[0.05em] uppercase">
+          Sources
+        </p>
         <div className="flex gap-2">
           {SOURCES.map((s) => {
             const active = value.sources.includes(s)
@@ -45,7 +47,7 @@ export function Filters({ value, onChange }: Props) {
                 variant={active ? 'default' : 'outline'}
                 onClick={() => toggleSource(s)}
                 aria-pressed={active}
-                className={cn('gap-1.5', !active && 'text-slate-600')}
+                className={cn('gap-1.5', !active && 'text-on-surface-variant')}
               >
                 <Icon className="h-3.5 w-3.5" />
                 {label}
@@ -56,7 +58,9 @@ export function Filters({ value, onChange }: Props) {
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-medium tracking-wide text-slate-500 uppercase">Période</p>
+        <p className="text-on-surface-variant mb-2 text-xs font-semibold tracking-[0.05em] uppercase">
+          Période
+        </p>
         <div className="flex gap-2">
           {PERIODS.map((p) => (
             <Button
@@ -73,10 +77,10 @@ export function Filters({ value, onChange }: Props) {
       </div>
 
       <div className="min-w-[220px] flex-1">
-        <p className="mb-2 text-xs font-medium tracking-wide text-slate-500 uppercase">
-          Score minimum : <span className="font-mono">{value.minScore}</span>
+        <p className="text-on-surface-variant mb-2 text-xs font-semibold tracking-[0.05em] uppercase">
+          Score minimum : <span className="text-on-surface font-mono">{value.minScore}</span>
           {value.minScore === 0 && (
-            <span className="ml-2 text-[10px] text-slate-400 normal-case">
+            <span className="text-outline ml-2 text-[10px] normal-case">
               (inclut les zéros — passe à 1+ pour cacher)
             </span>
           )}
@@ -91,7 +95,7 @@ export function Filters({ value, onChange }: Props) {
       </div>
 
       <div>
-        <p className="mb-2 flex items-center gap-1 text-xs font-medium tracking-wide text-slate-500 uppercase">
+        <p className="text-on-surface-variant mb-2 flex items-center gap-1 text-xs font-semibold tracking-[0.05em] uppercase">
           <ArrowDownAZ className="h-3 w-3" />
           Trier par
         </p>

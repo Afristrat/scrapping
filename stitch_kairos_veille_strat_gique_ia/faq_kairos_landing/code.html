@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FAQ - Kairos</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "on-primary-fixed-variant": "#005137",
+                  "surface-bright": "#f8f9ff",
+                  "on-surface-variant": "#3d4a42",
+                  "tertiary": "#9b3e3b",
+                  "on-tertiary-fixed": "#410004",
+                  "tertiary-fixed": "#ffdad7",
+                  "surface-container-low": "#eff4ff",
+                  "surface-container-highest": "#d5e3fc",
+                  "on-primary-fixed": "#002114",
+                  "surface": "#f8f9ff",
+                  "on-secondary-container": "#fefcff",
+                  "surface-tint": "#006c4a",
+                  "secondary-container": "#316bf3",
+                  "on-primary": "#ffffff",
+                  "inverse-primary": "#68dba9",
+                  "surface-container": "#e6eeff",
+                  "secondary-fixed": "#dbe1ff",
+                  "secondary": "#0051d5",
+                  "on-secondary": "#ffffff",
+                  "error": "#ba1a1a",
+                  "on-secondary-fixed": "#00174b",
+                  "on-background": "#0d1c2e",
+                  "on-tertiary": "#ffffff",
+                  "on-error-container": "#93000a",
+                  "on-error": "#ffffff",
+                  "surface-variant": "#d5e3fc",
+                  "on-secondary-fixed-variant": "#003ea8",
+                  "secondary-fixed-dim": "#b4c5ff",
+                  "on-tertiary-fixed-variant": "#7f2928",
+                  "error-container": "#ffdad6",
+                  "primary-fixed": "#85f8c4",
+                  "inverse-on-surface": "#eaf1ff",
+                  "outline": "#6d7a72",
+                  "outline-variant": "#bccac0",
+                  "surface-container-high": "#dce9ff",
+                  "tertiary-fixed-dim": "#ffb3ae",
+                  "inverse-surface": "#233144",
+                  "primary-fixed-dim": "#68dba9",
+                  "tertiary-container": "#ba5551",
+                  "on-tertiary-container": "#fffbff",
+                  "surface-container-lowest": "#ffffff",
+                  "primary": "#006948",
+                  "on-surface": "#0d1c2e",
+                  "surface-dim": "#ccdbf3",
+                  "background": "#f8f9ff",
+                  "on-primary-container": "#f5fff7",
+                  "primary-container": "#00855d"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.125rem",
+                  "lg": "0.25rem",
+                  "xl": "0.5rem",
+                  "full": "0.75rem"
+          },
+          "spacing": {
+                  "stack-lg": "24px",
+                  "margin-page": "2rem",
+                  "stack-sm": "8px",
+                  "unit-base": "4px",
+                  "gutter": "1.5rem",
+                  "max-width-dashboard": "1280px",
+                  "stack-md": "16px",
+                  "max-width-marketing": "1152px"
+          },
+          "fontFamily": {
+                  "h2-4xl": [
+                          "Inter"
+                  ],
+                  "h1-6xl": [
+                          "Inter"
+                  ],
+                  "h3-2xl": [
+                          "Inter"
+                  ],
+                  "body-sm": [
+                          "Inter"
+                  ],
+                  "body-lg": [
+                          "Inter"
+                  ],
+                  "label-caps": [
+                          "Inter"
+                  ],
+                  "body-md": [
+                          "Inter"
+                  ]
+          },
+          "fontSize": {
+                  "h2-4xl": [
+                          "36px",
+                          {
+                                  "lineHeight": "2.5rem",
+                                  "letterSpacing": "-0.02em",
+                                  "fontWeight": "700"
+                          }
+                  ],
+                  "h1-6xl": [
+                          "60px",
+                          {
+                                  "lineHeight": "1",
+                                  "letterSpacing": "-0.02em",
+                                  "fontWeight": "700"
+                          }
+                  ],
+                  "h3-2xl": [
+                          "24px",
+                          {
+                                  "lineHeight": "2rem",
+                                  "letterSpacing": "-0.01em",
+                                  "fontWeight": "600"
+                          }
+                  ],
+                  "body-sm": [
+                          "14px",
+                          {
+                                  "lineHeight": "1.25rem",
+                                  "letterSpacing": "0",
+                                  "fontWeight": "400"
+                          }
+                  ],
+                  "body-lg": [
+                          "18px",
+                          {
+                                  "lineHeight": "1.75rem",
+                                  "letterSpacing": "0",
+                                  "fontWeight": "400"
+                          }
+                  ],
+                  "label-caps": [
+                          "12px",
+                          {
+                                  "lineHeight": "1rem",
+                                  "letterSpacing": "0.05em",
+                                  "fontWeight": "600"
+                          }
+                  ],
+                  "body-md": [
+                          "16px",
+                          {
+                                  "lineHeight": "1.5rem",
+                                  "letterSpacing": "0",
+                                  "fontWeight": "400"
+                          }
+                  ]
+          }
+  },
+      },
+    }
+  </script>
+<style>
+    /* Custom styles for details/summary */
+    details > summary {
+      list-style: none;
+    }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+    details[open] summary ~ * {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    @keyframes fadeIn {
+      0% { opacity: 0; transform: translateY(-10px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    details[open] summary .material-symbols-outlined {
+      transform: rotate(180deg);
+    }
+    details[open] summary {
+        color: #00855d; /* text-primary-container equivalent to emerald-700 in visual weight for open state if strict theme followed, using primary-container */
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased">
+<!-- TopNavBar Navigation Component -->
+<header class="bg-surface-container-lowest/80 dark:bg-slate-900/80 backdrop-blur-md full-width top-0 sticky border-b border-outline-variant shadow-sm z-50">
+<div class="max-w-6xl mx-auto flex justify-between items-center h-16 px-6 w-full">
+<!-- Brand / Logo -->
+<a class="text-xl font-bold tracking-tight text-on-background dark:text-white flex items-center gap-2" href="#">
+<!-- Hidden image requirement usage -->
+<img alt="Kairos abstract logo visualization" class="w-8 h-8 rounded-DEFAULT hidden object-cover" data-alt="A stylized, modern geometric icon representing an AI monitoring system. The design uses crisp emerald green and deep slate tones on a pure white background. The icon features clean, sharp edges typical of premium B2B software interfaces, illuminated by bright, clear lighting." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+        Kairos
+      </a>
+<!-- Desktop Navigation -->
+<nav class="hidden md:flex items-center gap-6">
+<a class="font-body-md text-on-surface-variant font-medium hover:text-primary transition-colors cursor-pointer active:opacity-80 transition-all" href="#">Platform</a>
+<a class="font-body-md text-on-surface-variant font-medium hover:text-primary transition-colors cursor-pointer active:opacity-80 transition-all" href="#">Solutions</a>
+<a class="font-body-md text-on-surface-variant font-medium hover:text-primary transition-colors cursor-pointer active:opacity-80 transition-all" href="#">Monitoring</a>
+<a class="font-body-md text-on-surface-variant font-medium hover:text-primary transition-colors cursor-pointer active:opacity-80 transition-all" href="#">Pricing</a>
+<!-- Active Nav Item based on Intent -->
+<a aria-current="page" class="font-body-md text-primary font-semibold border-b-2 border-primary pb-1 hover:text-primary transition-colors cursor-pointer active:opacity-80 transition-all" href="#">FAQ</a>
+</nav>
+<!-- Actions -->
+<div class="flex items-center gap-4">
+<a class="hidden md:inline-flex font-body-md text-primary hover:text-on-primary-fixed-variant transition-colors" href="#">Sign In</a>
+<a class="inline-flex items-center justify-center px-4 py-2 bg-primary text-on-primary font-body-md font-medium rounded-lg shadow-sm hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors min-h-[40px]" href="#">Get Started</a>
+</div>
+</div>
+</header>
+<main>
+<!-- FAQ Section -->
+<section class="max-w-3xl mx-auto py-20 px-6 bg-surface-container-lowest">
+<!-- En-tête -->
+<div class="text-center mb-12">
+<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider mb-2 block">FOIRE AUX QUESTIONS</span>
+<h2 class="font-h2-4xl text-h2-4xl text-on-background font-bold">Les 5 questions qu'on nous pose.</h2>
+</div>
+<!-- Liste FAQ -->
+<div class="space-y-4">
+<!-- Item 1 -->
+<details class="group border-b border-outline-variant pb-4 rounded-DEFAULT hover:bg-surface-container-low transition-colors duration-150 p-2">
+<summary class="flex justify-between items-center cursor-pointer py-3 focus:outline-none focus:ring-2 focus:ring-primary rounded-lg text-h3-2xl font-h3-2xl text-on-background group-open:text-primary">
+            Pourquoi BYOK est-il plus cher que Maison ?
+            <span class="material-symbols-outlined text-outline transition-transform duration-300">expand_more</span>
+</summary>
+<div class="font-body-md text-body-md text-on-surface-variant leading-relaxed py-4 px-2">
+            La différence de prix s'explique par le contrôle et la souveraineté. L'approche Maison utilise nos ressources partagées pour minimiser les coûts. En revanche, le modèle BYOK (Bring Your Own Key) implique que vous gérez vos propres clés API et ressources de traitement. Vous payez pour l'infrastructure dédiée et la garantie que vos données LLM restent sous votre contrôle absolu, ce qui justifie un coût structurel différent par rapport à un modèle d'abonnement mutualisé classique.
+          </div>
+</details>
+<!-- Item 2 -->
+<details class="group border-b border-outline-variant pb-4 rounded-DEFAULT hover:bg-surface-container-low transition-colors duration-150 p-2">
+<summary class="flex justify-between items-center cursor-pointer py-3 focus:outline-none focus:ring-2 focus:ring-primary rounded-lg text-h3-2xl font-h3-2xl text-on-background group-open:text-primary">
+            Pourquoi pas Feedly, Inoreader ou un agrégateur RSS ?
+            <span class="material-symbols-outlined text-outline transition-transform duration-300">expand_more</span>
+</summary>
+<div class="font-body-md text-body-md text-on-surface-variant leading-relaxed py-4 px-2">
+            Les agrégateurs classiques comme Feedly ou Inoreader se contentent de collecter et d'afficher des flux d'information de manière chronologique. Kairos va beaucoup plus loin : notre système applique un <a class="text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary rounded-sm" href="#">scoring prédictif</a> basé sur l'IA pour évaluer la pertinence et le risque de chaque signal entrant. Nous ne sommes pas un lecteur de flux, mais une plateforme d'analyse et de décision intelligente qui trie le bruit pour vous.
+          </div>
+</details>
+<!-- Item 3 -->
+<details class="group border-b border-outline-variant pb-4 rounded-DEFAULT hover:bg-surface-container-low transition-colors duration-150 p-2">
+<summary class="flex justify-between items-center cursor-pointer py-3 focus:outline-none focus:ring-2 focus:ring-primary rounded-lg text-h3-2xl font-h3-2xl text-on-background group-open:text-primary">
+            Combien ça coûte vraiment en LLM (mode BYOK) ?
+            <span class="material-symbols-outlined text-outline transition-transform duration-300">expand_more</span>
+</summary>
+<div class="font-body-md text-body-md text-on-surface-variant leading-relaxed py-4 px-2">
+            Les coûts réels en mode BYOK dépendent fortement de votre volume de traitement et du modèle choisi. Selon nos estimations basées sur des cas d'usage réels en production, cela peut varier de ~3 <span class="sr-only">euros par mois</span>€/mois pour une petite équipe à ~200 <span class="sr-only">euros par mois</span>€/mois pour un monitoring intensif d'entreprise. Vous gardez un contrôle total sur ces dépenses via la console de votre fournisseur LLM.
+          </div>
+</details>
+<!-- Item 4 -->
+<details class="group border-b border-outline-variant pb-4 rounded-DEFAULT hover:bg-surface-container-low transition-colors duration-150 p-2">
+<summary class="flex justify-between items-center cursor-pointer py-3 focus:outline-none focus:ring-2 focus:ring-primary rounded-lg text-h3-2xl font-h3-2xl text-on-background group-open:text-primary">
+            Mes données sont-elles sécurisées ?
+            <span class="material-symbols-outlined text-outline transition-transform duration-300">expand_more</span>
+</summary>
+<div class="font-body-md text-body-md text-on-surface-variant leading-relaxed py-4 px-2">
+            Absolument. La sécurité est au cœur de notre architecture. Nous utilisons RLS (Row Level Security) sur Postgres pour garantir une isolation stricte des données entre les utilisateurs. Chaque environnement (Tenant) est isolé. De plus, avec l'option BYOK ou notre futur modèle Self-host, vous avez la garantie de conserver la maîtrise totale et la confidentialité de vos informations sensibles.
+          </div>
+</details>
+<!-- Item 5 -->
+<details class="group pb-4 rounded-DEFAULT hover:bg-surface-container-low transition-colors duration-150 p-2">
+<summary class="flex justify-between items-center cursor-pointer py-3 focus:outline-none focus:ring-2 focus:ring-primary rounded-lg text-h3-2xl font-h3-2xl text-on-background group-open:text-primary">
+            Est-ce adapté à mon équipe / mon organisation ?
+            <span class="material-symbols-outlined text-outline transition-transform duration-300">expand_more</span>
+</summary>
+<div class="font-body-md text-body-md text-on-surface-variant leading-relaxed py-4 px-2">
+            Oui, Kairos est conçu pour évoluer avec votre structure. Nous supportons l'authentification multi-méthodes (SSO, OAuth, Magic Links) pour s'intégrer facilement à vos processus existants. De plus, notre architecture multi-tenant native, qui sera pleinement déployée au Q3 2026, permettra une gestion granulaire des rôles et des accès pour les grandes organisations complexes.
+          </div>
+</details>
+</div>
+</section>
+</main>
+<!-- Footer Navigation Component -->
+<footer class="bg-surface-container-low dark:bg-slate-950 full-width py-12 border-t border-outline-variant">
+<div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+<!-- Brand & Copyright -->
+<div class="flex flex-col items-center md:items-start gap-2">
+<div class="text-lg font-bold text-on-background dark:text-white flex items-center gap-2">
+          Kairos
+        </div>
+<p class="text-sm font-sans text-on-surface-variant dark:text-slate-400">© 2024 Kairos AI Monitoring. All rights reserved.</p>
+</div>
+<!-- Links -->
+<nav class="flex flex-wrap justify-center gap-6">
+<a class="font-body-sm text-body-sm text-on-surface-variant dark:text-slate-400 hover:text-on-background dark:hover:text-slate-100 underline underline-offset-4 transition-all duration-200" href="#">Privacy Policy</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant dark:text-slate-400 hover:text-on-background dark:hover:text-slate-100 underline underline-offset-4 transition-all duration-200" href="#">Terms of Service</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant dark:text-slate-400 hover:text-on-background dark:hover:text-slate-100 underline underline-offset-4 transition-all duration-200" href="#">Security</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant dark:text-slate-400 hover:text-on-background dark:hover:text-slate-100 underline underline-offset-4 transition-all duration-200" href="#">Status</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant dark:text-slate-400 hover:text-on-background dark:hover:text-slate-100 underline underline-offset-4 transition-all duration-200" href="#">Contact</a>
+</nav>
+</div>
+</footer>
+</body></html>

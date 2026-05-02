@@ -1,170 +1,381 @@
-import { useState } from 'react'
-import { Sparkles, RefreshCw } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Sparkles, Trash2, AlertTriangle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useGenerateDigest, useLatestDigest, type PeriodDays } from '@/hooks/useDigest'
-import { cn } from '@/lib/utils'
+import { Slider } from '@/components/ui/slider'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import {
+  useDigests,
+  useGenerateDigest,
+  useDeleteDigest,
+  DigestError,
+  type DigestRow,
+} from '@/hooks/useDigest'
 
-const PERIODS: Array<{ label: string; days: PeriodDays }> = [
-  { label: '24h', days: 1 },
-  { label: '7j', days: 7 },
-  { label: '30j', days: 30 },
+const WINDOW_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 24, label: '24 h' },
+  { value: 72, label: '72 h' },
+  { value: 24 * 7, label: '7 j' },
+  { value: 24 * 30, label: '30 j' },
 ]
 
-export default function Digest() {
-  const [period, setPeriod] = useState<PeriodDays>(7)
-  const { data: digest, isLoading } = useLatestDigest(period)
-  const genMutation = useGenerateDigest()
+const RETRY_FALLBACK_SCORE = 30
 
-  const isStale =
-    digest && Date.now() - new Date(digest.generated_at).getTime() > 6 * 60 * 60 * 1000
+export default function Digest(): React.ReactElement {
+  const [windowHours, setWindowHours] = useState<number>(24)
+  const [minScoreRange, setMinScoreRange] = useState<number[]>([60])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const digestsQuery = useDigests()
+  const generate = useGenerateDigest()
+  const remove = useDeleteDigest()
+
+  const digests = useMemo<DigestRow[]>(() => digestsQuery.data ?? [], [digestsQuery.data])
+  const selected = useMemo<DigestRow | null>(() => {
+    if (!digests.length) return null
+    if (selectedId) {
+      const found = digests.find((d) => d.id === selectedId)
+      if (found) return found
+    }
+    return digests[0] ?? null
+  }, [digests, selectedId])
+
+  const minScore = minScoreRange[0] ?? 60
+
+  const submitGeneration = (params: { window_hours: number; min_score: number }): void => {
+    generate.mutate(params, {
+      onSuccess: (resp) => {
+        setSelectedId(resp.digest_id)
+      },
+    })
+  }
+
+  const handleGenerate = (): void => {
+    submitGeneration({ window_hours: windowHours, min_score: minScore })
+  }
+
+  const digestError = generate.error instanceof DigestError ? generate.error : null
+  // On ne propose le retry que si on a constaté que le seuil bloque
+  // (au moins 1 signal scoré dans la fenêtre, mais aucun au-dessus du seuil).
+  const canRetryWithLowerScore =
+    digestError !== null &&
+    digestError.code === 'no_signals' &&
+    typeof digestError.maxScoreInWindow === 'number' &&
+    digestError.maxScoreInWindow >= 0 &&
+    minScore > RETRY_FALLBACK_SCORE
+  const retryScore =
+    digestError !== null && typeof digestError.maxScoreInWindow === 'number'
+      ? Math.max(0, Math.min(RETRY_FALLBACK_SCORE, digestError.maxScoreInWindow))
+      : RETRY_FALLBACK_SCORE
+
+  const handleRetryWithLowerScore = (): void => {
+    setMinScoreRange([retryScore])
+    submitGeneration({ window_hours: windowHours, min_score: retryScore })
+  }
+
+  const handleDelete = (id: string): void => {
+    if (typeof window !== 'undefined' && !window.confirm('Supprimer ce brief ?')) return
+    remove.mutate(id, {
+      onSuccess: () => {
+        if (selectedId === id) setSelectedId(null)
+      },
+    })
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-            Brief de veille
-          </h2>
-          <p className="text-sm text-slate-500">
-            Synthèse 80/20 des signaux scorés, traduite dans ta langue.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1">
-            {PERIODS.map((p) => (
-              <Button
-                key={p.days}
-                size="sm"
-                variant={period === p.days ? 'default' : 'outline'}
-                onClick={() => setPeriod(p.days)}
-                aria-pressed={period === p.days}
-              >
-                {p.label}
-              </Button>
-            ))}
-          </div>
-          <Button
-            size="sm"
-            onClick={() => genMutation.mutate({ period_days: period })}
-            disabled={genMutation.isPending}
-            className="gap-1.5"
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', genMutation.isPending && 'animate-spin')} />
-            {genMutation.isPending ? 'Génération…' : 'Générer'}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-8">
+      <header className="space-y-2">
+        <h2 className="text-on-surface flex items-center gap-2 text-3xl font-bold tracking-tight">
+          <Sparkles className="text-primary h-7 w-7" />
+          Digest 80/20
+        </h2>
+        <p className="text-on-surface-variant text-base">
+          Synthèse des signaux qui comptent, dans votre langue.
+        </p>
+      </header>
 
-      {isLoading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
-      ) : !digest ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-            <Sparkles className="h-10 w-10 text-slate-300" />
-            <p className="text-sm text-slate-500">
-              Aucun brief pour cette période.
-              <br />
-              Lance le pipeline depuis le Dashboard, puis clique "Générer".
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {isStale && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Brief généré il y a plus de 6h — clique "Générer" pour rafraîchir.
-            </div>
-          )}
-          <div className="rounded-lg border border-slate-200 bg-white p-6">
-            <DigestRenderer markdown={digest.content} />
-            <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 text-xs text-slate-500">
-              <span>{digest.signals_count} signaux analysés</span>
-              <span>·</span>
-              <span className="font-mono">{digest.model_used}</span>
-              <span>·</span>
-              <span>${Number(digest.cost).toFixed(5)}</span>
-              <span>·</span>
-              <span>{new Date(digest.generated_at).toLocaleString('fr-FR')}</span>
-              <span>·</span>
-              <span className="uppercase">{digest.language}</span>
+      <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-sm">
+        <CardContent className="flex flex-wrap items-end gap-6 py-5">
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="window-hours"
+              className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
+            >
+              Fenêtre
+            </label>
+            <Select value={String(windowHours)} onValueChange={(v) => setWindowHours(Number(v))}>
+              <SelectTrigger id="window-hours" className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WINDOW_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
+            <label
+              htmlFor="min-score"
+              className="text-on-surface-variant flex items-center justify-between text-xs font-semibold tracking-[0.05em] uppercase"
+            >
+              <span>Score minimum</span>
+              <span className="text-primary font-mono text-sm normal-case">{minScore}</span>
+            </label>
+            <Slider
+              id="min-score"
+              min={0}
+              max={100}
+              step={5}
+              value={minScoreRange}
+              onValueChange={setMinScoreRange}
+            />
+          </div>
+
+          <Button
+            onClick={handleGenerate}
+            disabled={generate.isPending}
+            className="bg-primary text-on-primary hover:bg-primary-container gap-2 shadow-sm"
+          >
+            <Sparkles
+              className={`h-4 w-4 ${generate.isPending ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            {generate.isPending ? 'Génération…' : 'Générer le brief'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {digestError ? (
+        <div
+          role="alert"
+          className="border-tertiary-fixed-dim bg-tertiary-fixed text-on-tertiary-fixed flex flex-col gap-3 rounded-xl border p-4 text-sm shadow-sm sm:flex-row sm:items-start sm:justify-between"
+        >
+          <div className="flex gap-3">
+            <AlertTriangle
+              className="text-tertiary mt-0.5 h-5 w-5 flex-shrink-0"
+              aria-hidden="true"
+            />
+            <div className="space-y-1">
+              <p className="font-semibold">Aucun brief généré</p>
+              <p className="leading-relaxed">{digestError.message}</p>
+              {typeof digestError.scoredSignalsTotal === 'number' &&
+              digestError.scoredSignalsTotal >= 0 ? (
+                <p className="text-on-tertiary-fixed-variant text-xs">
+                  {digestError.scoredSignalsTotal} signaux scorés au total
+                  {typeof digestError.scoredSignalsInWindow === 'number'
+                    ? ` · ${digestError.scoredSignalsInWindow} dans la fenêtre`
+                    : ''}
+                  {typeof digestError.maxScoreInWindow === 'number' &&
+                  digestError.maxScoreInWindow >= 0
+                    ? ` · max ${digestError.maxScoreInWindow}/100`
+                    : ''}
+                </p>
+              ) : null}
             </div>
           </div>
-        </>
-      )}
+          {canRetryWithLowerScore ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRetryWithLowerScore}
+              disabled={generate.isPending}
+              className="border-outline self-start whitespace-nowrap"
+            >
+              Re-essayer avec seuil {retryScore}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
+        <aside className="space-y-3">
+          <h3 className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase">
+            Historique ({digests.length})
+          </h3>
+
+          {digestsQuery.isLoading ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : digests.length === 0 ? (
+            <p className="text-on-surface-variant text-sm">
+              Aucun brief généré pour l&apos;instant.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {digests.map((d) => {
+                const isActive = selected?.id === d.id
+                return (
+                  <li
+                    key={d.id}
+                    className={`group rounded-xl border transition ${
+                      isActive
+                        ? 'border-primary bg-primary-fixed/40 shadow-sm'
+                        : 'border-outline-variant bg-surface-container-lowest hover:border-outline hover:bg-surface-container-low'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1 px-1 py-1">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(d.id)}
+                        className="focus-visible:ring-primary flex-1 rounded px-2 py-1.5 text-left focus:outline-none focus-visible:ring-2"
+                        aria-pressed={isActive}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-on-surface text-sm font-semibold">
+                            {new Date(d.generated_at).toLocaleString('fr-FR', {
+                              dateStyle: 'short',
+                              timeStyle: 'short',
+                            })}
+                          </span>
+                          <Badge variant="outline" className="border-outline-variant uppercase">
+                            {d.language}
+                          </Badge>
+                        </div>
+                        <div className="text-on-surface-variant mt-1 text-xs">
+                          {d.signal_count} signaux · {d.window_hours}h · score ≥ {d.min_score}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(d.id)}
+                        className="text-on-surface-variant hover:bg-error-container hover:text-on-error-container focus-visible:ring-error rounded p-1.5 focus:outline-none focus-visible:ring-2"
+                        aria-label="Supprimer ce brief"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </aside>
+
+        <section>
+          {digestsQuery.isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          ) : !selected ? (
+            <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-md">
+              <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+                <Sparkles className="text-outline h-10 w-10" />
+                <p className="text-on-surface-variant text-sm">
+                  Aucun brief disponible.
+                  <br />
+                  Lance une génération avec les paramètres ci-dessus.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <article className="border-outline-variant bg-surface-container-lowest overflow-hidden rounded-xl border shadow-md">
+              <div className="border-outline-variant bg-surface-bright flex flex-col items-start justify-between gap-3 border-b p-6 sm:flex-row sm:items-center">
+                <div>
+                  <div className="mb-1 flex items-center gap-3">
+                    <h3 className="text-on-surface text-xl font-bold tracking-tight">
+                      Brief stratégique
+                    </h3>
+                    <span className="bg-primary-fixed text-on-primary-fixed rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase">
+                      Généré
+                    </span>
+                  </div>
+                  <p className="text-on-surface-variant text-xs">
+                    {new Date(selected.generated_at).toLocaleString('fr-FR')} · Fenêtre{' '}
+                    {selected.window_hours} h
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-outline-variant uppercase">
+                  {selected.language}
+                </Badge>
+              </div>
+              <div className="prose prose-sm prose-slate max-w-none p-6">
+                <ReactMarkdown
+                  components={{
+                    a: ({ href, children, ...rest }) => (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-secondary-container hover:text-secondary underline"
+                        {...rest}
+                      >
+                        {children}
+                      </a>
+                    ),
+                    h1: ({ children }) => (
+                      <h2 className="text-on-surface mt-4 mb-3 text-lg font-bold">{children}</h2>
+                    ),
+                    h2: ({ children }) => (
+                      <h3 className="text-on-surface mt-6 mb-2 text-base font-semibold">
+                        {children}
+                      </h3>
+                    ),
+                    h3: ({ children }) => (
+                      <h4 className="text-on-surface mt-4 mb-2 text-sm font-semibold">
+                        {children}
+                      </h4>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="text-on-surface my-3 ml-5 list-disc space-y-2 text-sm">
+                        {children}
+                      </ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="text-on-surface my-3 ml-5 list-decimal space-y-2 text-sm">
+                        {children}
+                      </ol>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-on-surface my-2 text-sm leading-relaxed">{children}</p>
+                    ),
+                    code: ({ children }) => (
+                      <code className="bg-surface-container-low rounded px-1 py-0.5 font-mono text-xs">
+                        {children}
+                      </code>
+                    ),
+                  }}
+                >
+                  {selected.content}
+                </ReactMarkdown>
+              </div>
+
+              <footer className="bg-surface-container-low border-outline-variant text-on-surface-variant flex flex-wrap items-center gap-3 border-t px-6 py-3 text-xs">
+                <span>{selected.signal_count} signaux analysés</span>
+                <span>·</span>
+                <span>fenêtre {selected.window_hours} h</span>
+                <span>·</span>
+                <span>score ≥ {selected.min_score}</span>
+                <span>·</span>
+                <span className="font-mono">{selected.model_used ?? '—'}</span>
+                <span>·</span>
+                <span className="text-primary font-mono font-semibold">
+                  ${Number(selected.cost ?? 0).toFixed(5)}
+                </span>
+              </footer>
+            </article>
+          )}
+        </section>
+      </div>
     </div>
   )
-}
-
-function DigestRenderer({ markdown }: { markdown: string }) {
-  const lines = markdown.split('\n')
-  const elements: React.ReactNode[] = []
-  let listItems: string[] = []
-  let key = 0
-
-  const flushList = () => {
-    if (listItems.length === 0) return
-    elements.push(
-      <ul key={key++} className="my-3 ml-5 list-disc space-y-2 text-sm text-slate-700">
-        {listItems.map((item, i) => (
-          <li key={i} dangerouslySetInnerHTML={{ __html: inlineMd(item) }} />
-        ))}
-      </ul>,
-    )
-    listItems = []
-  }
-
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (trimmed.startsWith('## ')) {
-      flushList()
-      elements.push(
-        <h3 key={key++} className="mt-6 mb-2 text-base font-semibold text-slate-900">
-          {trimmed.slice(3)}
-        </h3>,
-      )
-    } else if (trimmed.startsWith('# ')) {
-      flushList()
-      elements.push(
-        <h2 key={key++} className="mt-4 mb-3 text-lg font-bold text-slate-900">
-          {trimmed.slice(2)}
-        </h2>,
-      )
-    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      listItems.push(trimmed.slice(2))
-    } else if (trimmed === '') {
-      flushList()
-    } else {
-      flushList()
-      elements.push(
-        <p
-          key={key++}
-          className="my-2 text-sm leading-relaxed text-slate-700"
-          dangerouslySetInnerHTML={{ __html: inlineMd(trimmed) }}
-        />,
-      )
-    }
-  }
-  flushList()
-
-  return <div>{elements}</div>
-}
-
-function inlineMd(text: string): string {
-  // Escape HTML first
-  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  // Then apply transformations
-  return escaped
-    .replace(
-      /\[([^\]]+)\]\(([^)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener" class="text-blue-600 underline hover:text-blue-800">$1</a>',
-    )
-    .replace(/\*\*([^*]+)\*\*/g, '<strong class="text-slate-900">$1</strong>')
-    .replace(/`([^`]+)`/g, '<code class="rounded bg-slate-100 px-1 py-0.5 text-xs">$1</code>')
 }

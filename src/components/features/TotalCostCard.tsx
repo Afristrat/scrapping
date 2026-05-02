@@ -1,4 +1,4 @@
-import { TrendingDown, TrendingUp, Minus } from 'lucide-react'
+import { TrendingDown, TrendingUp, Minus, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -8,19 +8,23 @@ interface Props {
 
 export function TotalCostCard({ total7d, delta }: Props) {
   const Icon = delta > 1 ? TrendingUp : delta < -1 ? TrendingDown : Minus
-  const deltaColor = delta > 1 ? 'text-red-600' : delta < -1 ? 'text-emerald-600' : 'text-slate-500'
+  const deltaColor =
+    delta > 1 ? 'text-tertiary' : delta < -1 ? 'text-primary' : 'text-on-surface-variant'
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6">
-      <p className="text-xs tracking-wide text-slate-500 uppercase">
+    <div className="border-outline-variant bg-surface-container-lowest relative overflow-hidden rounded-xl border p-6 shadow-md">
+      <div className="text-primary absolute top-0 right-0 p-4 opacity-10">
+        <Wallet className="h-16 w-16" />
+      </div>
+      <p className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase">
         Coût total · 7 derniers jours
       </p>
       <div className="mt-2 flex items-baseline gap-3">
-        <p className="text-3xl font-semibold text-slate-900">${total7d.toFixed(4)}</p>
-        <p className={cn('flex items-center gap-1 text-sm', deltaColor)}>
+        <p className="text-on-surface text-4xl font-bold tracking-tight">${total7d.toFixed(4)}</p>
+        <p className={cn('flex items-center gap-1 text-sm font-medium', deltaColor)}>
           <Icon className="h-4 w-4" />
           {delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`}
-          <span className="text-slate-400">vs 7j précédents</span>
+          <span className="text-on-surface-variant font-normal">vs 7j précédents</span>
         </p>
       </div>
     </div>

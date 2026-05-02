@@ -21,26 +21,29 @@ const REDDIT_TIME_OPTIONS = ['hour', 'day', 'week', 'month', 'year', 'all'] as c
 
 export function ApifyConfigForm({ value, onChange }: Props) {
   return (
-    <Card>
+    <Card className="bg-surface-container-lowest border-outline-variant">
       <CardHeader>
-        <CardTitle className="text-base">Configuration Apify</CardTitle>
+        <CardTitle className="text-on-surface text-base">Configuration Apify</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* X list IDs */}
-        <div className="space-y-1.5">
-          <Label>X List IDs</Label>
+        <FieldGroup label="X List IDs">
           <TagInput
             value={value.x_list_ids}
             onChange={(next) => onChange({ ...value, x_list_ids: next })}
             placeholder="ID de liste X"
           />
-        </div>
+        </FieldGroup>
 
         {/* X max items */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Max items X</Label>
-            <span className="font-mono text-sm text-slate-600">{value.x_max_items}</span>
+            <Label className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase">
+              Max items X
+            </Label>
+            <span className="text-on-surface bg-surface-container-high rounded-md px-2 py-0.5 font-mono text-xs">
+              {value.x_max_items}
+            </span>
           </div>
           <Slider
             value={[value.x_max_items]}
@@ -52,8 +55,7 @@ export function ApifyConfigForm({ value, onChange }: Props) {
         </div>
 
         {/* Reddit actor */}
-        <div className="space-y-1.5">
-          <Label>Reddit Actor</Label>
+        <FieldGroup label="Reddit Actor">
           <Select
             value={value.reddit_actor}
             onValueChange={(v) => onChange({ ...value, reddit_actor: v })}
@@ -68,11 +70,10 @@ export function ApifyConfigForm({ value, onChange }: Props) {
               <SelectItem value="trudax/reddit-scraper">trudax/reddit-scraper</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </FieldGroup>
 
         {/* Reddit sort */}
-        <div className="space-y-1.5">
-          <Label>Reddit - Tri</Label>
+        <FieldGroup label="Reddit — Tri">
           <Select
             value={value.reddit_sort}
             onValueChange={(v) =>
@@ -90,11 +91,10 @@ export function ApifyConfigForm({ value, onChange }: Props) {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </FieldGroup>
 
         {/* Reddit time filter */}
-        <div className="space-y-1.5">
-          <Label>Reddit - Filtre temporel</Label>
+        <FieldGroup label="Reddit — Filtre temporel">
           <Select
             value={value.reddit_time_filter}
             onValueChange={(v) =>
@@ -112,13 +112,17 @@ export function ApifyConfigForm({ value, onChange }: Props) {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </FieldGroup>
 
         {/* Reddit max per sub */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Max posts par subreddit</Label>
-            <span className="font-mono text-sm text-slate-600">{value.reddit_max_per_sub}</span>
+            <Label className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase">
+              Max posts par subreddit
+            </Label>
+            <span className="text-on-surface bg-surface-container-high rounded-md px-2 py-0.5 font-mono text-xs">
+              {value.reddit_max_per_sub}
+            </span>
           </div>
           <Slider
             value={[value.reddit_max_per_sub]}
@@ -130,5 +134,16 @@ export function ApifyConfigForm({ value, onChange }: Props) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase">
+        {label}
+      </Label>
+      {children}
+    </div>
   )
 }

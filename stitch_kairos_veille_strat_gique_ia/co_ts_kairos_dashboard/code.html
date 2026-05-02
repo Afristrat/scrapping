@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos - Coûts</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#e6eeff",
+                        "background": "#f8f9ff",
+                        "surface-bright": "#f8f9ff",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface": "#f8f9ff",
+                        "on-background": "#0d1c2e",
+                        "tertiary-fixed": "#ffdad7",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-primary-fixed-variant": "#005137",
+                        "surface-container-highest": "#d5e3fc",
+                        "on-tertiary-fixed-variant": "#7f2928",
+                        "on-tertiary-fixed": "#410004",
+                        "surface-container-high": "#dce9ff",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#00855d",
+                        "on-tertiary-container": "#fffbff",
+                        "on-surface-variant": "#3d4a42",
+                        "surface-variant": "#d5e3fc",
+                        "surface-tint": "#006c4a",
+                        "secondary-fixed": "#dbe1ff",
+                        "primary-fixed": "#85f8c4",
+                        "surface-dim": "#ccdbf3",
+                        "tertiary-fixed-dim": "#ffb3ae",
+                        "surface-container-low": "#eff4ff",
+                        "inverse-surface": "#233144",
+                        "on-secondary-fixed": "#00174b",
+                        "on-error": "#ffffff",
+                        "secondary": "#0051d5",
+                        "tertiary": "#9b3e3b",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed-dim": "#68dba9",
+                        "outline-variant": "#bccac0",
+                        "on-primary-fixed": "#002114",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#0d1c2e",
+                        "on-secondary-container": "#fefcff",
+                        "outline": "#6d7a72",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-primary-container": "#f5fff7",
+                        "tertiary-container": "#ba5551",
+                        "inverse-primary": "#68dba9",
+                        "error": "#ba1a1a",
+                        "primary": "#006948",
+                        "secondary-container": "#316bf3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit-base": "4px",
+                        "stack-sm": "8px",
+                        "margin-page": "2rem",
+                        "max-width-dashboard": "1280px",
+                        "stack-lg": "24px",
+                        "gutter": "1.5rem",
+                        "max-width-marketing": "1152px",
+                        "stack-md": "16px"
+                    },
+                    "fontFamily": {
+                        "h3-2xl": ["Inter"],
+                        "body-md": ["Inter"],
+                        "h1-6xl": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "h2-4xl": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h3-2xl": ["24px", { "lineHeight": "2rem", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h1-6xl": ["60px", { "lineHeight": "1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.75rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "1rem", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "h2-4xl": ["36px", { "lineHeight": "2.5rem", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "1.25rem", "letterSpacing": "0", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen">
+<!-- Shell Layout Wrapper -->
+<div class="flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-inter antialiased text-sm font-medium border-r border-slate-200 dark:border-slate-800 flat no-shadow fixed left-0 top-0 h-full flex flex-col z-50">
+<div class="p-6 border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3">
+<img alt="Organization Logo" class="h-8 w-8 rounded-lg object-cover" data-alt="A clean, minimalist 3D rendering of an abstract geometric logo representing a technology organization. The logo features sharp edges, bright emerald green accents, and a deep slate background. The lighting is studio quality, highlighting the precision of the design. B2B software aesthetic." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+<div>
+<h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Kairos AI</h2>
+<p class="text-xs text-slate-500">Enterprise Monitoring</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto py-4">
+<ul class="space-y-1 px-3">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+<span>Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">sensors</span>
+<span>Signaux</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">auto_stories</span>
+<span>Digest</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">topic</span>
+<span>Topics</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-r-4 border-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span>Coûts</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">terminal</span>
+<span>Logs</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors duration-200 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+<span>Paramètres</span>
+</a>
+</li>
+</ul>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-w-0 ml-64 bg-background">
+<!-- TopAppBar -->
+<header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm docked full-width top-0 sticky z-40 flex justify-between items-center h-16 px-8 ml-64 w-[calc(100%-16rem)] absolute left-0">
+<div class="flex items-center gap-4 flex-1">
+<h1 class="text-lg font-black text-slate-900 dark:text-slate-50 hidden">Kairos AI</h1>
+<!-- Search Bar -->
+<div class="relative w-96 hidden md:block group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-full text-sm focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-on-surface-variant font-body-sm ring-emerald-500 focus:ring-2" placeholder="Rechercher..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<button class="p-1 rounded-full border border-slate-200 hover:border-emerald-500 transition-colors">
+<span class="material-symbols-outlined text-slate-400 text-3xl">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Scrollable Page Content -->
+<div class="flex-1 overflow-y-auto">
+<div class="max-w-7xl mx-auto px-6 py-8">
+<!-- PAGE HEADER -->
+<div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+<div>
+<h1 class="font-h2-4xl text-h2-4xl text-on-background mb-2">Coûts</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Tracez chaque euro dépensé en LLM et scraping.</p>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 shadow-sm flex items-center gap-4">
+<div class="bg-primary-container/20 p-3 rounded-full text-primary">
+<span class="material-symbols-outlined">euro</span>
+</div>
+<div>
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase">Coût mensuel projeté</p>
+<p class="text-2xl font-bold text-emerald-600">18,42 €</p>
+</div>
+</div>
+</div>
+<!-- (A) FILTRES -->
+<div class="flex flex-wrap gap-3 mb-6">
+<select class="bg-surface-container-lowest border border-outline-variant text-on-surface-variant text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 shadow-sm font-body-sm">
+<option>7 j</option>
+<option selected="">30 j</option>
+<option>90 j</option>
+<option>Custom</option>
+</select>
+<select class="bg-surface-container-lowest border border-outline-variant text-on-surface-variant text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 shadow-sm font-body-sm">
+<option selected="">Toutes les tâches</option>
+<option>Scoring</option>
+<option>Scraping</option>
+<option>Monitoring</option>
+<option>Digest</option>
+</select>
+<select class="bg-surface-container-lowest border border-outline-variant text-on-surface-variant text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 shadow-sm font-body-sm">
+<option selected="">Tous les providers</option>
+<option>OpenRouter</option>
+<option>Anthropic</option>
+<option>OpenAI</option>
+<option>Mistral</option>
+</select>
+<button class="bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors rounded-lg px-4 py-2 flex items-center gap-2 shadow-sm font-body-sm font-medium">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+                            Plus de filtres
+                        </button>
+</div>
+<!-- (B) 3 KPI CARDS -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-6xl text-primary">account_balance_wallet</span>
+</div>
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-2">Coût total période</p>
+<p class="font-h3-2xl text-h3-2xl text-on-background mb-2">12,84 €</p>
+<div class="flex items-center gap-1 text-emerald-600 font-body-sm">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span class="font-medium">+2,4 % vs prél.</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-6xl text-secondary">psychology</span>
+</div>
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-2">Modèle dominant</p>
+<p class="font-h3-2xl text-h3-2xl text-on-background mb-2">Claude 3.5 Sonnet</p>
+<div class="flex items-center gap-1 text-on-surface-variant font-body-sm">
+<span class="material-symbols-outlined text-[16px]">pie_chart</span>
+<span>64 % du volume</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-6xl text-tertiary">check_circle</span>
+</div>
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-2">Signaux scorés</p>
+<p class="font-h3-2xl text-h3-2xl text-on-background mb-2">1 247</p>
+<div class="flex items-center gap-1 text-on-surface-variant font-body-sm">
+<span class="material-symbols-outlined text-[16px]">price_check</span>
+<span>0,01 € / signal estimé</span>
+</div>
+</div>
+</div>
+<!-- (C) GRAPHE TIMELINE -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm mb-8">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center">
+<h2 class="font-h3-2xl text-h3-2xl text-on-background">Coût par jour</h2>
+<div class="flex gap-4">
+<div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-emerald-500"></div><span class="font-body-sm text-on-surface-variant">Scoring</span></div>
+<div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-blue-500"></div><span class="font-body-sm text-on-surface-variant">Scraping</span></div>
+<div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-orange-500"></div><span class="font-body-sm text-on-surface-variant">Monitoring</span></div>
+<div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-purple-500"></div><span class="font-body-sm text-on-surface-variant">Digest</span></div>
+</div>
+</div>
+<div class="p-6 h-80 relative flex items-end justify-between gap-1 pb-10 pt-4">
+<!-- Y-Axis Labels -->
+<div class="absolute left-6 top-4 bottom-10 w-10 flex flex-col justify-between text-xs text-on-surface-variant text-right pr-2 border-r border-outline-variant">
+<span>1.0€</span>
+<span>0.75€</span>
+<span>0.5€</span>
+<span>0.25€</span>
+<span>0€</span>
+</div>
+<!-- Chart Area (Mock) -->
+<div class="flex-1 flex items-end justify-between gap-1 pl-12 h-full">
+<!-- Day 1 -->
+<div class="w-full flex flex-col justify-end group relative cursor-pointer">
+<div class="w-full bg-purple-500/80 h-[5%] rounded-t-sm"></div>
+<div class="w-full bg-orange-500/80 h-[10%]"></div>
+<div class="w-full bg-blue-500/80 h-[25%]"></div>
+<div class="w-full bg-emerald-500/80 h-[40%] rounded-b-sm"></div>
+<!-- Tooltip -->
+<div class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-xs p-2 rounded shadow-lg hidden group-hover:block z-10 w-32">
+<p class="font-bold mb-1 border-b border-outline/30 pb-1">1 Nov</p>
+<div class="flex justify-between"><span>Scoring</span><span>0.40€</span></div>
+<div class="flex justify-between"><span>Scraping</span><span>0.25€</span></div>
+<div class="flex justify-between font-bold mt-1"><span>Total</span><span>0.80€</span></div>
+</div>
+<div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-on-surface-variant">1N</div>
+</div>
+<!-- Day 2 -->
+<div class="w-full flex flex-col justify-end group relative cursor-pointer">
+<div class="w-full bg-purple-500/80 h-[2%] rounded-t-sm"></div>
+<div class="w-full bg-orange-500/80 h-[15%]"></div>
+<div class="w-full bg-blue-500/80 h-[30%]"></div>
+<div class="w-full bg-emerald-500/80 h-[35%] rounded-b-sm"></div>
+<div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-on-surface-variant">2N</div>
+</div>
+<!-- Day 3 -->
+<div class="w-full flex flex-col justify-end group relative cursor-pointer">
+<div class="w-full bg-purple-500/80 h-[10%] rounded-t-sm"></div>
+<div class="w-full bg-orange-500/80 h-[5%]"></div>
+<div class="w-full bg-blue-500/80 h-[20%]"></div>
+<div class="w-full bg-emerald-500/80 h-[50%] rounded-b-sm"></div>
+<div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-on-surface-variant">3N</div>
+</div>
+<!-- Day 4 -->
+<div class="w-full flex flex-col justify-end group relative cursor-pointer">
+<div class="w-full bg-purple-500/80 h-[5%] rounded-t-sm"></div>
+<div class="w-full bg-orange-500/80 h-[12%]"></div>
+<div class="w-full bg-blue-500/80 h-[35%]"></div>
+<div class="w-full bg-emerald-500/80 h-[45%] rounded-b-sm"></div>
+<div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-on-surface-variant">4N</div>
+</div>
+<!-- Day 5 -->
+<div class="w-full flex flex-col justify-end group relative cursor-pointer">
+<div class="w-full bg-purple-500/80 h-[8%] rounded-t-sm"></div>
+<div class="w-full bg-orange-500/80 h-[18%]"></div>
+<div class="w-full bg-blue-500/80 h-[28%]"></div>
+<div class="w-full bg-emerald-500/80 h-[38%] rounded-b-sm"></div>
+<div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-on-surface-variant">5N</div>
+</div>
+<!-- Day 6 -->
+<div class="w-full flex flex-col justify-end group relative cursor-pointer">
+<div class="w-full bg-purple-500/80 h-[4%] rounded-t-sm"></div>
+<div class="w-full bg-orange-500/80 h-[10%]"></div>
+<div class="w-full bg-blue-500/80 h-[22%]"></div>
+<div class="w-full bg-emerald-500/80 h-[60%] rounded-b-sm"></div>
+<div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-on-surface-variant">6N</div>
+</div>
+<!-- Day 7 -->
+<div class="w-full flex flex-col justify-end group relative cursor-pointer">
+<div class="w-full bg-purple-500/80 h-[15%] rounded-t-sm"></div>
+<div class="w-full bg-orange-500/80 h-[20%]"></div>
+<div class="w-full bg-blue-500/80 h-[30%]"></div>
+<div class="w-full bg-emerald-500/80 h-[20%] rounded-b-sm"></div>
+<div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-on-surface-variant">7N</div>
+</div>
+</div>
+</div>
+</div>
+<!-- (D) GRAPHE BREAKDOWN -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+<!-- Pie Chart Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-6 flex flex-col">
+<h3 class="font-h3-2xl text-h3-2xl text-on-background mb-6">Répartition par Tâche</h3>
+<div class="flex-1 flex items-center justify-center gap-8">
+<!-- Donut Mock -->
+<div class="relative w-40 h-40 rounded-full" style="background: conic-gradient(#10b981 0% 45%, #3b82f6 45% 75%, #f97316 75% 90%, #a855f7 90% 100%);">
+<div class="absolute inset-4 bg-surface-container-lowest rounded-full shadow-inner"></div>
+</div>
+<div class="space-y-3">
+<div class="flex items-center gap-3"><div class="w-4 h-4 rounded bg-emerald-500"></div><span class="font-body-sm text-on-background">Scoring (45%)</span></div>
+<div class="flex items-center gap-3"><div class="w-4 h-4 rounded bg-blue-500"></div><span class="font-body-sm text-on-background">Scraping (30%)</span></div>
+<div class="flex items-center gap-3"><div class="w-4 h-4 rounded bg-orange-500"></div><span class="font-body-sm text-on-background">Monitoring (15%)</span></div>
+<div class="flex items-center gap-3"><div class="w-4 h-4 rounded bg-purple-500"></div><span class="font-body-sm text-on-background">Digest (10%)</span></div>
+</div>
+</div>
+</div>
+<!-- Bar Chart Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm p-6 flex flex-col">
+<h3 class="font-h3-2xl text-h3-2xl text-on-background mb-6">Coût par Modèle</h3>
+<div class="flex-1 flex flex-col justify-end gap-4">
+<div class="space-y-1">
+<div class="flex justify-between text-xs text-on-surface-variant"><span>Claude 3.5 Sonnet</span><span>6.80 €</span></div>
+<div class="w-full bg-surface-variant rounded-full h-3"><div class="bg-emerald-500 h-3 rounded-full" style="width: 60%"></div></div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-xs text-on-surface-variant"><span>GPT-4o</span><span>3.20 €</span></div>
+<div class="w-full bg-surface-variant rounded-full h-3"><div class="bg-blue-500 h-3 rounded-full" style="width: 25%"></div></div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-xs text-on-surface-variant"><span>Claude 3 Haiku</span><span>1.50 €</span></div>
+<div class="w-full bg-surface-variant rounded-full h-3"><div class="bg-emerald-400 h-3 rounded-full" style="width: 10%"></div></div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-xs text-on-surface-variant"><span>Mistral Large</span><span>0.80 €</span></div>
+<div class="w-full bg-surface-variant rounded-full h-3"><div class="bg-orange-500 h-3 rounded-full" style="width: 5%"></div></div>
+</div>
+</div>
+</div>
+</div>
+<!-- (E) TABLEAU TARIFS -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<div class="p-6 border-b border-outline-variant">
+<h2 class="font-h3-2xl text-h3-2xl text-on-background mb-1">Tarifs par modèle</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Sources : provider /models endpoints + DB pricing. Mis à jour quotidiennement.</p>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left font-body-sm border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider">
+<th class="px-6 py-4 font-semibold">Provider</th>
+<th class="px-6 py-4 font-semibold">Modèle</th>
+<th class="px-6 py-4 font-semibold text-right">Prompt $/1M</th>
+<th class="px-6 py-4 font-semibold text-right">Completion $/1M</th>
+<th class="px-6 py-4 font-semibold text-right">Coût / Signal</th>
+<th class="px-6 py-4 font-semibold text-center">Statut</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1: Active, Emerald -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4">Anthropic</td>
+<td class="px-6 py-4 font-medium text-on-background">Claude 3.5 Sonnet</td>
+<td class="px-6 py-4 text-right">3.00 $</td>
+<td class="px-6 py-4 text-right">15.00 $</td>
+<td class="px-6 py-4 text-right font-medium text-emerald-600 flex items-center justify-end gap-1"><span class="material-symbols-outlined text-[16px]">thumb_up</span>0.015 €</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                En usage
+                                            </span>
+</td>
+</tr>
+<!-- Row 2: Active, Neutral -->
+<tr class="hover:bg-surface-container-low transition-colors group bg-slate-50">
+<td class="px-6 py-4">OpenAI</td>
+<td class="px-6 py-4 font-medium text-on-background">GPT-4o</td>
+<td class="px-6 py-4 text-right">5.00 $</td>
+<td class="px-6 py-4 text-right">15.00 $</td>
+<td class="px-6 py-4 text-right font-medium text-slate-600">0.020 €</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                En usage
+                                            </span>
+</td>
+</tr>
+<!-- Row 3: Active, Emerald (Cheap) -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4">Anthropic</td>
+<td class="px-6 py-4 font-medium text-on-background">Claude 3 Haiku</td>
+<td class="px-6 py-4 text-right">0.25 $</td>
+<td class="px-6 py-4 text-right">1.25 $</td>
+<td class="px-6 py-4 text-right font-medium text-emerald-600 flex items-center justify-end gap-1"><span class="material-symbols-outlined text-[16px]">bolt</span>0.002 €</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                En usage
+                                            </span>
+</td>
+</tr>
+<!-- Row 4: Inactive, Orange (Expensive) -->
+<tr class="hover:bg-surface-container-low transition-colors group opacity-75">
+<td class="px-6 py-4">OpenRouter</td>
+<td class="px-6 py-4 font-medium text-on-background">Claude 3 Opus</td>
+<td class="px-6 py-4 text-right">15.00 $</td>
+<td class="px-6 py-4 text-right">75.00 $</td>
+<td class="px-6 py-4 text-right font-medium text-orange-600 flex items-center justify-end gap-1"><span class="material-symbols-outlined text-[16px]">warning</span>0.080 €</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                                Inactif
+                                            </span>
+</td>
+</tr>
+<!-- Row 5: Inactive, Neutral -->
+<tr class="hover:bg-surface-container-low transition-colors group bg-slate-50 opacity-75">
+<td class="px-6 py-4">Mistral</td>
+<td class="px-6 py-4 font-medium text-on-background">Mistral Large</td>
+<td class="px-6 py-4 text-right">2.00 $</td>
+<td class="px-6 py-4 text-right">6.00 $</td>
+<td class="px-6 py-4 text-right font-medium text-slate-600">0.010 €</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                                Inactif
+                                            </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="bg-surface-container-low p-4 text-xs text-on-surface-variant flex items-start gap-2 border-t border-outline-variant">
+<span class="material-symbols-outlined text-[16px] text-primary mt-0.5">info</span>
+<p><strong>Transparence des prix :</strong> Les coûts via OpenRouter incluent une légère marge selon le modèle. Pour les gros volumes, l'utilisation directe des API Anthropic ou OpenAI est recommandée. Les coûts par signal sont des estimations basées sur un token count moyen de 4500 (prompt) et 250 (completion).</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

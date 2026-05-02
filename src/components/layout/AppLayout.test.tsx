@@ -25,7 +25,7 @@ function renderAt(path: string) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<div>dashboard-stub</div>} />
+            <Route path="/dashboard" element={<div>dashboard-stub</div>} />
             <Route path="/settings" element={<div>settings-stub</div>} />
           </Route>
         </Routes>
@@ -36,19 +36,20 @@ function renderAt(path: string) {
 
 describe('AppLayout', () => {
   it('rend le branding nom + tous les liens sidebar + email user', () => {
-    renderAt('/')
+    renderAt('/dashboard')
     expect(screen.getByRole('heading', { level: 1, name: 'Test Brand' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /paramètres/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /logs/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /costs/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /coûts/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /topics/i })).toBeInTheDocument()
     expect(screen.getByText('alice@test.local')).toBeInTheDocument()
     expect(screen.getByText('dashboard-stub')).toBeInTheDocument()
   })
 
   it('marque la route active avec aria-current', () => {
     renderAt('/settings')
-    const settingsLink = screen.getByRole('link', { name: /settings/i })
+    const settingsLink = screen.getByRole('link', { name: /paramètres/i })
     expect(settingsLink).toHaveAttribute('aria-current', 'page')
     const dashboardLink = screen.getByRole('link', { name: /dashboard/i })
     expect(dashboardLink).not.toHaveAttribute('aria-current')
