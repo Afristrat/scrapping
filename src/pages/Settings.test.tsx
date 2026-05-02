@@ -7,13 +7,12 @@ import type { Settings as SettingsType } from '@/hooks/useSettings'
 
 const MOCK_SETTINGS: SettingsType = {
   user_id: 'user-1',
-  model_scraping: 'anthropic/claude-haiku-4.5',
-  model_scoring: 'anthropic/claude-sonnet-4.6',
-  model_monitoring: 'openai/gpt-4o-mini',
   prompt_scoring: 'Score ce signal de 0 a 100 selon sa pertinence pour un builder IA.',
   reddit_subs: ['MachineLearning', 'LocalLLaMA'],
   arxiv_categories: ['cs.AI'],
   x_queries: ['#LLM'],
+  topic_seeds: [],
+  model_config: {},
   branding: {
     name: 'Mon Dashboard',
     primary: '#3b82f6',
@@ -31,7 +30,6 @@ const MOCK_SETTINGS: SettingsType = {
     reddit_max_per_sub: 25,
   },
   language: 'fr',
-  model_digest: 'anthropic/claude-haiku-4.5',
   score_concurrency: 20,
   updated_at: '2026-04-30T00:00:00Z',
 }
@@ -48,8 +46,24 @@ vi.mock('@/hooks/useUpdateSettings', () => ({
 
 vi.mock('@/hooks/useApiKeys', () => ({
   useApiKeys: () => ({ data: [], isLoading: false }),
-  useUpsertApiKey: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpsertApiKey: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useDeleteApiKey: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateApiKeyValidation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('@/hooks/useLLMProviders', () => ({
+  useLLMProviders: () => ({ data: [], isLoading: false }),
+}))
+
+vi.mock('@/hooks/useProviderModels', () => ({
+  useProviderModels: () => ({ data: [], isLoading: false }),
+  useRefreshModels: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('@/hooks/useValidateApiKey', () => ({
+  useValidateApiKey: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  toDbValidationStatus: (s: string) =>
+    s === 'verified' ? 'valid' : s === 'invalid' ? 'invalid' : 'unknown',
 }))
 
 vi.mock('@/hooks/useRubrics', () => ({
@@ -89,13 +103,13 @@ function renderSettings() {
 }
 
 describe('Settings', () => {
-  it('rend les 5 onglets et le bouton enregistrer', () => {
+  it('rend les 6 onglets et le bouton enregistrer', () => {
     renderSettings()
 
-    expect(screen.getByRole('tab', { name: /modeles/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /grilles/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /modèles/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /rubriques/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /sources/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /cles api/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /clés api/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /branding/i })).toBeInTheDocument()
 
     expect(screen.getByRole('button', { name: /enregistrer/i })).toBeInTheDocument()
@@ -105,8 +119,8 @@ describe('Settings', () => {
     const user = userEvent.setup()
     renderSettings()
 
-    // Default tab is Models, should show OpenRouter
-    expect(screen.getByText('Modeles OpenRouter')).toBeInTheDocument()
+    // Default tab is Models, should show BYOK card
+    expect(screen.getByText(/Modèles par tâche \(BYOK\)/)).toBeInTheDocument()
 
     // Click Sources tab
     await user.click(screen.getByRole('tab', { name: /sources/i }))

@@ -13,6 +13,7 @@ import {
   useLLMCostsRecent,
   type LLMTask,
 } from '@/hooks/useLLMCosts'
+import { useProviderModels } from '@/hooks/useProviderModels'
 import { useSettings } from '@/hooks/useSettings'
 import { useTokensSummary } from '@/hooks/useTokensSummary'
 import { cn } from '@/lib/utils'
@@ -31,25 +32,32 @@ export default function Costs() {
   const { data: costsByDay } = useCostsByDay(period)
   const { data: recent, isLoading } = useLLMCostsRecent(period)
   const { data: tokensSummary } = useTokensSummary(period)
+  const { data: providerModels } = useProviderModels()
 
   const totals = useMemo(() => (recent ? computeTotals(recent) : null), [recent])
-  const breakdown = useMemo(() => (recent ? computeBreakdown(recent, period) : []), [recent, period])
+  const breakdown = useMemo(
+    () => (recent ? computeBreakdown(recent, period) : []),
+    [recent, period],
+  )
 
   const dailyBudget = settings?.daily_budget_usd ?? 5
   const avgDaily = totals ? totals.total7d / 7 : 0
   const isOverBudget = avgDaily > dailyBudget * 1.1
 
+  // Stable "now" snapshot — captured once on mount to avoid impure call during render.
+  const [nowMs] = useState(() => Date.now())
+
   // Cost by task
   const costByTask = useMemo(() => {
     if (!recent) return { scraping: 0, scoring: 0, monitoring: 0 }
-    const sinceMs = Date.now() - period * 86_400_000
+    const sinceMs = nowMs - period * 86_400_000
     const filtered = recent.filter((r) => new Date(r.ts).getTime() >= sinceMs)
     const map: Record<LLMTask, number> = { scraping: 0, scoring: 0, monitoring: 0 }
     for (const r of filtered) {
       map[r.task] += Number(r.cost)
     }
     return map
-  }, [recent, period])
+  }, [recent, period, nowMs])
 
   const totalTaskCost = costByTask.scraping + costByTask.scoring + costByTask.monitoring
 
@@ -58,7 +66,13 @@ export default function Costs() {
     if (!tokensSummary) return []
     const map = new Map<
       string,
-      { model: string; calls: number; prompt_tokens: number; completion_tokens: number; total_cost: number }
+      {
+        model: string
+        calls: number
+        prompt_tokens: number
+        completion_tokens: number
+        total_cost: number
+      }
     >()
     for (const row of tokensSummary) {
       const existing = map.get(row.model)
@@ -80,6 +94,22 @@ export default function Costs() {
     return [...map.values()].sort((a, b) => b.total_cost - a.total_cost)
   }, [tokensSummary])
 
+  // "Tarifs par modèle" — show every cached provider_models row with input/output
+  // pricing per 1M tokens. Ordered by total cost desc (models actually used first),
+  // then by provider/model_id alphabetically for the long tail with cost = 0.
+  const pricingTable = useMemo(() => {
+    if (!providerModels) return []
+    const costByModel = new Map<string, number>()
+    for (const m of modelSummary) costByModel.set(m.model, m.total_cost)
+    return [...providerModels]
+      .map((m) => ({ ...m, total_cost: costByModel.get(m.model_id) ?? 0 }))
+      .sort((a, b) => {
+        if (b.total_cost !== a.total_cost) return b.total_cost - a.total_cost
+        if (a.provider !== b.provider) return a.provider.localeCompare(b.provider)
+        return a.model_id.localeCompare(b.model_id)
+      })
+  }, [providerModels, modelSummary])
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -92,10 +122,12 @@ export default function Costs() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Couts</h2>
-          <p className="text-sm text-slate-500">Suivi detaille des depenses LLM.</p>
+          <h2 className="text-on-surface text-3xl font-bold tracking-tight">Couts</h2>
+          <p className="text-on-surface-variant mt-1 text-sm">
+            Tracez chaque euro depense en LLM et scraping.
+          </p>
         </div>
         <div className="flex gap-1">
           {PERIODS.map((p) => (
@@ -110,15 +142,15 @@ export default function Costs() {
             </Button>
           ))}
         </div>
-      </div>
+      </header>
 
       {/* Alert overshoot */}
       {isOverBudget && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
+        <div className="border-tertiary-fixed-dim bg-tertiary-fixed text-on-tertiary-fixed flex items-center gap-2 rounded-xl border p-4 text-sm shadow-sm">
+          <AlertTriangle className="text-tertiary h-4 w-4 shrink-0" />
           <span>
-            Depense moyenne quotidienne (${avgDaily.toFixed(4)}) depasse le budget de{' '}
-            ${dailyBudget.toFixed(2)}/jour de plus de 10%.
+            Depense moyenne quotidienne (${avgDaily.toFixed(4)}) depasse le budget de $
+            {dailyBudget.toFixed(2)}/jour de plus de 10%.
           </span>
         </div>
       )}
@@ -128,28 +160,28 @@ export default function Costs() {
       <CostChart data={costsByDay} />
 
       {/* Cost by task */}
-      <Card>
+      <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-md">
         <CardHeader>
-          <CardTitle className="text-base">Cout par tache</CardTitle>
+          <CardTitle className="text-on-surface text-lg font-semibold">Cout par tache</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           {(['scraping', 'scoring', 'monitoring'] as const).map((task) => {
             const pct = totalTaskCost > 0 ? (costByTask[task] / totalTaskCost) * 100 : 0
             return (
-              <div key={task} className="space-y-1">
+              <div key={task} className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="capitalize text-slate-700">{task}</span>
-                  <span className="font-mono text-xs text-slate-600">
+                  <span className="text-on-surface capitalize">{task}</span>
+                  <span className="text-on-surface-variant font-mono text-xs">
                     ${costByTask[task].toFixed(5)}
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="bg-surface-variant h-3 overflow-hidden rounded-full">
                   <div
                     className={cn(
                       'h-full rounded-full transition-all',
-                      task === 'scraping' && 'bg-emerald-500',
-                      task === 'scoring' && 'bg-blue-500',
-                      task === 'monitoring' && 'bg-amber-500',
+                      task === 'scraping' && 'bg-primary',
+                      task === 'scoring' && 'bg-secondary-container',
+                      task === 'monitoring' && 'bg-tertiary',
                     )}
                     style={{ width: `${pct}%` }}
                   />
@@ -157,7 +189,7 @@ export default function Costs() {
               </div>
             )
           })}
-          <p className="pt-1 text-right text-xs text-slate-500">
+          <p className="text-on-surface-variant pt-1 text-right text-xs">
             Budget quotidien : ${dailyBudget.toFixed(2)}
           </p>
         </CardContent>
@@ -165,35 +197,95 @@ export default function Costs() {
 
       {/* Cost by model (tokens summary) */}
       {modelSummary.length > 0 && (
-        <Card>
+        <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Cout par modele</CardTitle>
+            <CardTitle className="text-on-surface text-lg font-semibold">Cout par modele</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-hidden rounded-lg border border-slate-200">
+            <div className="border-outline-variant overflow-hidden rounded-xl border">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
+                <thead className="bg-surface-container text-on-surface-variant border-outline-variant border-b text-left text-xs font-semibold tracking-[0.05em] uppercase">
                   <tr>
-                    <th className="px-4 py-2.5">Modele</th>
-                    <th className="px-4 py-2.5 text-right">Calls</th>
-                    <th className="px-4 py-2.5 text-right">Tokens in</th>
-                    <th className="px-4 py-2.5 text-right">Tokens out</th>
-                    <th className="px-4 py-2.5 text-right">Cout</th>
+                    <th className="px-4 py-3">Modele</th>
+                    <th className="px-4 py-3 text-right">Calls</th>
+                    <th className="px-4 py-3 text-right">Tokens in</th>
+                    <th className="px-4 py-3 text-right">Tokens out</th>
+                    <th className="px-4 py-3 text-right">Cout</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-outline-variant/40 divide-y">
                   {modelSummary.map((row) => (
-                    <tr key={row.model}>
-                      <td className="px-4 py-3 font-mono text-xs">{row.model}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs">{row.calls}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs">
+                    <tr key={row.model} className="even:bg-surface-container-low/40">
+                      <td className="text-on-surface px-4 py-3 font-mono text-xs">{row.model}</td>
+                      <td className="text-on-surface px-4 py-3 text-right font-mono text-xs">
+                        {row.calls}
+                      </td>
+                      <td className="text-on-surface px-4 py-3 text-right font-mono text-xs">
                         {row.prompt_tokens.toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs">
+                      <td className="text-on-surface px-4 py-3 text-right font-mono text-xs">
                         {row.completion_tokens.toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs font-medium">
+                      <td className="text-primary px-4 py-3 text-right font-mono text-xs font-semibold">
                         ${row.total_cost.toFixed(5)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tarifs par modele (catalogue) */}
+      {pricingTable.length > 0 && (
+        <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-md">
+          <CardHeader>
+            <CardTitle className="text-on-surface text-lg font-semibold">
+              Tarifs par modele
+            </CardTitle>
+            <p className="text-on-surface-variant text-xs">
+              Prix unitaires (USD / 1M tokens) tires de provider_models. Actualises via Reglages
+              -&gt; Modeles.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="border-outline-variant overflow-hidden rounded-xl border">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-container text-on-surface-variant border-outline-variant border-b text-left text-xs font-semibold tracking-[0.05em] uppercase">
+                  <tr>
+                    <th className="px-4 py-3">Provider</th>
+                    <th className="px-4 py-3">Modele</th>
+                    <th className="px-4 py-3 text-right">Context</th>
+                    <th className="px-4 py-3 text-right">Input ($/1M)</th>
+                    <th className="px-4 py-3 text-right">Output ($/1M)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-outline-variant/40 divide-y">
+                  {pricingTable.map((row) => (
+                    <tr
+                      key={`${row.provider}:${row.model_id}`}
+                      className="even:bg-surface-container-low/40"
+                    >
+                      <td className="text-on-surface px-4 py-3 text-xs font-semibold uppercase">
+                        {row.provider}
+                      </td>
+                      <td className="text-on-surface px-4 py-3 font-mono text-xs">
+                        {row.model_id}
+                      </td>
+                      <td className="text-on-surface px-4 py-3 text-right font-mono text-xs">
+                        {row.context_window != null ? row.context_window.toLocaleString() : '—'}
+                      </td>
+                      <td className="text-on-surface px-4 py-3 text-right font-mono text-xs">
+                        {row.pricing_input_per_1m != null
+                          ? `$${row.pricing_input_per_1m.toFixed(4)}`
+                          : '—'}
+                      </td>
+                      <td className="text-on-surface px-4 py-3 text-right font-mono text-xs">
+                        {row.pricing_output_per_1m != null
+                          ? `$${row.pricing_output_per_1m.toFixed(4)}`
+                          : '—'}
                       </td>
                     </tr>
                   ))}

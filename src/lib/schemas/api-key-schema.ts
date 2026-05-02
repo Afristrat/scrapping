@@ -1,6 +1,18 @@
 import { z } from 'zod'
 
-export const apiKeyProviders = ['openrouter', 'apify'] as const
+export const apiKeyProviders = [
+  'openrouter',
+  'moonshot',
+  'anthropic',
+  'openai',
+  'google',
+  'mistral',
+  'groq',
+  'together',
+  'deepseek',
+  'ollama',
+  'apify',
+] as const
 export type ApiKeyProvider = (typeof apiKeyProviders)[number]
 
 export const apiKeySchema = z.object({
@@ -15,6 +27,9 @@ export interface UserApiKey {
   user_id: string
   provider: ApiKeyProvider
   masked_key: string
+  base_url: string | null
+  validation_status: 'valid' | 'invalid' | 'unknown' | null
+  last_validated_at: string | null
   created_at: string
   updated_at: string
 }

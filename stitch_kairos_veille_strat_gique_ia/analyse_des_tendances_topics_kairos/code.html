@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos AI - Topics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#e6eeff",
+                        "surface-bright": "#f8f9ff",
+                        "inverse-surface": "#233144",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "on-surface": "#0d1c2e",
+                        "secondary": "#0051d5",
+                        "primary": "#006948",
+                        "on-tertiary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-tint": "#006c4a",
+                        "primary-container": "#00855d",
+                        "secondary-fixed": "#dbe1ff",
+                        "tertiary-fixed-dim": "#ffb3ae",
+                        "tertiary-container": "#ba5551",
+                        "on-tertiary-fixed": "#410004",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "secondary-container": "#316bf3",
+                        "on-surface-variant": "#3d4a42",
+                        "outline-variant": "#bccac0",
+                        "on-background": "#0d1c2e",
+                        "on-tertiary-fixed-variant": "#7f2928",
+                        "primary-fixed": "#85f8c4",
+                        "tertiary-fixed": "#ffdad7",
+                        "on-primary": "#ffffff",
+                        "surface-container-high": "#dce9ff",
+                        "surface-dim": "#ccdbf3",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#fefcff",
+                        "surface-container-highest": "#d5e3fc",
+                        "on-primary-container": "#f5fff7",
+                        "primary-fixed-dim": "#68dba9",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed-variant": "#005137",
+                        "surface": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "background": "#f8f9ff",
+                        "on-secondary-fixed": "#00174b",
+                        "surface-variant": "#d5e3fc",
+                        "surface-container-low": "#eff4ff",
+                        "outline": "#6d7a72",
+                        "tertiary": "#9b3e3b",
+                        "on-primary-fixed": "#002114",
+                        "inverse-primary": "#68dba9",
+                        "inverse-on-surface": "#eaf1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-lg": "24px",
+                        "max-width-marketing": "1152px",
+                        "max-width-dashboard": "1280px",
+                        "gutter": "1.5rem",
+                        "unit-base": "4px",
+                        "margin-page": "2rem",
+                        "stack-md": "16px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "h1-6xl": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "h3-2xl": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h2-4xl": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h1-6xl": ["60px", { "lineHeight": "1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "1rem", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "1.25rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h3-2xl": ["24px", { "lineHeight": "2rem", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.75rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h2-4xl": ["36px", { "lineHeight": "2.5rem", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex">
+<!-- SideNavBar (from JSON) -->
+<nav class="bg-surface-bright border-r border-outline-variant h-screen w-64 fixed left-0 top-0 overflow-y-auto flex flex-col h-full p-4 space-y-2 z-50 md:flex hidden">
+<div class="mb-8 px-4 flex items-center gap-3">
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A small, professional user avatar placeholder. The image shows a neutral, stylized human silhouette against a soft Emerald green gradient background, fitting a high-end corporate AI dashboard aesthetic." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+<div>
+<div class="font-h3-2xl text-h3-2xl text-on-surface uppercase tracking-wider font-black">Enterprise Monitor</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Precision Analytics</div>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary py-2 px-4 rounded-lg font-label-caps text-label-caps mb-6 shadow-sm hover:opacity-90 transition-opacity">
+            New Analysis
+        </button>
+<ul class="flex-1 space-y-1">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-sm text-body-sm font-medium">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">sensors</span>
+<span class="font-body-sm text-body-sm font-medium">Signaux</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">notifications_active</span>
+<span class="font-body-sm text-body-sm font-medium">Alerts</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 bg-surface-container text-primary rounded-lg border-l-4 border-primary font-medium" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">trending_up</span>
+<span class="font-body-sm text-body-sm font-medium">Topics</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-body-sm text-body-sm font-medium">Costs</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">terminal</span>
+<span class="font-body-sm text-body-sm font-medium">Logs</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-sm text-body-sm font-medium">Settings</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content -->
+<main class="flex-1 md:ml-64 bg-background min-h-screen">
+<div class="max-w-[1280px] mx-auto py-8 px-6">
+<!-- Header -->
+<header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4">
+<div>
+<h1 class="font-h1-6xl text-h1-6xl text-on-background mb-2">Topics</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Suivi 90 jours glissants. Algorithme Welford z-score.</p>
+</div>
+<button class="px-4 py-2 border border-outline-variant text-on-surface-variant font-label-caps text-label-caps rounded-lg hover:bg-surface-container transition-colors duration-200">
+                    Que regarde-t-on ?
+                </button>
+</header>
+<!-- Section 1: Émergents -->
+<section class="mb-12">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary">trending_up</span>
+<h2 class="font-h2-4xl text-h2-4xl text-primary">Émergents</h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-6">Topics dont le volume + score moyen ont augmenté significativement sur les 7 derniers jours (z-score &gt; 2).</p>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md p-6 border border-outline-variant/30 flex flex-col">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface">Data Privacy</h3>
+<span class="px-2 py-1 bg-primary-container text-on-primary-container rounded font-label-caps text-label-caps" title="Z-score &gt; 2">+2.8 z</span>
+</div>
+<div class="h-16 w-full mb-4 bg-surface-container rounded overflow-hidden flex items-end">
+<div class="h-full w-full bg-primary opacity-20"></div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4 font-body-sm text-body-sm text-on-surface-variant">
+<div>Vol: <span class="font-semibold text-on-surface">1.2k</span></div>
+<div>Score: <span class="font-semibold text-on-surface">85</span></div>
+<div class="col-span-2">Apparition: <span class="text-on-surface">02/10/23</span></div>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant/30">
+<a class="font-label-caps text-label-caps text-secondary hover:text-secondary-container transition-colors" href="#">Filtrer le dashboard →</a>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: En déclin -->
+<section class="mb-12">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-tertiary">trending_down</span>
+<h2 class="font-h2-4xl text-h2-4xl text-tertiary">En déclin</h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-6">Topics dont le volume + score moyen ont chuté (z-score &lt; -2).</p>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md p-6 border border-outline-variant/30 flex flex-col">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface">Legacy Auth</h3>
+<span class="px-2 py-1 bg-tertiary-container text-on-tertiary-container rounded font-label-caps text-label-caps" title="Z-score &lt; -2">-2.4 z</span>
+</div>
+<div class="h-16 w-full mb-4 bg-surface-container rounded overflow-hidden flex items-end">
+<div class="h-full w-full bg-tertiary opacity-20"></div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4 font-body-sm text-body-sm text-on-surface-variant">
+<div>Vol: <span class="font-semibold text-on-surface">340</span></div>
+<div>Score: <span class="font-semibold text-on-surface">42</span></div>
+<div class="col-span-2">Apparition: <span class="text-on-surface">15/01/22</span></div>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant/30">
+<a class="font-label-caps text-label-caps text-secondary hover:text-secondary-container transition-colors" href="#">Filtrer le dashboard →</a>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Stables -->
+<section class="mb-12">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-on-surface-variant">remove</span>
+<h2 class="font-h2-4xl text-h2-4xl text-on-surface-variant">Stables</h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-6">Topics constants sur la fenêtre 90 j (-1 &lt; z-score &lt; 1).</p>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 border border-outline-variant/30 flex flex-col">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface">API Latency</h3>
+<span class="px-2 py-1 bg-surface-variant text-on-surface rounded font-label-caps text-label-caps" title="-1 &lt; Z-score &lt; 1">+0.2 z</span>
+</div>
+<div class="h-16 w-full mb-4 bg-surface-container rounded overflow-hidden flex items-end">
+<div class="h-full w-full bg-outline-variant opacity-20"></div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4 font-body-sm text-body-sm text-on-surface-variant">
+<div>Vol: <span class="font-semibold text-on-surface">5.8k</span></div>
+<div>Score: <span class="font-semibold text-on-surface">91</span></div>
+<div class="col-span-2">Apparition: <span class="text-on-surface">01/01/21</span></div>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant/30">
+<a class="font-label-caps text-label-caps text-secondary hover:text-secondary-container transition-colors" href="#">Filtrer le dashboard →</a>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: Calibrage -->
+<section class="mb-12">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-secondary">help</span>
+<h2 class="font-h2-4xl text-h2-4xl text-secondary">Calibrage</h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-6">Topics avec sample size insuffisant (&lt; 7 occurrences) — calibrage en cours.</p>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 border border-outline-variant/30 border-dashed flex flex-col">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface">Quantum Comp</h3>
+<span class="px-2 py-1 bg-secondary-container text-on-secondary-container rounded font-label-caps text-label-caps" title="Sample &lt; 7">N/A</span>
+</div>
+<div class="h-16 w-full mb-4 bg-surface-container rounded overflow-hidden flex items-end">
+<div class="h-full w-full border-t-2 border-dashed border-secondary opacity-50"></div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4 font-body-sm text-body-sm text-on-surface-variant">
+<div>Vol: <span class="font-semibold text-on-surface">3</span></div>
+<div>Score: <span class="font-semibold text-on-surface">--</span></div>
+<div class="col-span-2">Apparition: <span class="text-on-surface">Hier</span></div>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant/30">
+<a class="font-label-caps text-label-caps text-secondary hover:text-secondary-container transition-colors" href="#">Filtrer le dashboard →</a>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</body></html>

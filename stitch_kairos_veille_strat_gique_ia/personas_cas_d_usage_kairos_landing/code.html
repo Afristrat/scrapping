@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos - Personas</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed": "#00174b",
+                      "surface-tint": "#006c4a",
+                      "inverse-primary": "#68dba9",
+                      "primary": "#006948",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-tertiary-fixed": "#410004",
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#9b3e3b",
+                      "surface-bright": "#f8f9ff",
+                      "surface-dim": "#ccdbf3",
+                      "secondary-fixed-dim": "#b4c5ff",
+                      "error": "#ba1a1a",
+                      "inverse-surface": "#233144",
+                      "secondary-container": "#316bf3",
+                      "on-surface": "#0d1c2e",
+                      "on-error-container": "#93000a",
+                      "on-surface-variant": "#3d4a42",
+                      "on-secondary-fixed-variant": "#003ea8",
+                      "secondary": "#0051d5",
+                      "on-error": "#ffffff",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-highest": "#d5e3fc",
+                      "secondary-fixed": "#dbe1ff",
+                      "on-secondary-container": "#fefcff",
+                      "outline-variant": "#bccac0",
+                      "on-tertiary-fixed-variant": "#7f2928",
+                      "on-primary-container": "#f5fff7",
+                      "on-background": "#0d1c2e",
+                      "tertiary-fixed-dim": "#ffb3ae",
+                      "on-primary-fixed-variant": "#005137",
+                      "tertiary-container": "#ba5551",
+                      "primary-container": "#00855d",
+                      "surface-container": "#e6eeff",
+                      "primary-fixed": "#85f8c4",
+                      "on-primary": "#ffffff",
+                      "surface-variant": "#d5e3fc",
+                      "outline": "#6d7a72",
+                      "on-tertiary": "#ffffff",
+                      "tertiary-fixed": "#ffdad7",
+                      "primary-fixed-dim": "#68dba9",
+                      "error-container": "#ffdad6",
+                      "background": "#f8f9ff",
+                      "surface-container-low": "#eff4ff",
+                      "surface": "#f8f9ff",
+                      "on-primary-fixed": "#002114",
+                      "surface-container-high": "#dce9ff",
+                      "on-tertiary-container": "#fffbff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-page": "2rem",
+                      "unit-base": "4px",
+                      "max-width-marketing": "1152px",
+                      "gutter": "1.5rem",
+                      "stack-sm": "8px",
+                      "stack-md": "16px",
+                      "stack-lg": "24px",
+                      "max-width-dashboard": "1280px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "h3-2xl": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "h1-6xl": [
+                              "Inter"
+                      ],
+                      "label-caps": [
+                              "Inter"
+                      ],
+                      "h2-4xl": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5rem",
+                                      "letterSpacing": "0",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "h3-2xl": [
+                              "24px",
+                              {
+                                      "lineHeight": "2rem",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "1.75rem",
+                                      "letterSpacing": "0",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.25rem",
+                                      "letterSpacing": "0",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "h1-6xl": [
+                              "60px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "1rem",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "h2-4xl": [
+                              "36px",
+                              {
+                                      "lineHeight": "2.5rem",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased">
+<!-- TopAppBar Semantic Shell Placeholder (Assuming Top Level Navigation Intent is absent for component specific request, hiding nav as instructed but adding TopAppBar based on JSON instructions if it were a full page, However, user requested ONLY 'a section'. So skipping shell to focus on Canvas) -->
+<main class="bg-slate-50 py-20 px-6" id="personas">
+<div class="max-w-6xl mx-auto">
+<!-- Header Section -->
+<div class="text-center mb-16">
+<p class="font-label-caps text-label-caps text-slate-500 uppercase tracking-wider mb-2">Pour qui</p>
+<h2 class="font-h2-4xl text-h2-4xl text-slate-900 mb-4">6 façons de capturer la valeur.</h2>
+<p class="font-body-lg text-body-lg text-slate-600 max-w-2xl mx-auto">
+                    Kairos s'adapte à votre métier. Le tarif suit la valeur que vous capturez.
+                </p>
+</div>
+<!-- Personas Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+<!-- Card 1 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 transition-all duration-300 hover:border-inverse-primary hover:shadow-md flex flex-col h-full group">
+<div class="w-12 h-12 bg-primary-fixed rounded-lg flex items-center justify-center mb-6">
+<span aria-label="Briefcase" class="material-symbols-outlined text-primary-fixed-dim">work</span>
+</div>
+<div class="mb-6 flex-grow">
+<span class="inline-block px-3 py-1 bg-surface-container text-primary-container font-label-caps text-label-caps rounded-full mb-4">VC / Private Equity IA</span>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Ne ratez plus un deal qui démarre sur arXiv.</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Sources tier 1 IA, alertes lifecycle, auteurs vérifiés.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 mt-auto">
+<div class="flex justify-between items-center mb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Maison (Sonnet inclus)</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">599€<span class="sr-only"> par siège par mois</span></span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-on-surface-variant">BYOK (votre Opus)</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">999€<span class="sr-only"> par siège par mois</span></span>
+</div>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 transition-all duration-300 hover:border-inverse-primary hover:shadow-md flex flex-col h-full group">
+<div class="w-12 h-12 bg-primary-fixed rounded-lg flex items-center justify-center mb-6">
+<span aria-label="Scale" class="material-symbols-outlined text-primary-fixed-dim">balance</span>
+</div>
+<div class="mb-6 flex-grow">
+<span class="inline-block px-3 py-1 bg-surface-container text-primary-container font-label-caps text-label-caps rounded-full mb-4">Cabinet d'avocats / IA Act</span>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Anticipez la réglementation, ne la suivez pas.</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Sources EU AI Office, AAAI, FAccT. Cross-source corroboration.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 mt-auto">
+<div class="flex justify-between items-center mb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Maison</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">399€</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-on-surface-variant">BYOK</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">699€</span>
+</div>
+</div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 transition-all duration-300 hover:border-inverse-primary hover:shadow-md flex flex-col h-full group">
+<div class="w-12 h-12 bg-primary-fixed rounded-lg flex items-center justify-center mb-6">
+<span aria-label="Newspaper" class="material-symbols-outlined text-primary-fixed-dim">newspaper</span>
+</div>
+<div class="mb-6 flex-grow">
+<span class="inline-block px-3 py-1 bg-surface-container text-primary-container font-label-caps text-label-caps rounded-full mb-4">Newsletter / éditeurs IA</span>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Publiez avant TechCrunch.</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Backtest ligne éditoriale, export API, branding digests.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 mt-auto">
+<div class="flex justify-between items-center mb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Maison (3 sièges)</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">499€<span class="sr-only"> par mois</span></span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-on-surface-variant">BYOK (3 sièges)</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">799€<span class="sr-only"> par mois</span></span>
+</div>
+</div>
+</article>
+<!-- Card 4 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 transition-all duration-300 hover:border-inverse-primary hover:shadow-md flex flex-col h-full group">
+<div class="w-12 h-12 bg-primary-fixed rounded-lg flex items-center justify-center mb-6">
+<span aria-label="Megaphone" class="material-symbols-outlined text-primary-fixed-dim">campaign</span>
+</div>
+<div class="mb-6 flex-grow">
+<span class="inline-block px-3 py-1 bg-surface-container text-primary-container font-label-caps text-label-caps rounded-full mb-4">Brand / Marketing IA-corp</span>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Vos conversations brand restent dans VOTRE infra.</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Author reputation, sentiment, alertes Slack signaux &gt;= 70.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 mt-auto">
+<div class="flex justify-between items-center mb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Maison</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">499€</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-on-surface-variant">BYOK</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">799€</span>
+</div>
+</div>
+</article>
+<!-- Card 5 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 transition-all duration-300 hover:border-inverse-primary hover:shadow-md flex flex-col h-full group">
+<div class="w-12 h-12 bg-primary-fixed rounded-lg flex items-center justify-center mb-6">
+<span aria-label="Code" class="material-symbols-outlined text-primary-fixed-dim">code</span>
+</div>
+<div class="mb-6 flex-grow">
+<span class="inline-block px-3 py-1 bg-surface-container text-primary-container font-label-caps text-label-caps rounded-full mb-4">CTO / Tech Lead PME</span>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Validez vos choix techno avant 6 mois de dev.</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Rubriques RAG, agents, modèles locaux, infra LLM.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 mt-auto">
+<div class="flex justify-between items-center mb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Maison (5 sièges)</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">149€<span class="sr-only"> par siège</span></span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-on-surface-variant">BYOK (5 sièges)</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">249€<span class="sr-only"> par siège</span></span>
+</div>
+</div>
+</article>
+<!-- Card 6 (Lower Priority) -->
+<article class="bg-surface border border-outline-variant rounded-xl p-6 opacity-95 transition-all duration-300 hover:opacity-100 hover:border-inverse-primary hover:shadow-md flex flex-col h-full group">
+<div class="w-12 h-12 bg-surface-container-highest rounded-lg flex items-center justify-center mb-6">
+<span aria-label="Rocket" class="material-symbols-outlined text-on-surface-variant">rocket_launch</span>
+</div>
+<div class="mb-6 flex-grow">
+<span class="inline-block px-3 py-1 bg-surface-variant text-on-surface-variant font-label-caps text-label-caps rounded-full mb-4">Solo créateur IA</span>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Votre clé, votre choix de modèle.</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">1 utilisateur, 100 signaux/jour, memory 30 j.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 mt-auto">
+<div class="flex justify-between items-center mb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Maison Haiku</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">49€</span>
+</div>
+<div class="flex justify-between items-center mb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">BYOK</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">99€</span>
+</div>
+<p class="font-label-caps text-label-caps text-primary mt-2 text-center">Essai 14 j sans carte requise.</p>
+</div>
+</article>
+</div>
+<!-- Bottom CTA -->
+<div class="text-center mt-12 bg-surface-container-lowest p-8 rounded-xl border border-outline-variant flex flex-col md:flex-row items-center justify-between gap-6">
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-semibold mb-2 text-left">Vous ne vous reconnaissez pas dans une de ces 6 cartes ?</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-left">Nous construisons des solutions sur-mesure pour les cas d'usage atypiques.</p>
+</div>
+<a class="inline-flex items-center justify-center px-6 py-3 min-h-[40px] bg-primary text-on-primary font-body-md text-body-md rounded-lg shadow-sm hover:bg-primary-container focus:ring-2 focus:ring-inverse-primary focus:outline-none transition-colors whitespace-nowrap" href="#">
+                    Décrivez-nous votre cas
+                    <span aria-hidden="true" class="material-symbols-outlined ml-2 text-sm">arrow_forward</span>
+</a>
+</div>
+<div class="mt-16 flex justify-center hidden">
+<img alt="An elegant, abstract representation of interconnected nodes and data streams in a corporate environment. The image features a modern, high-contrast dark palette with deep slate blues and blacks, highlighted by vibrant emerald green glowing lines and intersections. The aesthetic is clean, professional, and indicative of advanced enterprise AI technology, conveying a mood of precision and reliable infrastructure." class="rounded-xl shadow-md border border-slate-200" data-alt="An elegant, abstract representation of interconnected nodes and data streams in a corporate environment. The image features a modern, high-contrast dark palette with deep slate blues and blacks, highlighted by vibrant emerald green glowing lines and intersections. The aesthetic is clean, professional, and indicative of advanced enterprise AI technology, conveying a mood of precision and reliable infrastructure." src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+</div>
+</div>
+</main>
+</body></html>

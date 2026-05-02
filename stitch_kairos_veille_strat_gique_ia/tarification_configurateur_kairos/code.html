@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos - Tarifs</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "outline-variant": "#bccac0",
+                        "primary-fixed-dim": "#68dba9",
+                        "primary": "#006948",
+                        "on-surface-variant": "#3d4a42",
+                        "surface-dim": "#ccdbf3",
+                        "secondary-fixed": "#dbe1ff",
+                        "tertiary-fixed": "#ffdad7",
+                        "surface-bright": "#f8f9ff",
+                        "on-primary-fixed-variant": "#005137",
+                        "tertiary-fixed-dim": "#ffb3ae",
+                        "primary-container": "#00855d",
+                        "surface-tint": "#006c4a",
+                        "surface-container-low": "#eff4ff",
+                        "surface-container-high": "#dce9ff",
+                        "surface-container": "#e6eeff",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-container-highest": "#d5e3fc",
+                        "surface": "#f8f9ff",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "on-surface": "#0d1c2e",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#00174b",
+                        "tertiary-container": "#ba5551",
+                        "on-background": "#0d1c2e",
+                        "outline": "#6d7a72",
+                        "inverse-surface": "#233144",
+                        "background": "#f8f9ff",
+                        "primary-fixed": "#85f8c4",
+                        "on-primary-fixed": "#002114",
+                        "surface-variant": "#d5e3fc",
+                        "secondary": "#0051d5",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-primary-container": "#f5fff7",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#410004",
+                        "on-secondary-container": "#fefcff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "tertiary": "#9b3e3b",
+                        "on-tertiary": "#ffffff",
+                        "secondary-container": "#316bf3",
+                        "on-error": "#ffffff",
+                        "inverse-primary": "#68dba9",
+                        "on-tertiary-fixed-variant": "#7f2928",
+                        "on-error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit-base": "4px",
+                        "stack-lg": "24px",
+                        "stack-md": "16px",
+                        "max-width-dashboard": "1280px",
+                        "margin-page": "2rem",
+                        "stack-sm": "8px",
+                        "max-width-marketing": "1152px",
+                        "gutter": "1.5rem"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Inter"],
+                        "body-md": ["Inter"],
+                        "h1-6xl": ["Inter"],
+                        "h3-2xl": ["Inter"],
+                        "h2-4xl": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["12px", { "lineHeight": "1rem", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h1-6xl": ["60px", { "lineHeight": "1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h3-2xl": ["24px", { "lineHeight": "2rem", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "h2-4xl": ["36px", { "lineHeight": "2.5rem", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "1.25rem", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.75rem", "letterSpacing": "0", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 ease-in-out">
+<div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+<div class="flex items-center gap-8">
+<a class="text-xl font-bold tracking-tight text-slate-900 dark:text-white" href="#">Kairos</a>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Platform</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Solutions</a>
+<a class="text-emerald-600 dark:text-emerald-400 font-semibold border-b-2 border-emerald-600 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Pricing</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Documentation</a>
+</div>
+</div>
+<div class="hidden md:flex items-center gap-4">
+<a class="text-emerald-600 dark:text-emerald-500 font-medium font-body-md" href="#">Sign In</a>
+<a class="bg-primary text-on-primary px-4 py-2 rounded-lg font-body-md hover:opacity-90 transition-opacity" href="#">Get Started</a>
+</div>
+</div>
+</nav>
+<main class="pt-24 pb-16">
+<section class="max-w-marketing mx-auto px-6">
+<!-- Header Section -->
+<div class="text-center mb-16">
+<p class="font-label-caps text-label-caps text-primary uppercase tracking-wider mb-stack-sm">Tarifs</p>
+<h2 class="font-h2-4xl text-h2-4xl text-on-surface mb-stack-md">Choisissez votre stack</h2>
+<p class="font-body-lg text-body-lg text-outline max-w-2xl mx-auto">
+                    Optimisez votre monitoring IA avec nos plans flexibles. Optez pour notre infrastructure LLM Maison clé en main, ou utilisez vos propres clés (BYOK) pour un contrôle total des coûts.
+                </p>
+</div>
+<!-- Toggle (Tabs) -->
+<div class="flex flex-col items-center mb-stack-lg">
+<div class="bg-surface-variant p-1 rounded-lg flex items-center shadow-sm">
+<button class="px-6 py-2 rounded-md bg-surface text-primary shadow-sm font-body-md font-semibold transition-all">
+                        LLM Maison (tout-inclus)
+                    </button>
+<button class="px-6 py-2 rounded-md text-on-surface-variant font-body-md font-medium hover:text-on-surface transition-all">
+                        BYOK (vos clés)
+                    </button>
+</div>
+<p class="mt-stack-sm text-body-sm font-body-sm text-outline">
+                    Modèle recommandé : Infrastructure gérée, facturation simplifiée.
+                </p>
+</div>
+<!-- Pricing Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+<!-- Solo Plan -->
+<div class="bg-surface-container-lowest rounded-xl p-8 shadow-md border border-surface-variant flex flex-col h-full">
+<div class="mb-stack-lg">
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-stack-sm">Solo</h3>
+<p class="font-body-sm text-body-sm text-outline">Idéal pour les développeurs indépendants.</p>
+</div>
+<div class="mb-stack-lg">
+<span class="font-h2-4xl text-h2-4xl text-on-surface">49€</span>
+<span class="font-body-sm text-body-sm text-outline">/mois</span>
+</div>
+<div class="bg-surface-container p-4 rounded-lg mb-stack-lg flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface font-medium">1 Utilisateur</span>
+<span class="material-symbols-outlined text-outline" data-icon="person">person</span>
+</div>
+<ul class="space-y-4 mb-stack-lg flex-1">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">Jusqu'à 10k requêtes/mois</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">Dashboards standards</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">Support communautaire</span>
+</li>
+</ul>
+<button class="w-full py-3 rounded-lg border border-outline text-on-surface font-body-md font-medium hover:bg-surface-variant transition-colors mt-auto">
+                        Commencer gratuitement
+                    </button>
+</div>
+<!-- Pro Plan (Recommended) -->
+<div class="bg-surface-container-lowest rounded-xl p-8 shadow-lg border-2 border-primary relative flex flex-col h-full transform md:-translate-y-4">
+<div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-primary text-on-primary px-4 py-1 rounded-full flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-sm" data-icon="star" data-weight="fill">star</span>
+<span class="font-label-caps text-label-caps uppercase">Recommandé</span>
+</div>
+<div class="mb-stack-lg mt-2">
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-stack-sm">Pro</h3>
+<p class="font-body-sm text-body-sm text-outline">Pour les équipes en croissance.</p>
+</div>
+<div class="mb-stack-md">
+<span class="font-h2-4xl text-h2-4xl text-on-surface">149€</span>
+<span class="font-body-sm text-body-sm text-outline">/siège/mois</span>
+</div>
+<!-- Slider Simulation -->
+<div class="bg-surface-container-low p-4 rounded-lg mb-stack-lg border border-surface-variant">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Nombre de sièges</span>
+<span class="font-body-sm text-body-sm font-semibold text-primary">5</span>
+</div>
+<div class="w-full h-2 bg-surface-variant rounded-full mb-2 overflow-hidden relative">
+<div class="absolute top-0 left-0 h-full bg-primary w-1/5 rounded-full"></div>
+</div>
+<div class="flex justify-between text-xs text-outline">
+<span>5</span>
+<span>25+</span>
+</div>
+<div class="mt-3 p-2 bg-primary-container/10 rounded text-center">
+<span class="font-body-sm text-body-sm text-primary font-medium">Économie de 15% appliquée</span>
+</div>
+</div>
+<ul class="space-y-4 mb-stack-lg flex-1">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">Requêtes illimitées (Fair Use)</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">Analytique avancée &amp; Custom Dashboards</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">Alerting temps réel (Slack, Email)</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">Support prioritaire (SLA 24h)</span>
+</li>
+</ul>
+<button class="w-full py-3 rounded-lg bg-primary text-on-primary font-body-md font-medium hover:bg-surface-tint shadow-sm transition-colors mt-auto">
+                        Démarrer l'essai Pro
+                    </button>
+</div>
+<!-- Enterprise Plan -->
+<div class="bg-inverse-surface rounded-xl p-8 shadow-md flex flex-col h-full relative overflow-hidden">
+<img alt="A dark, abstract digital visualization representing enterprise AI architecture. Subtle, deep emerald geometric lines intersecting over a midnight blue and slate background. The aesthetic is highly technical, secure, and sophisticated, suggesting data processing at scale. Lighting is low-key, with faint, glowing nodes indicating active connections in a secure network environment." class="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none mix-blend-overlay" src="https://lh3.googleusercontent.com/aida/ADBb0uh1iy71tnLX5vCwo0Oy9eEJWINqgjjovSRAn84iHp2JlUzEYznHUUU0JNu1QRdYU0JNaUpgmZQeD9MpK4zRpC3SL5-9QbXcLqDqmgjN3-buljId2OmPa1yOemEoPEe1LAp9Gb3zJv-d5FBLJgFXZsjwZl_93sLVNkCnFCE954GFsUNcULY8JC6XkZFww_TJEzdBrC6ahUv32_4F41xIL2b5sj3wcKDWEGOZjbJWO-MbmPB2L96wcX8SKDc"/>
+<div class="relative z-10">
+<div class="mb-stack-lg">
+<h3 class="font-h3-2xl text-h3-2xl text-on-primary mb-stack-sm">Enterprise</h3>
+<p class="font-body-sm text-body-sm text-surface-dim">Pour les déploiements critiques.</p>
+</div>
+<div class="mb-stack-lg h-[56px] flex items-center">
+<span class="font-h2-4xl text-h2-4xl text-on-primary">Sur devis</span>
+</div>
+<div class="bg-surface-container-highest/20 p-4 rounded-lg mb-stack-lg flex items-center justify-between border border-surface-variant/20">
+<span class="font-body-sm text-body-sm text-on-primary font-medium">Déploiement sur mesure</span>
+<span class="material-symbols-outlined text-surface-dim" data-icon="domain">domain</span>
+</div>
+<ul class="space-y-4 mb-stack-lg flex-1">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary-fixed-dim text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-surface-bright">Tenant isolé (Single-Tenant)</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary-fixed-dim text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-surface-bright">Audit Logs détaillés &amp; SSO (SAML)</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary-fixed-dim text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-surface-bright">SLA Garantie (99.99%)</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary-fixed-dim text-xl" data-icon="check_circle" data-weight="fill">check_circle</span>
+<span class="font-body-sm text-body-sm text-surface-bright">Customer Success Manager dédié</span>
+</li>
+</ul>
+<button class="w-full py-3 rounded-lg bg-surface-container-lowest text-on-surface font-body-md font-medium hover:bg-surface-variant transition-colors mt-auto">
+                            Contacter les ventes
+                        </button>
+</div>
+</div>
+</div>
+<!-- Add-ons Accordion -->
+<div class="mt-24 max-w-3xl mx-auto">
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-stack-md">Add-ons optionnels</h3>
+<div class="border border-surface-variant rounded-xl overflow-hidden bg-surface-container-lowest shadow-sm">
+<!-- Accordion Item 1 -->
+<div class="border-b border-surface-variant">
+<button class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface-variant/50 transition-colors">
+<div class="flex flex-col">
+<span class="font-body-md font-semibold text-on-surface">Rétention de données étendue (1 an+)</span>
+<span class="font-body-sm text-outline">Stockage long-terme pour la conformité.</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="font-body-md font-medium text-primary">+29€/mois</span>
+<span class="material-symbols-outlined text-outline" data-icon="expand_more">expand_more</span>
+</div>
+</button>
+</div>
+<!-- Accordion Item 2 -->
+<div class="border-b border-surface-variant bg-surface-variant/30">
+<button class="w-full px-6 py-4 flex items-center justify-between text-left">
+<div class="flex flex-col">
+<span class="font-body-md font-semibold text-on-surface">Connecteurs de données personnalisés</span>
+<span class="font-body-sm text-outline">Intégration avec des sources de données propriétaires.</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="font-body-md font-medium text-primary">Sur devis</span>
+<span class="material-symbols-outlined text-on-surface" data-icon="expand_less">expand_less</span>
+</div>
+</button>
+<div class="px-6 pb-4 pt-2">
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                                Développez des intégrations sur mesure avec vos bases de données internes (Snowflake, BigQuery, bases SQL locales) pour enrichir le monitoring de vos modèles IA avec le contexte métier spécifique de votre entreprise.
+                            </p>
+</div>
+</div>
+<!-- Accordion Item 3 -->
+<div>
+<button class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface-variant/50 transition-colors">
+<div class="flex flex-col">
+<span class="font-body-md font-semibold text-on-surface">Formation des équipes (Onboarding)</span>
+<span class="font-body-sm text-outline">Sessions guidées par nos experts.</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="font-body-md font-medium text-primary">À partir de 990€</span>
+<span class="material-symbols-outlined text-outline" data-icon="expand_more">expand_more</span>
+</div>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-12 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flat opacity-80 hover:opacity-100 transition-all duration-200 ease-in-out">
+<div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+<div class="text-lg font-bold text-slate-900 dark:text-white">Kairos</div>
+<div class="flex flex-wrap justify-center gap-6">
+<a class="text-sm font-inter text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Privacy Policy</a>
+<a class="text-sm font-inter text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Terms of Service</a>
+<a class="text-sm font-inter text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Security</a>
+<a class="text-sm font-inter text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Status</a>
+<a class="text-sm font-inter text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" href="#">Contact</a>
+</div>
+<div class="text-sm font-inter text-slate-500 dark:text-slate-400">© 2024 Kairos AI Monitoring. Engineered for precision.</div>
+</div>
+</footer>
+</body></html>

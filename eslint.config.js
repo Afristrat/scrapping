@@ -35,4 +35,13 @@ export default defineConfig([
       'no-console': 'off',
     },
   },
+  {
+    files: ['scripts/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ])

@@ -1,18 +1,11 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import OpenAI from 'npm:openai@4'
-import { getUserApiKey } from '../_shared/api-keys.ts'
 import { formatError, summarizeError } from '../_shared/errors.ts'
+import { parseScoringResponse, ScoreParseError } from '../_shared/parse-score.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
-const PRICE_FALLBACK_PER_1K: Record<string, { in: number; out: number }> = {
-  'anthropic/claude-haiku-4.5': { in: 0.001, out: 0.005 },
-  'openrouter/auto': { in: 0.002, out: 0.006 },
 }
 
 interface RequestBody {
@@ -23,6 +16,16 @@ interface ScoringCriterion {
   weight: number
 }
 
+interface DispatchResponse {
+  ok: boolean
+  error?: string
+  detail?: string
+  content?: string
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number }
+  model_used?: string
+  provider_used?: string
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -30,7 +33,13 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization')
   if (!auth) return json({ error: 'missing_authorization' }, 401)
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return json({ error: 'supabase_env_missing' }, 500)
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
   })
 
@@ -38,17 +47,6 @@ Deno.serve(async (req) => {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return json({ error: 'invalid_token' }, 401)
-
-  const apiKey = await getUserApiKey(supabase, user.id, 'openrouter')
-  if (!apiKey)
-    return json(
-      {
-        error: 'missing_openrouter_key',
-        detail:
-          'Configure une cle dans Parametres -> Cles API ou definis OPENROUTER_API_KEY en secret edge function.',
-      },
-      500,
-    )
 
   let body: RequestBody
   try {
@@ -117,23 +115,24 @@ Deno.serve(async (req) => {
 
   const prompt = `${scoringPrompt}${criteriaBlock}\nTu vas scorer ${signals.length} signaux d'un coup. Pour CHAQUE signal, donne un score de 0 a 100 et une justification d'1 phrase courte.\n\nReponds en JSON strict (et UNIQUEMENT en JSON) :\n{"scores":[{"id":"<uuid du signal>","score":<0-100>,"reasoning":"<1 phrase>"},...]}\n\nSignaux a scorer :\n\n${itemsBlock}`
 
-  const client = new OpenAI({
-    baseURL: OPENROUTER_BASE,
-    apiKey,
-    defaultHeaders: {
-      'HTTP-Referer': 'https://theresa-scrap.local',
-      'X-Title': 'theresa-scrap-batch',
-    },
-  })
-
-  let completion
+  let dispatchResult: DispatchResponse
   try {
-    completion = await client.chat.completions.create({
-      model: settings.model_scoring,
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      max_tokens: Math.min(400 * signals.length, 8000),
+    const dispatchRes = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
+      method: 'POST',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        task: 'scoring',
+        messages: [{ role: 'user', content: prompt }],
+        options: {
+          max_tokens: Math.min(400 * signals.length, 8000),
+          response_format: { type: 'json_object' },
+        },
+      }),
     })
+    dispatchResult = (await dispatchRes.json()) as DispatchResponse
   } catch (err) {
     const formatted = formatError(err)
     await supabase.from('logs').insert({
@@ -141,57 +140,116 @@ Deno.serve(async (req) => {
       action: 'llm:score-batch',
       status: 'error',
       payload: {
-        stage: 'openrouter_call',
+        stage: 'dispatch_fetch',
         count: signals.length,
-        model: settings.model_scoring,
         prompt_chars: prompt.length,
         ...formatted,
         summary: summarizeError(err),
-        hint:
-          formatted.status === 401
-            ? 'OpenRouter rejette la cle. Verifie Parametres -> Cles API et la validite sur openrouter.ai/keys.'
-            : formatted.hint,
       },
     })
-    return json({ error: 'openrouter_failed', ...formatted }, 502)
+    return json({ error: 'dispatch_unreachable', ...formatted }, 502)
   }
 
-  const raw = completion.choices[0]?.message?.content ?? '{}'
-  let parsed: { scores?: Array<{ id: string; score: number; reasoning: string }> }
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    parsed = {}
+  if (!dispatchResult.ok) {
+    const reason = dispatchResult.error ?? 'dispatch_failed'
+    const detail = dispatchResult.detail
+    await supabase.from('logs').insert({
+      user_id: user.id,
+      action: 'llm:score-batch',
+      status: 'error',
+      payload: {
+        stage: 'dispatch_call',
+        count: signals.length,
+        prompt_chars: prompt.length,
+        error: reason,
+        detail,
+        hint:
+          reason === 'missing_api_key'
+            ? 'Aucune cle API trouvee pour ce provider. Verifie Parametres -> Cles API.'
+            : undefined,
+      },
+    })
+    return json({ error: 'llm_failed', detail: detail ?? reason }, 502)
   }
 
-  const usage = completion.usage as
-    | { prompt_tokens?: number; completion_tokens?: number; cost?: number }
-    | undefined
+  const dispatchModel = dispatchResult.model_used ?? 'unknown'
+  const raw = dispatchResult.content ?? ''
+
+  const usage = dispatchResult.usage
   const promptTokens = usage?.prompt_tokens ?? 0
   const completionTokens = usage?.completion_tokens ?? 0
-  const totalCost =
-    usage?.cost ?? estimateCost(settings.model_scoring, promptTokens, completionTokens)
+  const totalCost = usage?.cost ?? 0
   const costPerSignal = signals.length > 0 ? totalCost / signals.length : 0
 
   const validById = new Map<string, { score: number; reasoning: string }>()
-  for (const s of parsed.scores ?? []) {
-    if (typeof s.id !== 'string' || !signals.find((x) => x.id === s.id)) continue
-    const score = Math.max(0, Math.min(100, Number(s.score) || 0))
-    const reasoning = typeof s.reasoning === 'string' ? s.reasoning.slice(0, 1000) : ''
-    validById.set(s.id, { score, reasoning })
+  try {
+    const entries = parseScoringResponse(raw)
+    const knownIds = new Set(signals.map((s) => s.id))
+    for (const e of entries) {
+      if (!knownIds.has(e.id)) continue
+      validById.set(e.id, { score: e.score, reasoning: e.reasoning })
+    }
+  } catch (err) {
+    const reason = err instanceof ScoreParseError ? err.message : 'unknown_parse_error'
+    await supabase.from('logs').insert({
+      user_id: user.id,
+      action: 'llm-score-batch:parse_fail',
+      status: 'error',
+      payload: {
+        stage: 'parse_response',
+        count: signals.length,
+        reason,
+        model: dispatchModel,
+        raw_preview: raw.slice(0, 2000),
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+      },
+    })
+    // Erreur métier (LLM a renvoyé du texte inexploitable) : on retourne 200
+    // pour que le frontend puisse afficher un toast clair plutôt qu'un
+    // « non-2xx status code » générique. Le coût LLM est tracé dans
+    // llm_costs car le call a bien eu lieu — l'utilisateur le verra dans
+    // /costs. Aucun signal n'est écrit en DB (pas de placeholder score=0).
+    await supabase.from('llm_costs').insert({
+      user_id: user.id,
+      task: 'scoring',
+      model: dispatchModel,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      cost: totalCost,
+    })
+    return json(
+      {
+        batch_size: signals.length,
+        scored: 0,
+        missed: signals.length,
+        cost: totalCost,
+        parse_failed: true,
+        error: 'parse_failed',
+        detail: reason,
+      },
+      200,
+    )
   }
 
-  const scoreRows = signals.map((sig) => {
-    const v = validById.get(sig.id) ?? { score: 0, reasoning: '(LLM batch missed this signal)' }
-    return {
-      signal_id: sig.id,
-      user_id: user.id,
-      score: v.score,
-      reasoning: v.reasoning,
-      model_used: settings.model_scoring,
-      cost: costPerSignal,
-    }
-  })
+  // Critical : do NOT insert placeholder rows for missed signals. A row
+  // with score=0 used to be written for every absent id, which polluted
+  // the dashboard with false-positive zeros. Missed ids stay unscored
+  // (visible in the UI as "—") and remain eligible for the next run via
+  // the `unscored_signals` RPC.
+  const scoreRows = signals
+    .filter((sig) => validById.has(sig.id))
+    .map((sig) => {
+      const v = validById.get(sig.id)!
+      return {
+        signal_id: sig.id,
+        user_id: user.id,
+        score: v.score,
+        reasoning: v.reasoning,
+        model_used: dispatchModel,
+        cost: costPerSignal,
+      }
+    })
 
   const { error: scoreErr } = await supabase
     .from('scores')
@@ -215,7 +273,7 @@ Deno.serve(async (req) => {
   await supabase.from('llm_costs').insert({
     user_id: user.id,
     task: 'scoring',
-    model: settings.model_scoring,
+    model: dispatchModel,
     prompt_tokens: promptTokens,
     completion_tokens: completionTokens,
     cost: totalCost,
@@ -232,7 +290,7 @@ Deno.serve(async (req) => {
       cost: totalCost,
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
-      model: settings.model_scoring,
+      model: dispatchModel,
     },
   })
 
@@ -246,12 +304,6 @@ Deno.serve(async (req) => {
     200,
   )
 })
-
-function estimateCost(model: string, promptTokens: number, completionTokens: number): number {
-  const price = PRICE_FALLBACK_PER_1K[model]
-  if (!price) return 0
-  return (promptTokens * price.in + completionTokens * price.out) / 1000
-}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {

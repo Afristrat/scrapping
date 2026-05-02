@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kairos - Moats &amp; Differentiators</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "primary-container": "#00855d",
+                  "inverse-on-surface": "#eaf1ff",
+                  "secondary": "#0051d5",
+                  "surface-container-high": "#dce9ff",
+                  "surface-container": "#e6eeff",
+                  "outline": "#6d7a72",
+                  "on-tertiary-fixed": "#410004",
+                  "surface-container-highest": "#d5e3fc",
+                  "on-surface": "#0d1c2e",
+                  "on-surface-variant": "#3d4a42",
+                  "inverse-primary": "#68dba9",
+                  "surface-tint": "#006c4a",
+                  "tertiary-container": "#ba5551",
+                  "error": "#ba1a1a",
+                  "on-error": "#ffffff",
+                  "on-primary-container": "#f5fff7",
+                  "on-tertiary": "#ffffff",
+                  "on-secondary-fixed-variant": "#003ea8",
+                  "inverse-surface": "#233144",
+                  "surface-container-lowest": "#ffffff",
+                  "primary": "#006948",
+                  "error-container": "#ffdad6",
+                  "on-background": "#0d1c2e",
+                  "surface-variant": "#d5e3fc",
+                  "surface-container-low": "#eff4ff",
+                  "on-primary-fixed": "#002114",
+                  "on-primary": "#ffffff",
+                  "secondary-container": "#316bf3",
+                  "on-error-container": "#93000a",
+                  "on-tertiary-container": "#fffbff",
+                  "on-secondary": "#ffffff",
+                  "tertiary-fixed-dim": "#ffb3ae",
+                  "secondary-fixed": "#dbe1ff",
+                  "secondary-fixed-dim": "#b4c5ff",
+                  "primary-fixed": "#85f8c4",
+                  "surface": "#f8f9ff",
+                  "on-tertiary-fixed-variant": "#7f2928",
+                  "on-primary-fixed-variant": "#005137",
+                  "primary-fixed-dim": "#68dba9",
+                  "outline-variant": "#bccac0",
+                  "on-secondary-fixed": "#00174b",
+                  "surface-bright": "#f8f9ff",
+                  "background": "#f8f9ff",
+                  "tertiary": "#9b3e3b",
+                  "tertiary-fixed": "#ffdad7",
+                  "surface-dim": "#ccdbf3",
+                  "on-secondary-container": "#fefcff"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.125rem",
+                  "lg": "0.25rem",
+                  "xl": "0.5rem",
+                  "full": "0.75rem"
+          },
+          "spacing": {
+                  "stack-md": "16px",
+                  "stack-lg": "24px",
+                  "max-width-dashboard": "1280px",
+                  "margin-page": "2rem",
+                  "unit-base": "4px",
+                  "stack-sm": "8px",
+                  "gutter": "1.5rem",
+                  "max-width-marketing": "1152px"
+          },
+          "fontFamily": {
+                  "body-sm": [
+                          "Inter"
+                  ],
+                  "h3-2xl": [
+                          "Inter"
+                  ],
+                  "body-lg": [
+                          "Inter"
+                  ],
+                  "h1-6xl": [
+                          "Inter"
+                  ],
+                  "label-caps": [
+                          "Inter"
+                  ],
+                  "body-md": [
+                          "Inter"
+                  ],
+                  "h2-4xl": [
+                          "Inter"
+                  ]
+          },
+          "fontSize": {
+                  "body-sm": [
+                          "14px",
+                          {
+                                  "lineHeight": "1.25rem",
+                                  "letterSpacing": "0",
+                                  "fontWeight": "400"
+                          }
+                  ],
+                  "h3-2xl": [
+                          "24px",
+                          {
+                                  "lineHeight": "2rem",
+                                  "letterSpacing": "-0.01em",
+                                  "fontWeight": "600"
+                          }
+                  ],
+                  "body-lg": [
+                          "18px",
+                          {
+                                  "lineHeight": "1.75rem",
+                                  "letterSpacing": "0",
+                                  "fontWeight": "400"
+                          }
+                  ],
+                  "h1-6xl": [
+                          "60px",
+                          {
+                                  "lineHeight": "1",
+                                  "letterSpacing": "-0.02em",
+                                  "fontWeight": "700"
+                          }
+                  ],
+                  "label-caps": [
+                          "12px",
+                          {
+                                  "lineHeight": "1rem",
+                                  "letterSpacing": "0.05em",
+                                  "fontWeight": "600"
+                          }
+                  ],
+                  "body-md": [
+                          "16px",
+                          {
+                                  "lineHeight": "1.5rem",
+                                  "letterSpacing": "0",
+                                  "fontWeight": "400"
+                          }
+                  ],
+                  "h2-4xl": [
+                          "36px",
+                          {
+                                  "lineHeight": "2.5rem",
+                                  "letterSpacing": "-0.02em",
+                                  "fontWeight": "700"
+                          }
+                  ]
+          }
+        },
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface font-body-sm text-body-sm text-on-surface antialiased">
+<!-- TopNavBar (Shared Component) -->
+<nav class="bg-white/80 dark:bg-slate-950/80 backdrop-blur-md full-width top-0 sticky z-50 shadow-sm transition-colors duration-200 ease-in-out border-b border-slate-200 dark:border-slate-800 hidden md:block">
+<div class="max-w-7xl mx-auto flex items-center justify-between px-6 h-16">
+<div class="flex items-center gap-8">
+<div class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Kairos
+        </div>
+<div class="hidden md:flex gap-6">
+<a class="text-emerald-600 dark:text-emerald-400 font-semibold border-b-2 border-emerald-600 hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors" href="#">Platform</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors" href="#">Solutions</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors" href="#">Monitoring</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors" href="#">Roadmap</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors" href="#">Pricing</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="font-body-md text-body-md text-slate-600 dark:text-slate-400 font-medium hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors">Login</button>
+<button class="bg-primary-container text-on-primary-container px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity">Get Started</button>
+</div>
+</div>
+</nav>
+<!-- Moats Section -->
+<section class="bg-surface-container-lowest w-full py-20">
+<div class="max-w-marketing mx-auto px-6 lg:px-8">
+<!-- Section Header -->
+<div class="mb-16">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-2 block">Pourquoi Kairos</span>
+<h2 class="font-h2-4xl text-h2-4xl text-on-surface mb-4">4 différenciateurs durables.</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
+          Le scoring devient une commodité. Notre moat, c'est la mémoire longue, la composition, et la liberté de stack.
+        </p>
+</div>
+<!-- Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-lg">
+<!-- Card 1 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-primary-fixed-dim transition-all duration-300 flex flex-col relative group">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-surface-container-high flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 0;">psychology</span>
+</div>
+<span class="bg-surface-container-high text-primary px-2 py-1 rounded font-label-caps text-label-caps">LIVRÉ</span>
+</div>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">10 providers LLM au choix (BYOK)</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 flex-grow">
+            OpenRouter, Anthropic, OpenAI, Google, Mistral, Groq, Together, DeepSeek, Moonshot, Ollama. Aucune marge cachée : vous payez votre conso. Mode Maison disponible.
+          </p>
+<div class="flex flex-wrap gap-2 mt-auto">
+<span class="px-3 py-1 bg-surface-container-low text-on-surface-variant rounded-full font-body-sm text-body-sm">OpenRouter</span>
+<span class="px-3 py-1 bg-surface-container-low text-on-surface-variant rounded-full font-body-sm text-body-sm">Anthropic</span>
+<span class="px-3 py-1 bg-surface-container-low text-on-surface-variant rounded-full font-body-sm text-body-sm">OpenAI</span>
+<span class="px-3 py-1 bg-surface-container-low text-on-surface-variant rounded-full font-body-sm text-body-sm">Google</span>
+<span class="px-3 py-1 bg-surface-container-low text-on-surface-variant rounded-full font-body-sm text-body-sm">Mistral</span>
+<span class="px-3 py-1 bg-surface-container-low text-on-surface-variant rounded-full font-body-sm text-body-sm">+5 autres</span>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-primary-fixed-dim transition-all duration-300 flex flex-col relative group">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">account_tree</span>
+</div>
+<span class="bg-surface-container-high text-primary px-2 py-1 rounded font-label-caps text-label-caps">LIVRÉ</span>
+</div>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Cascade Compose Engine</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 flex-grow">
+            Vos prompts admin peuvent référencer d'autres prompts via {{run:reddit}}, {{run:arxiv}}. Détection cycle, profondeur max 3. Unique au marché.
+          </p>
+<div class="mt-auto bg-inverse-surface rounded-lg p-4 font-mono text-sm overflow-x-auto border border-outline">
+<code class="text-primary-fixed">Synthèse de la semaine : {{run:reddit}} + {{run:arxiv}} + {{run:x}}</code>
+</div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-primary-fixed-dim transition-all duration-300 flex flex-col relative group">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">monitoring</span>
+</div>
+<span class="bg-surface-container-high text-primary px-2 py-1 rounded font-label-caps text-label-caps">LIVRÉ</span>
+</div>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Topic memory 90 jours</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 flex-grow">
+            Algorithme Welford z-score sur fenêtre glissante 90 jours. Détectez les sujets qui émergent avant qu'ils trendent. 4 sections : Émergents, Déclin, Stables, Calibrage.
+          </p>
+<div class="mt-auto h-16 w-full flex items-end gap-1 px-2">
+<!-- Simulated sparkline bars -->
+<div class="w-1/12 bg-surface-variant h-1/4 rounded-t-sm"></div>
+<div class="w-1/12 bg-surface-variant h-2/4 rounded-t-sm"></div>
+<div class="w-1/12 bg-surface-variant h-1/4 rounded-t-sm"></div>
+<div class="w-1/12 bg-surface-variant h-3/4 rounded-t-sm"></div>
+<div class="w-1/12 bg-surface-variant h-2/4 rounded-t-sm"></div>
+<div class="w-1/12 bg-primary-fixed-dim h-4/4 rounded-t-sm"></div>
+<div class="w-1/12 bg-primary h-full rounded-t-sm"></div>
+<div class="w-1/12 bg-surface-variant h-3/4 rounded-t-sm"></div>
+<div class="w-1/12 bg-surface-variant h-2/4 rounded-t-sm"></div>
+<div class="w-1/12 bg-surface-variant h-1/4 rounded-t-sm"></div>
+</div>
+</article>
+<!-- Card 4 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-primary-fixed-dim transition-all duration-300 flex flex-col relative group">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">auto_awesome</span>
+</div>
+<span class="bg-secondary-fixed text-on-secondary-fixed-variant px-2 py-1 rounded font-label-caps text-label-caps">ROADMAP PUBLIQUE</span>
+</div>
+<span class="material-symbols-outlined absolute top-8 right-8 text-outline-variant opacity-50" style="font-variation-settings: 'FILL' 0;">lock</span>
+<h3 class="font-h3-2xl text-h3-2xl text-on-surface mb-3 group-hover:text-primary transition-colors">Multi-LLM consensus + Backtest</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 flex-grow">
+            Q3 2026 : scoring multi-modèles. Q4 2026 : backtest sur historique 30j. Q1 2027 : trust score auteur. La data accumule dès aujourd'hui.
+          </p>
+<div class="mt-auto pl-2 border-l-2 border-surface-variant flex flex-col gap-4 relative">
+<div class="relative pl-4">
+<div class="absolute w-2 h-2 bg-surface-variant rounded-full -left-[5px] top-1.5 border-2 border-surface-container-lowest"></div>
+<span class="font-label-caps text-label-caps text-on-surface block">Q3 2026</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Scoring multi-modèles</span>
+</div>
+<div class="relative pl-4">
+<div class="absolute w-2 h-2 bg-surface-variant rounded-full -left-[5px] top-1.5 border-2 border-surface-container-lowest"></div>
+<span class="font-label-caps text-label-caps text-on-surface block">Q4 2026</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Backtest 30j</span>
+</div>
+<div class="relative pl-4">
+<div class="absolute w-2 h-2 bg-surface-variant rounded-full -left-[5px] top-1.5 border-2 border-surface-container-lowest"></div>
+<span class="font-label-caps text-label-caps text-on-surface block">Q1 2027</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Trust score auteur</span>
+</div>
+</div>
+</article>
+</div>
+</div>
+</section>
+<!-- Footer (Shared Component) -->
+<footer class="bg-surface dark:bg-slate-900 w-full py-12 border-t border-outline-variant dark:border-slate-800 flat no shadows">
+<div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="font-bold text-slate-900 dark:text-white">
+        Kairos
+      </div>
+<div class="flex flex-wrap justify-center gap-6">
+<a class="text-sm font-inter text-on-surface-variant dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors opacity-100 hover:opacity-80" href="#">Privacy Policy</a>
+<a class="text-sm font-inter text-on-surface-variant dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors opacity-100 hover:opacity-80" href="#">Terms of Service</a>
+<a class="text-sm font-inter text-on-surface-variant dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors opacity-100 hover:opacity-80" href="#">Security</a>
+<a class="text-sm font-inter text-on-surface-variant dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors opacity-100 hover:opacity-80" href="#">Status</a>
+</div>
+<div class="text-sm font-inter text-on-surface-variant dark:text-slate-400">
+        © 2024 Kairos AI Monitoring. All rights reserved.
+      </div>
+</div>
+</footer>
+</body></html>
