@@ -46,8 +46,24 @@ vi.mock('@/hooks/useUpdateSettings', () => ({
 
 vi.mock('@/hooks/useApiKeys', () => ({
   useApiKeys: () => ({ data: [], isLoading: false }),
-  useUpsertApiKey: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpsertApiKey: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useDeleteApiKey: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateApiKeyValidation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('@/hooks/useLLMProviders', () => ({
+  useLLMProviders: () => ({ data: [], isLoading: false }),
+}))
+
+vi.mock('@/hooks/useProviderModels', () => ({
+  useProviderModels: () => ({ data: [], isLoading: false }),
+  useRefreshModels: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('@/hooks/useValidateApiKey', () => ({
+  useValidateApiKey: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  toDbValidationStatus: (s: string) =>
+    s === 'verified' ? 'valid' : s === 'invalid' ? 'invalid' : 'unknown',
 }))
 
 vi.mock('@/hooks/useRubrics', () => ({
