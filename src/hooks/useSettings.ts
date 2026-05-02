@@ -52,7 +52,7 @@ export function useSettings() {
 }
 
 export const DEFAULT_BRANDING: Branding = {
-  name: 'theresa-scrap',
+  name: 'Kairos',
   primary: '#3b82f6',
   logo_url: null,
 }

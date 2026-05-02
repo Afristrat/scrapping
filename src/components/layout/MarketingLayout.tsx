@@ -2,9 +2,11 @@ import { Sparkles } from 'lucide-react'
 import { Link, Outlet } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { useAppName } from '@/hooks/useAppName'
 import { useAuthStore } from '@/stores/auth'
 
-const GITHUB_URL = 'https://github.com/meydeey/theresa-scrap'
+const GITHUB_URL = 'https://github.com/Afristrat/scrapping'
+const CONTACT_EMAIL = 'hello@kairos.ai-mpower.com'
 
 function GithubIcon({ className }: { className?: string }): React.ReactElement {
   return (
@@ -23,6 +25,7 @@ function GithubIcon({ className }: { className?: string }): React.ReactElement {
 
 export function MarketingLayout(): React.ReactElement {
   const session = useAuthStore((s) => s.session)
+  const appName = useAppName()
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
@@ -32,7 +35,7 @@ export function MarketingLayout(): React.ReactElement {
             <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-900 text-white">
               <Sparkles className="h-4 w-4" aria-hidden="true" />
             </span>
-            <span>zlatan-scrap</span>
+            <span>{appName}</span>
           </Link>
 
           <nav className="flex items-center gap-2">
@@ -75,7 +78,7 @@ export function MarketingLayout(): React.ReactElement {
                 <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-900 text-white">
                   <Sparkles className="h-4 w-4" aria-hidden="true" />
                 </span>
-                <span>zlatan-scrap</span>
+                <span>{appName}</span>
               </Link>
               <p className="mt-3 max-w-sm text-sm text-slate-600">
                 La veille IA qui comprend vos critères. Scoring LLM custom, cascade transversale,
@@ -136,7 +139,7 @@ export function MarketingLayout(): React.ReactElement {
                   </a>
                 </li>
                 <li>
-                  <a href="mailto:hello@zlatan-scrap.com" className="hover:text-slate-900">
+                  <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-slate-900">
                     Nous contacter
                   </a>
                 </li>
@@ -144,7 +147,9 @@ export function MarketingLayout(): React.ReactElement {
             </div>
           </div>
           <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-slate-200 pt-6 text-xs text-slate-500 sm:flex-row sm:items-center">
-            <p>© {new Date().getFullYear()} zlatan-scrap — Veille IA pour les équipes.</p>
+            <p>
+              © {new Date().getFullYear()} {appName} — Veille IA pour les équipes.
+            </p>
             <p>Open source · MIT · Stack inspirée des best-practices Meydeey 2026</p>
           </div>
         </div>
