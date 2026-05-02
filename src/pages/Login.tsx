@@ -113,8 +113,10 @@ export default function Login() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>zlatan-scrap</CardTitle>
-          <CardDescription>Connecte-toi pour accéder à ton dashboard de veille IA.</CardDescription>
+          <CardTitle>Kairos</CardTitle>
+          <CardDescription>
+            Connectez-vous pour accéder à votre dashboard de veille IA.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Button

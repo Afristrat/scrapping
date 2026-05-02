@@ -28,10 +28,10 @@ const FAQ: FaqItem[] = [
     q: 'Pourquoi pas Feedly, Inoreader ou un agrégateur RSS ?',
     a: (
       <p>
-        Feedly agrège, mais ne score pas selon VOS critères. zlatan-scrap n'est pas un agrégateur :
-        c'est un scoreur LLM custom + cascade transversale + topic memory 90 jours. Vous gardez le
-        flux brut, mais vous obtenez un classement aligné sur vos rubriques d'investissement, de
-        veille techno ou de conformité.
+        Feedly agrège, mais ne score pas selon VOS critères. Kairos n'est pas un agrégateur : c'est
+        un scoreur LLM custom + cascade transversale + topic memory 90 jours. Vous gardez le flux
+        brut, mais vous obtenez un classement aligné sur vos rubriques d'investissement, de veille
+        techno ou de conformité.
       </p>
     ),
   },

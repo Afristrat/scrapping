@@ -8,7 +8,7 @@ import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-const CONTACT_EMAIL = 'hello@zlatan-scrap.com'
+const CONTACT_EMAIL = 'hello@kairos.ai-mpower.com'
 
 type PricingMode = 'maison' | 'byok'
 
@@ -107,7 +107,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
         'SLA 99,9 %',
       ],
       ctaLabel: 'Contactez-nous',
-      ctaHref: `mailto:${CONTACT_EMAIL}?subject=zlatan-scrap%20Enterprise`,
+      ctaHref: `mailto:${CONTACT_EMAIL}?subject=Kairos%20Enterprise`,
       ctaVariant: 'outline',
     },
   },
@@ -174,7 +174,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
         'SLA 99,9 %',
       ],
       ctaLabel: 'Contactez-nous',
-      ctaHref: `mailto:${CONTACT_EMAIL}?subject=zlatan-scrap%20Enterprise%20BYOK`,
+      ctaHref: `mailto:${CONTACT_EMAIL}?subject=Kairos%20Enterprise%20BYOK`,
       ctaVariant: 'outline',
     },
   },
@@ -440,7 +440,7 @@ export function PricingTable(): React.ReactElement {
             </p>
           </div>
           <Button asChild variant="outline" className="gap-2">
-            <a href={`mailto:${CONTACT_EMAIL}?subject=zlatan-scrap%20-%20Demande%20de%20d%C3%A9mo`}>
+            <a href={`mailto:${CONTACT_EMAIL}?subject=Kairos%20-%20Demande%20de%20d%C3%A9mo`}>
               <Mail className="h-4 w-4" aria-hidden />
               Contactez-nous pour une démo
             </a>
