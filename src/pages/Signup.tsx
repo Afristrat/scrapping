@@ -23,6 +23,11 @@ import { useAuthStore } from '@/stores/auth'
 
 const schema = z
   .object({
+    organizationName: z
+      .string()
+      .min(2, 'Au moins 2 caractères')
+      .max(100, 'Au plus 100 caractères')
+      .trim(),
     email: z
       .string()
       .min(3, 'Adresse email invalide')
@@ -104,7 +109,7 @@ export default function Signup(): React.ReactElement {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: '', password: '', confirm: '' },
+    defaultValues: { organizationName: '', email: '', password: '', confirm: '' },
   })
 
   useEffect(() => {
@@ -157,7 +162,10 @@ export default function Signup(): React.ReactElement {
     const { error } = await supabase.auth.signUp({
       email,
       password: values.password,
-      options: { emailRedirectTo: `${window.location.origin}${nextPath}` },
+      options: {
+        emailRedirectTo: `${window.location.origin}${nextPath}`,
+        data: { organization_name: values.organizationName.trim() },
+      },
     })
     if (error) {
       toast.error(`Échec : ${error.message}`)
@@ -201,6 +209,30 @@ export default function Signup(): React.ReactElement {
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="flex flex-col gap-4"
               >
+                <div className="flex flex-col gap-1.5">
+                  <Label
+                    htmlFor="signup-organization-name"
+                    className="text-on-surface-variant text-xs font-medium"
+                  >
+                    Nom de votre organisation
+                  </Label>
+                  <Input
+                    id="signup-organization-name"
+                    type="text"
+                    autoComplete="organization"
+                    placeholder="Ex. Acme Capital, Cabinet Dupont, ma-newsletter.io"
+                    className="border-outline-variant bg-surface-container-lowest h-11 rounded-lg"
+                    {...form.register('organizationName')}
+                  />
+                  {form.formState.errors.organizationName && (
+                    <p className="text-error text-xs">
+                      {form.formState.errors.organizationName.message}
+                    </p>
+                  )}
+                  <p className="text-on-surface-variant text-[11px]">
+                    Sera affiché dans le bandeau Kairos. Vous pourrez le modifier plus tard.
+                  </p>
+                </div>
                 <div className="flex flex-col gap-1.5">
                   <Label
                     htmlFor="signup-email"
