@@ -1,57 +1,134 @@
-== PASSATION zlatan-scrap 2026-05-01T17:00Z ==
+== PASSATION Kairos (ex-zlatan-scrap / theresa-scrap) 2026-05-02T01:30Z ==
+
+[REBRAND]
+Nom marque officiel = **Kairos** (du grec ancien καιρός, « le moment opportun »). Repo Git toujours `zlatan-scrap`/`Afristrat/scrapping` en interne. Tout le frontend public utilise « Kairos » via hook `useAppName()` (`src/hooks/useAppName.ts`) qui lit `settings.branding.name` si user loggé sinon retourne `DEFAULT_APP_NAME = 'Kairos'`. Domaine cible `scrap.ai-mpower.com` toujours actif → migrer vers `kairos.ai-mpower.com` quand DNS prêt.
 
 [ETAT]
-branch=feat/topic-tracking-minio (~50 commits, ahead origin 0) | live=https://scrap.ai-mpower.com ✓ HTTP 200 | bundle splitté (5 chunks max ~350KB) | typecheck ✓ | build ✓ | lint 1 warning préexistant Settings.tsx:65 (react-hook-form watch) | tests 14/33 pass + 19 préexistants cassés (jest-dom matchers infra) — non bloquant
-backend=Supabase project crplceoptyeslqyfcqvj ~ 17 migrations appliquées | 9 edge functions déployées (run-pipeline, scraper-x/reddit/arxiv, llm-score, llm-score-batch, topic-classifier, dispatch-llm, refresh-models, digest, run-admin-prompt, purge)
-infra=Coolify app jhg5pwiyul9r992k8qg2lkx6 | tunnel CF nahda-tunnel (id 7156c3f9-...) → ingress scrap.ai-mpower.com → localhost:80 | MinIO bucket zlatan-scrap-topics sur cloud-station.io
+branch=feat/topic-tracking-minio (synchro avec origin/Afristrat/scrapping) | last commit=3940d09 docs(design): collection Stitch | working tree clean
+live=https://scrap.ai-mpower.com (actuel) → renommage à venir
+bundle Vite=5 chunks max ~500KB (recharts 350KB, react-vendor 272KB, supabase 230KB, radix 114KB, index 504KB) — à splitter encore Wave 7 si besoin
+typecheck ✓ 0 err | lint 0 err / 1 warning préexistant Settings.tsx:65 (RHF watch — toléré, hors scope) | vitest 48/48 ✓ | deno tests 28/28 parse-score + 24/24 template = 52/52 ✓ | build ✓ 712-918 ms
+backend=Supabase project crplceoptyeslqyfcqvj | 17 migrations appliquées + 4 NOUVELLES Wave 6.1 NON POUSSÉES en prod (cf. [BLOQUE]) | 11 edge functions déployées : run-pipeline, scraper-x/reddit/arxiv, llm-score, llm-score-batch (modifiée non redéployée), topic-classifier, dispatch-llm, refresh-models, digest, run-admin-prompt (Wave 4), purge
+infra=Coolify app jhg5pwiyul9r992k8qg2lkx6 | tunnel CF nahda-tunnel → ingress scrap.ai-mpower.com → localhost:80 | MinIO bucket zlatan-scrap-topics sur cloud-station.io
+
+[WAVE_5_FERMEE] (commits 0f16b2e .. 3940d09)
+✓ S-MoatHunter (b92c4b9) : brief stratégique 600 l. dans `docs/strategy/2026-05-02-moats-and-value-capture.md` — 15 analogies inter-industries scorées (Top 5 moats à 13-14/15) + analyse conjointe v2 (8 attributs × 4 niveaux × 6 segments) + 12 SKUs Maison/BYOK + MRR cible 132k€/mois = 1,58 M€ ARR
+✓ S-DashDelete (d898c66 + 01319ff) : delete inline + checkbox + bulk delete dans SignalTable, AlertDialog confirmations, sticky bar `top-0 z-10`, hooks useDeleteSignal/useDeleteSignalsBulk, primitives shadcn checkbox + alert-dialog, 4 tests Vitest
+✓ S-ScoreZero (e2ed173 + 01319ff + cba1b80) : root cause = JSON.parse silent catch + Number()||0 + placeholder DB | fix = parse-score.ts (28 tests Deno) avec stripMarkdownFence + extractFirstJsonObject bracket-aware + coerceScore retourne null (jamais 0) | UX = ScoreCell HoverCard reasoning/modèle/rubric/distance temporelle FR + bouton ↻ inline + bulk + flash bg-emerald-100 1.5s pattern React 19 store-previous-prop
+✓ S-Landing (1a31b4b) : routing / publique (MarketingLayout) + /dashboard auth-protected ProtectedRoute, sanitizeNext open-redirect protection, Login redirect via ?next=, logout → /, GITHUB_URL → Afristrat/scrapping
+✓ S-LandingContent (ed140be) : 7 composants modulaires `src/components/features/landing/` (Hero, Problem, Solution, Moats, Personas, PricingTable, FAQ), PricingTable avec toggle Tabs Maison/BYOK + slider seats Pro 5-25 dégressif (-15% Maison / -10% BYOK)
+
+[WAVE_5_BONUS] (post-fermeture)
+✓ Rebrand Kairos (22d53ae) : hook `useAppName.ts` + DEFAULT_BRANDING.name='Kairos', MarketingLayout/Login/FAQ/PricingTable/index.html mis à jour, GITHUB_URL → Afristrat/scrapping, CONTACT_EMAIL → hello@kairos.ai-mpower.com
+✓ Fix bug re-scoring (cba1b80) : 3 causes — (1) hook ne lisait pas error.context.body sur 5xx (toast affichait « non-2xx status code » générique) → ajout helper `extractFunctionsError` qui clone Response et lit body.json() pour récupérer error+detail+hint | (2) parse_failed retournait 502 alors qu'erreur métier (call LLM eu lieu, coût à tracer) → return 200 avec parse_failed=true + insert llm_costs | (3) bulk stoppait à la 1re batch fail → try/catch par chunk + abandon après 3 échecs consécutifs sans succès (évite gaspiller tokens) | useRescoreSignalsBulk type étendu BulkRescoreResult avec batches_total, batches_failed, errors[], toast différencié success/partial/failure
+✓ Collection Stitch prompts (3940d09) : 13 prompts copy-paste-ready dans `docs/design/kairos-stitch-prompts.md` (1 156 l) — 7 landing + 5 pages auth + 1 onboarding flow, format optimisé Stitch Gemini 2.5 avec préambule design system commun + variantes/états/a11y
+
+[WAVE_6.1_LIVREE_NON_POUSSEE_PROD] (commit 4b2bda5)
+4 migrations SQL prêtes pour `npx supabase db push` :
+
+- 20260502000001_orgs.sql (325 l) : 6 nouvelles tables (organizations, organization_members, subscriptions, subscription_seats, invitations, usage_records) + 5 ENUMs (org_segment, org_plan, billing_mode, org_role, subscription_status) + RLS policies + trigger updated_at
+- 20260502000002_org_id_columns.sql (54 l) : ajout colonne `org_id uuid REFERENCES organizations(id)` sur **15 tables** (l'agent a découvert provider_models en plus des 14 listées dans le PRD initial) + 15 indexes
+- 20260502000003_backfill_orgs.sql (149 l) : DO block créant 1 org/user existant + organization_members.role=owner + populate org_id partout + trigger `create_default_org_for_user` AFTER INSERT auth.users
+- 20260502000004*rls_org_rewrite.sql (541 l) : drop 39 policies own*_, create 57 policies org\__ qui filtrent via `organization_members`, helper `user_default_org_id()` (STABLE, SECURITY INVOKER) posé en DEFAULT sur org_id pour rétrocompat frontend Wave 6.3 pas encore livrée, SET DEFAULT puis SET NOT NULL sur 15 tables
+- src/types/database.ts étendu manuellement (pas accès Supabase live) : 6 nouvelles tables Row/Insert/Update + org_id ajouté dans Row+Update de chaque table tenant + 5 nouveaux ENUMs (Types + Constants)
+
+[WAVE_6_PRD_PLANIFIE] (`.ralph/wave-6-prd.md`)
+22 stories en 5 sous-vagues, dispatch attend GO utilisateur après push migrations 6.1 :
+
+- 🟦 6.1 Foundation (4) : LIVRÉE, attend push prod
+- 🟨 6.2 Stripe Billing (4) : S6-StripeSetup (script bootstrap + 12 SKUs prods+prices), S6-StripeWebhook (sync subscriptions table), S6-MeteredUsage (cron pg_cron quotidien), S6-CheckoutFlow (edge fn create-checkout-session)
+- 🟩 6.3 UI Multi-tenant (5) : S6-OrgSelector (dropdown header + Zustand useOrgStore), S6-OrgQueries (refacto ~10 hooks pour filter org_id), S6-TeamPage (/settings/team), S6-InvitationFlow (edge fn invite-member + accept-invitation + page /accept-invitation/:token), S6-Configurator (page /pricing publique 4 questions)
+- 🟧 6.4 BYOK & Compliance (4) : S6-BYOKProvisioning (UI validation auto clés providers), S6-AuditLog (table + middleware + page /settings/audit + export CSV), S6-TenantIsolated (provisioning schéma Postgres séparé), S6-AdminCockpit (page /admin avec COG/MRR/ARR projeté)
+- 🟥 6.5 Enterprise (5) : S6-SelfHostDocker (compose + doc + script setup), S6-CSMOnboarding, S6-SLAMonitoring (/health + /status), S6-LegalPack (RGPD DPA + EU AI Act compliance matrix), S6-MarketingSite (refonte landing avec PricingConfigurator + blog + analytics)
+  Estimation : 8-15 jours dev humain ; 2-4 sessions Ralph en agents parallèles (post 6.1)
 
 [ENCOURS]
-RAS — toutes stories session sont passes=true | wave restante facultative : Wave 4 PRD admin (S-AdminTests + S-AdminCompose) à dispatcher si besoin
-
-[FAIT]
-✓ git init + push GitHub Afristrat/scrapping (2 branches)
-✓ Feature topic-tracking-minio complète (4 tables + RLS + Welford z-score + MinIO 90j rolling + queue eventual consistency + UI widget Dashboard + page /topics) — 20 stories
-✓ BYOK multi-provider (10 providers : OpenRouter, Moonshot, Anthropic, OpenAI, Google, Mistral, Groq, Together, DeepSeek, Ollama) en 4 phases : auth → schema → UI providers → cascade modèles par tâche → refresh-models edge fn → auto-refresh à la save
-✓ Auth multi-méthode : magic link + password + Google OAuth + page /signup
-✓ Setup Supabase live (migrations + types regen) | Setup Coolify deploy via Dockerfile multi-stage + nginx SPA + 3 commits fix (tsconfig exclude tests, vite chunkSizeWarningLimit, react-is dep manquante)
-✓ Setup Cloudflare Tunnel via config.yml nahda + DNS CNAME automatique via cloudflared CLI sur serveur user
-✓ Refactor Wave 1 (Ralph mode + 6 agents parallèles) : dispatch-llm fn unique (kills duplication 3 LLM clients) | llm_providers DB table (single source of truth, drop dup TS) | lint fixes ModelSelectField+Costs | husky skip sans .git | Vite manualChunks (1.2MB→5 chunks max 350KB) | GitHub Actions CI workflow
-✓ Refactor Wave 2 : digest impl complète (table + edge fn + UI markdown) | drop legacy model_* columns | dead code purge (no-op, S-A avait nettoyé)
-✓ Feature Admin prompts éditables (PRD US-001 à US-004) : table admin_prompts + admin_prompt_runs + RLS + trigger seed auto + 4 prompts seed (Reddit/arXiv/X/Synthesis) + edge fn run-admin-prompt avec template engine ({{signals}}, {{signals_block}}, {{language}}, {{date}}, {{topics_emerging}}, {{rubric}}, {{run:<task_kind>}}) + onglet Settings → Admin avec list/edit/run/history + hooks useAdminPrompts*
-✓ Wave parallèle fixes : digest configurable (slider min_score + select fenêtre + erreur actionnable) | /topics redesigné en 4 sections trend (Émergents/En déclin/Stables/Calibrage) + help dialog + actions suggérées + tooltips z-score | pricing dynamique via provider_models + tableau "Tarifs par modèle" dans /costs (fallback usage.cost → DB pricing → 0) | admin prompts amélioré : History button visible avec compteur + Live Preview vars dans Edit modal + Cost Guard avant Run + BudgetGuardDialog
-✓ Bug fixes critiques : settings_not_found (backfill missing rows + dispatch-llm défensif maybeSingle) | cascade modèles inactive (read form watch au lieu de settings DB) | terme "Moat" purgé partout (task_kind enum + badges + seeds + descriptions + variables {{run:reddit}})
+RAS bloquant code | seul reste à dispatcher : Wave 6.2/6.3/6.4/6.5 sur GO utilisateur après push migrations 6.1 prod
 
 [ALERTE]
-!! CREDENTIALS LEAKED IN CHAT — à rotater impérativement : DB password Supabase wt2giXPxCYEMVhit | anon key Supabase | Coolify token mZV3t49u058ar3Gaq8POCHzjZ2LU7x3lJlRIPCXW5700c32d | MinIO root user fadbf15390f9465e + password bff19156b48a422583215a2a7f03e056
-! 19 tests vitest cassés préexistants (jest-dom matchers `toBeInTheDocument`/`toHaveTextContent` non chargés) — incompatibilité vitest@4.1.5 ↔ @testing-library/jest-dom@6.9.1 — story dédiée nécessaire pour upgrade
-! Anthropic/OpenAI/Groq/Together/DeepSeek : pricing pas exposé dans /models endpoint → cost tracking dépend de usage.cost retourné par l'API (OpenRouter only le retourne actuellement)
-! Provider tunnel scrap-frontend créé inutilement dans Cloudflare au début de session — à supprimer dans dashboard CF Networks → Connectors
+!! 4 migrations Wave 6.1 NON POUSSÉES en prod — l'utilisateur doit valider en lisant les ~1 070 l. SQL puis exécuter `bunx supabase link --project-ref crplceoptyeslqyfcqvj && bunx supabase db push`. Le helper `user_default_org_id()` posé en DEFAULT garantit la rétrocompat frontend Wave 6.3 pas encore livrée — push safe sans casser dashboard actuel
+!! Edge function llm-score-batch MODIFIÉE en local mais NON REDÉPLOYÉE — le bug re-scoring + le câblage parse-score.ts ne sont actifs qu'après `bunx supabase functions deploy llm-score-batch`. Action utilisateur requise
+!! CREDENTIALS LEAKÉS dans chats antérieurs (déjà signalés PASSATION précédente) à rotater impérativement : DB password Supabase wt2giXPxCYEMVhit | anon key Supabase | Coolify token mZV3t49u058ar3Gaq8POCHzjZ2LU7x3lJlRIPCXW5700c32d | MinIO root user fadbf15390f9465e + password bff19156b48a422583215a2a7f03e056
+! 19 tests Vitest préexistants cassés AVANT cette session sont REPARÉS automatiquement par `bun install` post-Wave 4 (vitest 14/33 → 48/48). À surveiller : si jest-dom matchers redeviennent cassés au prochain bun install, faire upgrade jest-dom ou downgrade vitest
+! Provider tunnel scrap-frontend créé inutilement Cloudflare début Wave 5 — toujours à supprimer dans dashboard CF Networks → Connectors
 
 [BLOQUE]
-RAS
 
-[NEXT]
-Priorité 1 : rotater les credentials leakés ci-dessus (action user)
-Priorité 2 : si Wave 4 PRD admin souhaitée → dispatch S-AdminTests (tests Vitest+Deno template engine) + S-AdminCompose ({{run:reddit}} chain pour vraie synthèse)
-Priorité 3 : fix infra tests vitest (upgrade jest-dom ou downgrade vitest) — débloque 19 tests
-Priorité 4 : configurer Coolify webhook GitHub auto-deploy (élimine deploy manuel via API)
-Priorité 5 : pg_cron daily refresh-models pour auto-actualiser les listes de modèles providers
+- Stitch via extension Chrome MCP : iframe cross-origin app-companion-430619.appspot.com bloque toute interaction (read_page/screenshot/find timeout 45s sur document_idle, click/type passent mais aveugle). Workaround = utilisateur copie-colle 13 prompts manuellement depuis `docs/design/kairos-stitch-prompts.md` OU pivot vers `frontend-design` skill (codage React direct sans passer par Stitch)
+- Wave 6.2 Stripe : nécessite STRIPE_SECRET_KEY en mode test minimum + skill `stripe:stripe-best-practices` pour cadrer les products/prices
 
-[CTX]
-session ~10h | nb commits ~50 | nb agents Ralph dispatchés ~15 | $ inconnu (bun/sonnet) | ~10 deploys Coolify | ~25 deploys edge functions Supabase | conversation très longue
+[NEXT_PRIORITES]
 
-[MEMO]
-- Project ref Supabase live = crplceoptyeslqyfcqvj (créé fresh cette session, pas l'ancien rratnmtiescwdvtnjbeq)
+1. PUSH MIGRATIONS WAVE 6.1 EN PROD (action user) :
+   bunx supabase link --project-ref crplceoptyeslqyfcqvj
+   bunx supabase db push
+   bunx supabase functions deploy llm-score-batch
+   → vérifier en dashboard que les 4 migrations passent et que le bug score=0 disparaît
+2. ROTATER LES CREDENTIALS LEAKÉS (action user)
+3. DISPATCH WAVE 6.2/6.3/6.4 EN PARALLÈLE après GO :
+   - 6.2 Stripe (1 ou 2 agents) — nécessite test mode Stripe
+   - 6.3 UI Multi-tenant (3-4 agents en parallèle)
+   - 6.4 BYOK & Compliance (3 agents en parallèle)
+4. DISPATCH WAVE 6.5 ENTERPRISE après 6.1+6.2 stables (5 agents)
+5. STITCH DESIGNS — 2 options : (a) utilisateur copie-colle les 13 prompts manuellement, (b) pivoter vers frontend-design skill pour coder direct en React + Tailwind + shadcn
+6. ROADMAP WAVE 7+ (post Wave 6 stable) : Top 5 features moat de l'analyse conjointe — Multi-LLM consensus (#1, score 14) puis Backtest grilles (#2, score 14) puis Negative propagation (#3) + Cross-source corroboration (#4) + Author Reputation Layer (#5)
+
+[CTX_SESSION]
+session totale Wave 5+6.1 ~6h | nb commits ajoutés cette session = 11 (4d763ce..3940d09 +commits Wave 4 ; 22d53ae cba1b80 4b2bda5 3940d09 = derniers 4) | nb agents Ralph dispatchés = 8 (S-AdminTests, S-AdminCompose, S-DashDelete, S-ScoreZero, S-Landing, S-LandingContent v1+v2, Wave-6.1) | $ inconnu | 0 deploys Coolify (uniquement push GitHub) | 0 deploys edge fns Supabase (à faire pour llm-score-batch !)
+
+[REPO_LAYOUT]
+Code:
+src/ → Vite + React 19 + TS strict + Tailwind v4 + shadcn
+pages/Home.tsx → 51 l. orchestrateur landing publique
+pages/Login.tsx Signup.tsx → auth multi-méthodes (magic link + password + Google)
+pages/Dashboard.tsx → table signaux scorés + bulk actions + re-score
+pages/Digest.tsx Costs.tsx Logs.tsx Topics.tsx Settings.tsx
+components/layout/ → AppLayout (sidebar + BrandedHeader) + MarketingLayout (public)
+components/auth/ → ProtectedRoute (sanitizeNext) + AuthListener
+components/features/landing/ → 7 composants modulaires Wave 5
+components/features/ → SignalTable, ScoreCell, AdminPromptsConfig, BrandingForm, etc.
+components/ui/ → primitives shadcn (button, card, dialog, alert-dialog, checkbox, hover-card, slider, tabs, etc.)
+hooks/ → useSignals, useDeleteSignal, useRescoreSignals (bulk robuste), useAdminPrompts, useAppName, useSettings, useDigest, useTopics, useCosts, useLogs, etc.
+stores/auth.ts → Zustand session + user + signOut redirect /
+lib/supabase.ts → client typé Database
+lib/promptPreview.ts → live preview des variables admin prompts
+lib/schemas/ → schemas zod
+types/database.ts → généré + étendu manuellement Wave 6.1
+supabase/
+migrations/ → 17 anciennes + 4 NOUVELLES Wave 6.1 (NON POUSSÉES)
+functions/ → 11 edge fns Deno
+run-admin-prompt/ → index.ts + compose.ts + template.ts + template.test.ts (24 tests)
+llm-score-batch/ → index.ts + parse-score.test.ts (28 tests)
+\_shared/ → api-keys, errors, retry, providers, welford, minio (+ minio.test.ts), unicode, filter, parse-score (NEW)
+Docs:
+HANDOFF.md → pointe vers récap session + brief stratégique
+docs/handoffs/2026-05-01-session-ralph-complete.md → récap Wave 1-4
+docs/strategy/2026-05-02-moats-and-value-capture.md → moat-hunter + analyse conjointe v2 (12 SKUs)
+docs/design/kairos-stitch-prompts.md → 13 prompts Stitch copy-paste-ready
+.ralph/prd.json → state machine stories Wave 1-5 (TRONQUÉE par linter à plusieurs reprises, à reconstruire si besoin)
+.ralph/wave-6-prd.md → PRD Wave 6 complet 22 stories en 5 sous-vagues
+.ralph/progress.md → run history Wave 4-5
+
+[MEMO_TECH]
+
+- Project ref Supabase live = crplceoptyeslqyfcqvj | repo GitHub Afristrat/scrapping branche feat/topic-tracking-minio (~57 commits ahead origin main qui n'existe pas encore)
 - Pattern BYOK : settings.model_config[task] (jsonb) → fallback DEFAULT_PROVIDER='openrouter' + DEFAULT_MODEL='openrouter/auto' dans dispatch-llm
 - 4 tasks supportées : scoring | scraping | monitoring | digest
-- 5 task_kind admin : reddit | arxiv | x | synthesis | custom
-- Trigger seed_admin_prompts_on_user_creation se déclenche AFTER INSERT auth.users → seed les 4 prompts auto
-- MinIO endpoint = MINIO_SERVER_URL (cst-minio-a255a4be-16637b8b...) — PAS le BROWSER_REDIRECT_URL
-- cloudflared tunnel config = /home/serveurai/.cloudflared/config-nahda.yml (PID variable, kill -HUP pour reload)
-- Coolify build = Dockerfile multi-stage (node:20-alpine build → nginx:alpine serve dist + nginx.conf SPA fallback)
-- npm install --legacy-peer-deps requis (React 19 peer deps strict) — .npmrc le force
-- Husky prepare = "husky || true" (skip si .git absent dans container)
+- 5 task_kind admin prompts : reddit | arxiv | x | synthesis | custom
+- Trigger seed_admin_prompts_on_user_creation seed les 4 prompts auto AFTER INSERT auth.users
+- Wave 6.1 : ajout trigger create_default_org_for_user qui s'exécute APRÈS les 2 autres dans l'ordre alphabétique (sécurité : on_auth_user_created* est lexico avant trg_seed_admin_prompts*) — au signup d'un nouveau user, settings + admin_prompts sont créés AVANT que org_id soit résolu via DEFAULT user_default_org_id() — DEFAULT en RLS context via auth.uid() retourne NULL si pas encore d'org → vérifier en E2E que le rebuild est bien dans l'ordre attendu
+- llm-score-batch sur parse_failed retourne maintenant 200 (pas 502) pour que le frontend distingue erreur métier de panne réseau, et insert llm_costs même si parse_failed (le call LLM a eu lieu)
+- Pattern test Deno : `deno test --allow-env --node-modules-dir=auto supabase/functions/<fn>/<file>.test.ts` ; side-effect = crée node_modules/.deno/ qui pollue tsc -b → `bun install` réintègre
+- Husky prepare = "husky || true" (skip si .git absent dans container Coolify)
 - Vite v8 + rolldown : manualChunks DOIT être une fonction (Rollup-style objet refusé)
-- Test infra : vitest exclude supabase/functions/** (Deno tests via `deno test --node-modules-dir=auto`)
-- Repo GitHub : Afristrat/scrapping (privé/public ?), branche prod future = main, dev courant = feat/topic-tracking-minio
-- Domain : ai-mpower.com via Cloudflare, app sur scrap.ai-mpower.com
+- Test infra Vitest exclut supabase/functions/\*\* (Deno tests via deno test)
+- Domain : ai-mpower.com via Cloudflare, app sur scrap.ai-mpower.com → futur kairos.ai-mpower.com
+- 12 SKUs Stripe à créer Wave 6.2 : prod*{solo,cto,newsletter,brand,legal,vc}*{maison,byok} | 9 add-ons : webhooks +49 / api_public +99 / custom_sources +199 / audit_log +149 / tenant_isolated +299 / selfhost +499/an / csm_dedicated +999/an / backtest_unlimited +149 / reputation_api +199
+- COG mensuel approximatif : Solo Maison Haiku 4€/Sonnet 18€ | Team 5 users Maison Haiku 41€/Sonnet 181€ | Business 25 users Maison Haiku 205€/Sonnet 905€ | Enterprise 100+ users Maison Haiku 725€/Sonnet 3525€ | règle pricing prix ≥ 4× COG (marge brute ≥ 75%)
+- Logique BYOK > Maison en prix : signal de marché enterprise/souverain (WTP supérieure), pas COG. Comparable Vercel AI SDK Cloud / LangChain Enterprise 50-200$/seat
+- Solo segment utility 280/800 = mauvais business, à traiter UNIQUEMENT comme funnel SEO, jamais marketé en hero
+
+[STITCH_BYPASS]
+Si on persiste avec Stitch après push prod : tester si extension Claude Chrome arrive à computer.left_click + computer.type en aveugle même quand screenshot timeout — le seul moyen est events natifs OS qui passent par-dessus le sandbox cross-origin. Coordonnées probables champ input : (956, ~870) bottom-center du viewport 1912×951. À tester avec un seul prompt court avant d'enchaîner les 13.
+
+[FIN_PASSATION]
