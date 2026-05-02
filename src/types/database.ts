@@ -1,16 +1,10 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: '14.5'
   }
   public: {
     Tables: {
@@ -22,6 +16,7 @@ export type Database = {
           executed_at: string
           id: string
           model_used: string | null
+          org_id: string
           output_markdown: string | null
           prompt_id: string
           prompt_tokens: number
@@ -36,6 +31,7 @@ export type Database = {
           executed_at?: string
           id?: string
           model_used?: string | null
+          org_id?: string
           output_markdown?: string | null
           prompt_id: string
           prompt_tokens?: number
@@ -50,6 +46,7 @@ export type Database = {
           executed_at?: string
           id?: string
           model_used?: string | null
+          org_id?: string
           output_markdown?: string | null
           prompt_id?: string
           prompt_tokens?: number
@@ -59,11 +56,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "admin_prompt_runs_prompt_id_fkey"
-            columns: ["prompt_id"]
+            foreignKeyName: 'admin_prompt_runs_prompt_id_fkey'
+            columns: ['prompt_id']
             isOneToOne: false
-            referencedRelation: "admin_prompts"
-            referencedColumns: ["id"]
+            referencedRelation: 'admin_prompts'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -75,6 +72,7 @@ export type Database = {
           id: string
           is_seed: boolean
           name: string
+          org_id: string
           source_filter: Json
           system_prompt: string
           task_kind: string
@@ -89,6 +87,7 @@ export type Database = {
           id?: string
           is_seed?: boolean
           name: string
+          org_id?: string
           source_filter?: Json
           system_prompt: string
           task_kind: string
@@ -103,6 +102,7 @@ export type Database = {
           id?: string
           is_seed?: boolean
           name?: string
+          org_id?: string
           source_filter?: Json
           system_prompt?: string
           task_kind?: string
@@ -121,6 +121,7 @@ export type Database = {
           language: string
           min_score: number
           model_used: string | null
+          org_id: string
           signal_count: number
           user_id: string
           window_hours: number
@@ -133,6 +134,7 @@ export type Database = {
           language?: string
           min_score?: number
           model_used?: string | null
+          org_id?: string
           signal_count?: number
           user_id: string
           window_hours?: number
@@ -145,11 +147,56 @@ export type Database = {
           language?: string
           min_score?: number
           model_used?: string | null
+          org_id?: string
           signal_count?: number
           user_id?: string
           window_hours?: number
         }
         Relationships: []
+      }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          org_id: string
+          role: Database['public']['Enums']['org_role']
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          invited_by?: string | null
+          org_id: string
+          role?: Database['public']['Enums']['org_role']
+          token: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          org_id?: string
+          role?: Database['public']['Enums']['org_role']
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'invitations_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+        ]
       }
       llm_costs: {
         Row: {
@@ -157,8 +204,9 @@ export type Database = {
           cost: number
           id: number
           model: string
+          org_id: string
           prompt_tokens: number
-          task: Database["public"]["Enums"]["llm_task"]
+          task: Database['public']['Enums']['llm_task']
           ts: string
           user_id: string
         }
@@ -167,8 +215,9 @@ export type Database = {
           cost?: number
           id?: number
           model: string
+          org_id?: string
           prompt_tokens?: number
-          task: Database["public"]["Enums"]["llm_task"]
+          task: Database['public']['Enums']['llm_task']
           ts?: string
           user_id: string
         }
@@ -177,8 +226,9 @@ export type Database = {
           cost?: number
           id?: number
           model?: string
+          org_id?: string
           prompt_tokens?: number
-          task?: Database["public"]["Enums"]["llm_task"]
+          task?: Database['public']['Enums']['llm_task']
           ts?: string
           user_id?: string
         }
@@ -236,6 +286,7 @@ export type Database = {
         Row: {
           action: string
           id: number
+          org_id: string
           payload: Json | null
           status: string | null
           ts: string
@@ -244,6 +295,7 @@ export type Database = {
         Insert: {
           action: string
           id?: number
+          org_id?: string
           payload?: Json | null
           status?: string | null
           ts?: string
@@ -252,10 +304,76 @@ export type Database = {
         Update: {
           action?: string
           id?: number
+          org_id?: string
           payload?: Json | null
           status?: string | null
           ts?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      organization_members: {
+        Row: {
+          joined_at: string
+          org_id: string
+          role: Database['public']['Enums']['org_role']
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          org_id: string
+          role?: Database['public']['Enums']['org_role']
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          org_id?: string
+          role?: Database['public']['Enums']['org_role']
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'organization_members_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          billing_email: string | null
+          billing_mode: Database['public']['Enums']['billing_mode']
+          created_at: string
+          id: string
+          name: string
+          plan: Database['public']['Enums']['org_plan']
+          segment: Database['public']['Enums']['org_segment']
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          billing_email?: string | null
+          billing_mode?: Database['public']['Enums']['billing_mode']
+          created_at?: string
+          id?: string
+          name: string
+          plan?: Database['public']['Enums']['org_plan']
+          segment?: Database['public']['Enums']['org_segment']
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          billing_email?: string | null
+          billing_mode?: Database['public']['Enums']['billing_mode']
+          created_at?: string
+          id?: string
+          name?: string
+          plan?: Database['public']['Enums']['org_plan']
+          segment?: Database['public']['Enums']['org_segment']
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -265,6 +383,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          org_id: string
           run_at: string
           topic_id: string
           user_id: string
@@ -274,6 +393,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          org_id?: string
           run_at: string
           topic_id: string
           user_id: string
@@ -283,17 +403,18 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          org_id?: string
           run_at?: string
           topic_id?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pending_minio_writes_topic_id_fkey"
-            columns: ["topic_id"]
+            foreignKeyName: 'pending_minio_writes_topic_id_fkey'
+            columns: ['topic_id']
             isOneToOne: false
-            referencedRelation: "topics"
-            referencedColumns: ["id"]
+            referencedRelation: 'topics'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -304,6 +425,7 @@ export type Database = {
           display_name: string | null
           fetched_at: string
           model_id: string
+          org_id: string
           pricing_input_per_1m: number | null
           pricing_output_per_1m: number | null
           provider: string
@@ -315,6 +437,7 @@ export type Database = {
           display_name?: string | null
           fetched_at?: string
           model_id: string
+          org_id?: string
           pricing_input_per_1m?: number | null
           pricing_output_per_1m?: number | null
           provider: string
@@ -326,6 +449,7 @@ export type Database = {
           display_name?: string | null
           fetched_at?: string
           model_id?: string
+          org_id?: string
           pricing_input_per_1m?: number | null
           pricing_output_per_1m?: number | null
           provider?: string
@@ -337,6 +461,7 @@ export type Database = {
         Row: {
           cost: number
           model_used: string
+          org_id: string
           reasoning: string | null
           score: number
           scored_at: string
@@ -346,6 +471,7 @@ export type Database = {
         Insert: {
           cost?: number
           model_used: string
+          org_id?: string
           reasoning?: string | null
           score: number
           scored_at?: string
@@ -355,6 +481,7 @@ export type Database = {
         Update: {
           cost?: number
           model_used?: string
+          org_id?: string
           reasoning?: string | null
           score?: number
           scored_at?: string
@@ -363,11 +490,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "scores_signal_id_fkey"
-            columns: ["signal_id"]
+            foreignKeyName: 'scores_signal_id_fkey'
+            columns: ['signal_id']
             isOneToOne: false
-            referencedRelation: "signals"
-            referencedColumns: ["id"]
+            referencedRelation: 'signals'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -379,6 +506,7 @@ export type Database = {
           id: string
           is_default: boolean
           name: string
+          org_id: string
           prompt: string
           updated_at: string
           user_id: string
@@ -390,6 +518,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           name: string
+          org_id?: string
           prompt: string
           updated_at?: string
           user_id: string
@@ -401,6 +530,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           name?: string
+          org_id?: string
           prompt?: string
           updated_at?: string
           user_id?: string
@@ -416,6 +546,7 @@ export type Database = {
           daily_budget_usd: number
           language: string
           model_config: Json
+          org_id: string
           prompt_scoring: string
           reddit_subs: string[]
           score_concurrency: number
@@ -433,6 +564,7 @@ export type Database = {
           daily_budget_usd?: number
           language?: string
           model_config?: Json
+          org_id?: string
           prompt_scoring?: string
           reddit_subs?: string[]
           score_concurrency?: number
@@ -450,6 +582,7 @@ export type Database = {
           daily_budget_usd?: number
           language?: string
           model_config?: Json
+          org_id?: string
           prompt_scoring?: string
           reddit_subs?: string[]
           score_concurrency?: number
@@ -461,11 +594,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "settings_active_rubric_id_fkey"
-            columns: ["active_rubric_id"]
+            foreignKeyName: 'settings_active_rubric_id_fkey'
+            columns: ['active_rubric_id']
             isOneToOne: false
-            referencedRelation: "scoring_rubrics"
-            referencedColumns: ["id"]
+            referencedRelation: 'scoring_rubrics'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -473,10 +606,11 @@ export type Database = {
         Row: {
           external_id: string
           id: string
+          org_id: string
           raw_payload: Json
           scraped_at: string
           signal_date: string | null
-          source: Database["public"]["Enums"]["signal_source"]
+          source: Database['public']['Enums']['signal_source']
           title: string | null
           url: string | null
           user_id: string
@@ -484,10 +618,11 @@ export type Database = {
         Insert: {
           external_id: string
           id?: string
+          org_id?: string
           raw_payload: Json
           scraped_at?: string
           signal_date?: string | null
-          source: Database["public"]["Enums"]["signal_source"]
+          source: Database['public']['Enums']['signal_source']
           title?: string | null
           url?: string | null
           user_id: string
@@ -495,20 +630,107 @@ export type Database = {
         Update: {
           external_id?: string
           id?: string
+          org_id?: string
           raw_payload?: Json
           scraped_at?: string
           signal_date?: string | null
-          source?: Database["public"]["Enums"]["signal_source"]
+          source?: Database['public']['Enums']['signal_source']
           title?: string | null
           url?: string | null
           user_id?: string
         }
         Relationships: []
       }
+      subscription_seats: {
+        Row: {
+          assigned_at: string
+          id: string
+          subscription_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          id?: string
+          subscription_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          id?: string
+          subscription_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscription_seats_subscription_id_fkey'
+            columns: ['subscription_id']
+            isOneToOne: false
+            referencedRelation: 'subscriptions'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          billing_mode: Database['public']['Enums']['billing_mode']
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          org_id: string
+          plan: Database['public']['Enums']['org_plan']
+          seats: number
+          status: Database['public']['Enums']['subscription_status']
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          billing_mode: Database['public']['Enums']['billing_mode']
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          org_id: string
+          plan: Database['public']['Enums']['org_plan']
+          seats?: number
+          status?: Database['public']['Enums']['subscription_status']
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          billing_mode?: Database['public']['Enums']['billing_mode']
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          org_id?: string
+          plan?: Database['public']['Enums']['org_plan']
+          seats?: number
+          status?: Database['public']['Enums']['subscription_status']
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscriptions_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       topic_runs: {
         Row: {
           id: string
           minio_appended: boolean
+          org_id: string
           run_at: string
           signal_count: number
           sources: Json
@@ -520,6 +742,7 @@ export type Database = {
         Insert: {
           id?: string
           minio_appended?: boolean
+          org_id?: string
           run_at?: string
           signal_count?: number
           sources?: Json
@@ -531,6 +754,7 @@ export type Database = {
         Update: {
           id?: string
           minio_appended?: boolean
+          org_id?: string
           run_at?: string
           signal_count?: number
           sources?: Json
@@ -541,44 +765,47 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "topic_runs_topic_id_fkey"
-            columns: ["topic_id"]
+            foreignKeyName: 'topic_runs_topic_id_fkey'
+            columns: ['topic_id']
             isOneToOne: false
-            referencedRelation: "topics"
-            referencedColumns: ["id"]
+            referencedRelation: 'topics'
+            referencedColumns: ['id']
           },
         ]
       }
       topic_signals: {
         Row: {
+          org_id: string
           signal_id: string
           topic_id: string
           user_id: string
         }
         Insert: {
+          org_id?: string
           signal_id: string
           topic_id: string
           user_id: string
         }
         Update: {
+          org_id?: string
           signal_id?: string
           topic_id?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "topic_signals_signal_id_fkey"
-            columns: ["signal_id"]
+            foreignKeyName: 'topic_signals_signal_id_fkey'
+            columns: ['signal_id']
             isOneToOne: false
-            referencedRelation: "signals"
-            referencedColumns: ["id"]
+            referencedRelation: 'signals'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "topic_signals_topic_id_fkey"
-            columns: ["topic_id"]
+            foreignKeyName: 'topic_signals_topic_id_fkey'
+            columns: ['topic_id']
             isOneToOne: false
-            referencedRelation: "topics"
-            referencedColumns: ["id"]
+            referencedRelation: 'topics'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -593,6 +820,7 @@ export type Database = {
           is_seed: boolean
           last_seen_at: string
           name: string
+          org_id: string
           slug: string
           total_signal_count: number
           trend: string
@@ -608,6 +836,7 @@ export type Database = {
           is_seed?: boolean
           last_seen_at?: string
           name: string
+          org_id?: string
           slug: string
           total_signal_count?: number
           trend?: string
@@ -623,12 +852,57 @@ export type Database = {
           is_seed?: boolean
           last_seen_at?: string
           name?: string
+          org_id?: string
           slug?: string
           total_signal_count?: number
           trend?: string
           user_id?: string
         }
         Relationships: []
+      }
+      usage_records: {
+        Row: {
+          apify_cost_eur: number
+          id: string
+          llm_cost_eur: number
+          org_id: string
+          period_end: string
+          period_start: string
+          recorded_at: string
+          reported_to_stripe: boolean
+          signals_count: number
+        }
+        Insert: {
+          apify_cost_eur?: number
+          id?: string
+          llm_cost_eur?: number
+          org_id: string
+          period_end: string
+          period_start: string
+          recorded_at?: string
+          reported_to_stripe?: boolean
+          signals_count?: number
+        }
+        Update: {
+          apify_cost_eur?: number
+          id?: string
+          llm_cost_eur?: number
+          org_id?: string
+          period_end?: string
+          period_start?: string
+          recorded_at?: string
+          reported_to_stripe?: boolean
+          signals_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'usage_records_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+        ]
       }
       user_api_keys: {
         Row: {
@@ -638,6 +912,7 @@ export type Database = {
           id: string
           last_validated_at: string | null
           masked_key: string
+          org_id: string
           provider: string
           updated_at: string
           user_id: string
@@ -650,6 +925,7 @@ export type Database = {
           id?: string
           last_validated_at?: string | null
           masked_key: string
+          org_id?: string
           provider: string
           updated_at?: string
           user_id: string
@@ -662,6 +938,7 @@ export type Database = {
           id?: string
           last_validated_at?: string | null
           masked_key?: string
+          org_id?: string
           provider?: string
           updated_at?: string
           user_id?: string
@@ -678,7 +955,7 @@ export type Database = {
         Args: { days?: number }
         Returns: {
           day: string
-          task: Database["public"]["Enums"]["llm_task"]
+          task: Database['public']['Enums']['llm_task']
           total_cost: number
         }[]
       }
@@ -701,8 +978,13 @@ export type Database = {
       }
     }
     Enums: {
-      llm_task: "scraping" | "scoring" | "monitoring"
-      signal_source: "reddit" | "arxiv" | "x"
+      billing_mode: 'maison' | 'byok'
+      llm_task: 'scraping' | 'scoring' | 'monitoring'
+      org_plan: 'solo' | 'pro' | 'enterprise'
+      org_role: 'owner' | 'admin' | 'member' | 'viewer'
+      org_segment: 'vc_pe' | 'legal' | 'newsletter' | 'brand' | 'cto_sme' | 'solo'
+      signal_source: 'reddit' | 'arxiv' | 'x'
+      subscription_status: 'active' | 'past_due' | 'canceled' | 'trialing' | 'incomplete'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -710,33 +992,31 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -745,23 +1025,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -770,23 +1050,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -795,43 +1075,48 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
+    | keyof DefaultSchema['Enums']
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
+    | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
     Enums: {
-      llm_task: ["scraping", "scoring", "monitoring"],
-      signal_source: ["reddit", "arxiv", "x"],
+      billing_mode: ['maison', 'byok'],
+      llm_task: ['scraping', 'scoring', 'monitoring'],
+      org_plan: ['solo', 'pro', 'enterprise'],
+      org_role: ['owner', 'admin', 'member', 'viewer'],
+      org_segment: ['vc_pe', 'legal', 'newsletter', 'brand', 'cto_sme', 'solo'],
+      signal_source: ['reddit', 'arxiv', 'x'],
+      subscription_status: ['active', 'past_due', 'canceled', 'trialing', 'incomplete'],
     },
   },
 } as const
