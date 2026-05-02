@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { type Control, Controller, type UseFormSetValue } from 'react-hook-form'
+import { Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -46,15 +47,20 @@ export function BrandingForm({ control, setValue }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <Controller
         control={control}
         name="branding.name"
         render={({ field, fieldState }) => (
           <div className="space-y-1.5">
-            <Label htmlFor="branding-name">Nom de l&apos;application</Label>
+            <Label
+              htmlFor="branding-name"
+              className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
+            >
+              Nom de l'application
+            </Label>
             <Input id="branding-name" placeholder="Mon Dashboard" {...field} />
-            {fieldState.error && <p className="text-xs text-red-500">{fieldState.error.message}</p>}
+            {fieldState.error && <p className="text-error text-xs">{fieldState.error.message}</p>}
           </div>
         )}
       />
@@ -64,28 +70,38 @@ export function BrandingForm({ control, setValue }: Props) {
         name="branding.primary"
         render={({ field, fieldState }) => (
           <div className="space-y-1.5">
-            <Label htmlFor="branding-color">Couleur primaire</Label>
+            <Label
+              htmlFor="branding-color"
+              className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
+            >
+              Couleur primaire
+            </Label>
             <div className="flex items-center gap-2">
               <input
                 id="branding-color"
                 type="color"
-                className="h-9 w-12 cursor-pointer rounded-md border border-slate-200 p-1"
+                className="border-outline-variant h-10 w-14 cursor-pointer rounded-md border p-1"
                 {...field}
               />
               <Input
-                className="w-28 font-mono"
-                placeholder="#3b82f6"
+                className="w-32 font-mono"
+                placeholder="#006948"
                 value={field.value}
                 onChange={field.onChange}
               />
             </div>
-            {fieldState.error && <p className="text-xs text-red-500">{fieldState.error.message}</p>}
+            {fieldState.error && <p className="text-error text-xs">{fieldState.error.message}</p>}
           </div>
         )}
       />
 
       <div className="space-y-1.5">
-        <Label htmlFor="branding-logo">Logo (PNG / JPG, max 1 MB)</Label>
+        <Label
+          htmlFor="branding-logo"
+          className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
+        >
+          Logo (PNG / JPG, max 1 Mo)
+        </Label>
         <input
           id="branding-logo"
           ref={fileInputRef}
@@ -100,8 +116,9 @@ export function BrandingForm({ control, setValue }: Props) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex h-9 items-center rounded-md border border-slate-200 bg-white px-3 text-sm shadow-sm hover:bg-slate-50"
+          className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low flex h-10 items-center gap-2 rounded-md border px-4 text-sm shadow-sm transition-colors"
         >
+          <Upload className="h-4 w-4" />
           Choisir un fichier…
         </button>
       </div>

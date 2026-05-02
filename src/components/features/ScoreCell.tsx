@@ -36,10 +36,10 @@ interface ScoreCellProps {
  *   - 70-100     → emerald (à lire absolument)
  */
 function scoreColorClasses(score: number | null): string {
-  if (score === null || score === 0) return 'text-slate-400'
-  if (score <= 39) return 'text-orange-500'
-  if (score <= 69) return 'text-blue-600'
-  return 'text-emerald-600 font-semibold'
+  if (score === null || score === 0) return 'text-on-surface-variant'
+  if (score <= 39) return 'text-tertiary'
+  if (score <= 69) return 'text-secondary-container'
+  return 'text-primary font-semibold'
 }
 
 /**
@@ -117,7 +117,7 @@ export function ScoreCell({
     <div
       className={cn(
         'inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors duration-1000',
-        flashing ? 'bg-emerald-100' : 'bg-transparent',
+        flashing ? 'bg-primary-fixed' : 'bg-transparent',
       )}
     >
       <HoverCard openDelay={150} closeDelay={80}>
@@ -153,7 +153,7 @@ export function ScoreCell({
           aria-label="Re-scorer ce signal"
           title="Re-scorer ce signal"
           className={cn(
-            'inline-flex h-6 w-6 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50',
+            'text-on-surface-variant hover:bg-surface-container hover:text-on-surface inline-flex h-6 w-6 items-center justify-center rounded transition-colors disabled:opacity-50',
             rescore.isPending && 'cursor-wait',
           )}
         >
@@ -186,8 +186,8 @@ function ScoreTooltipBody({
   if (isUnscored) {
     return (
       <div className="space-y-1">
-        <p className="font-semibold text-slate-900">Pas encore scoré</p>
-        <p className="text-slate-600">
+        <p className="text-on-surface font-semibold">Pas encore scoré</p>
+        <p className="text-on-surface-variant">
           Ce signal sera scoré au prochain run du pipeline. Tu peux aussi le re-scorer dès
           maintenant via le bouton ↻.
         </p>
@@ -197,42 +197,44 @@ function ScoreTooltipBody({
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-base font-semibold text-slate-900">
+        <span className="text-on-surface text-base font-semibold">
           {score}
-          <span className="text-xs font-normal text-slate-500">/100</span>
+          <span className="text-on-surface-variant text-xs font-normal">/100</span>
         </span>
         {scoredAt && (
-          <span className="text-[11px] text-slate-500">
+          <span className="text-on-surface-variant text-[11px]">
             {formatDistanceToNow(new Date(scoredAt), { addSuffix: true, locale: fr })}
           </span>
         )}
       </div>
 
       {(score === 0 || isLegacyMissed) && (
-        <div className="rounded border border-orange-200 bg-orange-50 p-2 text-orange-900">
+        <div className="border-tertiary-fixed-dim bg-tertiary-fixed text-on-tertiary-fixed rounded border p-2">
           <p className="font-medium">Ce signal n’a pas pu être scoré correctement.</p>
-          <p className="mt-1 text-orange-800">Clique sur le bouton ↻ pour relancer le scoring.</p>
+          <p className="text-on-tertiary-fixed-variant mt-1">
+            Clique sur le bouton ↻ pour relancer le scoring.
+          </p>
         </div>
       )}
 
       {reasoning && reasoning !== '(LLM batch missed this signal)' && (
         <div>
-          <p className="mb-1 font-medium text-slate-700">Pourquoi ce score ?</p>
-          <p className="leading-snug whitespace-pre-line text-slate-600">{reasoning}</p>
+          <p className="text-on-surface mb-1 font-medium">Pourquoi ce score ?</p>
+          <p className="text-on-surface-variant leading-snug whitespace-pre-line">{reasoning}</p>
         </div>
       )}
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 border-t border-slate-100 pt-2 text-[11px]">
+      <dl className="border-outline-variant grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 border-t pt-2 text-[11px]">
         {modelUsed && (
           <>
-            <dt className="text-slate-500">Modèle</dt>
-            <dd className="truncate font-mono text-slate-700">{modelUsed}</dd>
+            <dt className="text-on-surface-variant">Modèle</dt>
+            <dd className="text-on-surface truncate font-mono">{modelUsed}</dd>
           </>
         )}
         {rubricName && (
           <>
-            <dt className="text-slate-500">Rubrique</dt>
-            <dd className="truncate text-slate-700">{rubricName}</dd>
+            <dt className="text-on-surface-variant">Rubrique</dt>
+            <dd className="text-on-surface truncate">{rubricName}</dd>
           </>
         )}
       </dl>

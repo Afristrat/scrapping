@@ -135,9 +135,11 @@ export function SignalTable({
 
   if (!rows || rows.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-        <p className="text-base font-medium text-slate-900">Aucun signal</p>
-        <p className="text-sm text-slate-500">Clique « Run pipeline » pour ingérer les sources.</p>
+      <div className="border-outline-variant bg-surface-container-low flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-12 text-center">
+        <p className="text-on-surface text-base font-medium">Aucun signal</p>
+        <p className="text-on-surface-variant text-sm">
+          Clique « Run pipeline » pour ingérer les sources.
+        </p>
       </div>
     )
   }
@@ -148,8 +150,8 @@ export function SignalTable({
     <div className="space-y-2">
       {/* Barre d'actions bulk — sticky en haut quand sélection > 0 */}
       {selectionCount > 0 && (
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-md border border-slate-900 bg-slate-900 px-4 py-2 text-sm text-slate-50 shadow-sm">
-          <span className="font-medium">
+        <div className="bg-inverse-surface text-inverse-on-surface sticky top-0 z-10 flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm shadow-md">
+          <span className="font-semibold">
             {selectionCount > 1
               ? `${selectionCount} signaux sélectionnés`
               : `${selectionCount} signal sélectionné`}
@@ -160,7 +162,7 @@ export function SignalTable({
               size="sm"
               onClick={clearSelection}
               disabled={deleteBulk.isPending}
-              className="border-slate-700 bg-transparent text-slate-100 hover:bg-slate-800 hover:text-slate-50"
+              className="border-outline text-inverse-on-surface hover:bg-outline/40 hover:text-inverse-on-surface bg-transparent"
             >
               Désélectionner tout
             </Button>
@@ -169,7 +171,7 @@ export function SignalTable({
               size="sm"
               onClick={() => setConfirmBulkDelete(true)}
               disabled={deleteBulk.isPending}
-              className="gap-1"
+              className="bg-error-container text-on-error-container hover:bg-error-container/80 gap-1"
             >
               {deleteBulk.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -182,27 +184,27 @@ export function SignalTable({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="border-outline-variant bg-surface-container-lowest overflow-hidden rounded-xl border shadow-md">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
+          <thead className="bg-surface-container text-on-surface-variant border-outline-variant border-b text-left text-xs font-semibold tracking-[0.05em] uppercase">
             <tr>
-              <th className="w-10 px-4 py-2.5">
+              <th className="w-10 px-4 py-3">
                 <Checkbox
                   checked={headerCheckboxState}
                   onCheckedChange={toggleAll}
                   aria-label="Sélectionner tous les signaux"
                 />
               </th>
-              <th className="w-20 px-4 py-2.5">Score</th>
-              <th className="w-24 px-4 py-2.5">Source</th>
-              <th className="px-4 py-2.5">Titre</th>
-              <th className="w-32 px-4 py-2.5">Date contenu</th>
-              <th className="w-32 px-4 py-2.5">Scrapé</th>
-              <th className="w-40 px-4 py-2.5">Modèle</th>
-              <th className="w-12 px-4 py-2.5" aria-label="Actions" />
+              <th className="w-20 px-4 py-3">Score</th>
+              <th className="w-24 px-4 py-3">Source</th>
+              <th className="px-4 py-3">Titre</th>
+              <th className="w-32 px-4 py-3">Date contenu</th>
+              <th className="w-32 px-4 py-3">Scrapé</th>
+              <th className="w-40 px-4 py-3">Modèle</th>
+              <th className="w-12 px-4 py-3" aria-label="Actions" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-outline-variant/40 divide-y">
             {rows.map((r) => {
               const { label, badgeClass } = SOURCE_META[r.source]
               const isSelected = selected.has(r.id)
@@ -211,8 +213,8 @@ export function SignalTable({
                   key={r.id}
                   onClick={() => onRowClick(r)}
                   className={cn(
-                    'group/row cursor-pointer hover:bg-slate-50',
-                    isSelected && 'bg-slate-50',
+                    'group/row hover:bg-surface-container-high/60 even:bg-surface-container-low/40 cursor-pointer transition-colors',
+                    isSelected && 'bg-primary-fixed/30',
                   )}
                 >
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -234,11 +236,18 @@ export function SignalTable({
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <Badge className={cn('font-normal', badgeClass)}>{label}</Badge>
+                    <Badge
+                      className={cn(
+                        'rounded-full border-transparent px-2 py-0.5 text-xs font-medium',
+                        badgeClass,
+                      )}
+                    >
+                      {label}
+                    </Badge>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="line-clamp-2 text-slate-900">
+                      <span className="text-on-surface line-clamp-2 font-medium">
                         {r.title ?? '(sans titre)'}
                       </span>
                       {r.url && (
@@ -247,7 +256,7 @@ export function SignalTable({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="shrink-0 text-slate-400 hover:text-slate-600"
+                          className="text-on-surface-variant hover:text-primary shrink-0"
                           aria-label="Ouvrir la source"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
@@ -255,7 +264,7 @@ export function SignalTable({
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">
+                  <td className="text-on-surface-variant px-4 py-3 text-xs">
                     {r.signal_date ? (
                       <span title={new Date(r.signal_date).toLocaleString('fr-FR')}>
                         {formatDistanceToNow(new Date(r.signal_date), {
@@ -264,17 +273,17 @@ export function SignalTable({
                         })}
                       </span>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-outline">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">
+                  <td className="text-on-surface-variant px-4 py-3 text-xs">
                     {formatDistanceToNow(new Date(r.scraped_at), {
                       addSuffix: true,
                       locale: fr,
                     })}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">
-                    {r.model_used ?? <span className="text-slate-400">—</span>}
+                  <td className="text-on-surface-variant px-4 py-3 font-mono text-xs">
+                    {r.model_used ?? <span className="text-outline">—</span>}
                   </td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <Button
@@ -282,7 +291,7 @@ export function SignalTable({
                       size="sm"
                       onClick={() => setConfirmDeleteId(r.id)}
                       aria-label="Supprimer ce signal"
-                      className="h-7 w-7 p-0 text-red-600 opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-red-50 hover:text-red-700 focus-visible:opacity-100"
+                      className="text-error hover:bg-error-container hover:text-on-error-container h-7 w-7 p-0 opacity-0 transition-opacity group-hover/row:opacity-100 focus-visible:opacity-100"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -316,7 +325,7 @@ export function SignalTable({
                 handleConfirmDeleteOne()
               }}
               disabled={deleteOne.isPending}
-              className={cn('gap-1 bg-red-500 text-slate-50 shadow-sm hover:bg-red-500/90')}
+              className={cn('bg-error text-on-error hover:bg-error/90 gap-1 shadow-sm')}
             >
               {deleteOne.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -356,7 +365,7 @@ export function SignalTable({
                 handleConfirmBulkDelete()
               }}
               disabled={deleteBulk.isPending}
-              className={cn('gap-1 bg-red-500 text-slate-50 shadow-sm hover:bg-red-500/90')}
+              className={cn('bg-error text-on-error hover:bg-error/90 gap-1 shadow-sm')}
             >
               {deleteBulk.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

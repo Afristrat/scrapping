@@ -1,66 +1,64 @@
-import { AlertTriangle, BellOff, Clock4 } from 'lucide-react'
-
 interface ProblemStatProps {
-  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
   value: string
   label: string
   detail: string
 }
 
-function ProblemStat({ icon: Icon, value, label, detail }: ProblemStatProps): React.ReactElement {
+function ProblemStat({ value, label, detail }: ProblemStatProps): React.ReactElement {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-6">
-      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-orange-50 text-orange-600">
-        <Icon className="h-5 w-5" aria-hidden />
-      </div>
-      <p className="text-3xl font-semibold tracking-tight text-slate-900">{value}</p>
-      <p className="text-sm font-medium text-slate-700">{label}</p>
-      <p className="text-sm text-slate-500">{detail}</p>
+    <div className="flex flex-col items-center text-center">
+      <span className="text-primary-fixed-dim text-4xl font-bold tracking-[-0.02em] sm:text-5xl">
+        {value}
+      </span>
+      <span className="mt-2 text-sm font-medium text-white/80">{label}</span>
+      <span className="mt-1 text-xs text-white/50">{detail}</span>
     </div>
   )
 }
 
 export function ProblemSection(): React.ReactElement {
   return (
-    <section className="border-b border-slate-100 bg-slate-50">
-      <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
-        <div className="mb-10 max-w-3xl">
-          <p className="text-sm font-semibold tracking-wider text-orange-600 uppercase">
+    <section className="bg-inverse-surface text-inverse-on-surface relative w-full overflow-hidden py-24">
+      {/* Overlay gradient subtil — accent emerald sur fond slate-900 */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-900/30 via-transparent to-transparent"
+        aria-hidden
+      />
+      <div className="relative mx-auto w-full max-w-[72rem] px-6">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="text-primary-fixed-dim mb-4 text-xs font-semibold tracking-[0.05em] uppercase">
             Le problème
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+          <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl lg:text-[42px]">
             90 % de bruit IA. 10 % de signal. 100 % de fatigue.
           </h2>
-          <p className="mt-4 text-lg text-slate-600">
-            Chaque jour, votre équipe se noie dans des centaines de threads, papers et posts. Aucun
-            outil de veille générique ne sait distinguer ce qui compte pour VOTRE organisation de ce
-            qui buzze pour le grand public.
+          <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-white/70">
+            Chaque jour : ~350 nouveaux papers arXiv en IA, ~12 000 tweets dans les listes que vous
+            suivez, des centaines de threads Reddit. Aucun outil de veille générique ne comprend ce
+            qui compte POUR VOTRE équipe.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mt-12 grid grid-cols-1 gap-8 border-t border-white/10 pt-12 md:grid-cols-3">
           <ProblemStat
-            icon={AlertTriangle}
-            value="≈ 350 / jour"
-            label="papers déposés sur arXiv (cs.AI + cs.CL + cs.LG)"
-            detail="Impossible à trier sans critères propres à votre thèse d'investissement ou votre roadmap."
+            value="≈ 350 / j"
+            label="papers déposés sur arXiv"
+            detail="cs.AI · cs.CL · cs.LG"
           />
           <ProblemStat
-            icon={BellOff}
-            value="≈ 12 000 / jour"
-            label="tweets IA dans les listes que vous suivez"
-            detail="Feedly, Twitter listes, Slack RSS : tout est agrégé, rien n'est priorisé selon vos enjeux."
+            value="≈ 12 000 / j"
+            label="tweets IA dans vos listes"
+            detail="X listes tier 1 + curation perso"
           />
           <ProblemStat
-            icon={Clock4}
             value="5 h / sem."
             label="passées à scroller au lieu de décider"
-            detail="Et pourtant, 80 % de la valeur tient dans 20 % des signaux — encore faut-il les retrouver."
+            detail="80 % de la valeur tient dans 20 % des signaux"
           />
         </div>
 
-        <p className="mt-10 max-w-3xl text-base text-slate-700">
-          <span className="font-semibold">
+        <p className="mx-auto mt-12 max-w-3xl text-center text-base text-white/70">
+          <span className="font-semibold text-white">
             Aucun outil de veille générique ne comprend ce qui compte POUR VOTRE équipe.
           </span>{' '}
           Feedly agrège, ChatGPT résume, Exa cherche — mais aucun ne score selon vos rubriques, ne

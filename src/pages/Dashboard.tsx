@@ -67,21 +67,23 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Signaux</h2>
-          <p className="text-sm text-slate-500">
-            {rows ? `${rows.length} résultats` : 'Chargement…'}
+          <h2 className="text-on-surface text-3xl font-bold tracking-tight">Signaux</h2>
+          <p className="text-on-surface-variant mt-1 text-sm">
+            {rows
+              ? `${rows.length} résultats — analyse et priorisation des flux entrants.`
+              : 'Chargement…'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {zeroOrUnscoredIds.length > 0 && (
             <Button
               variant="outline"
               size="sm"
               onClick={handleRescoreAllZeros}
               disabled={rescoreBulk.isPending}
-              className="gap-1.5"
+              className="border-tertiary text-tertiary hover:bg-tertiary-fixed/50 gap-1.5"
               title="Relance le scoring LLM pour tous les signaux affichés non scorés ou à 0"
             >
               {rescoreBulk.isPending ? (
@@ -97,7 +99,7 @@ export default function Dashboard() {
           <PurgeButton />
           <RunPipelineButton />
         </div>
-      </div>
+      </header>
 
       <TopicsWidget />
 

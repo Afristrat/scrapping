@@ -103,13 +103,13 @@ function renderSettings() {
 }
 
 describe('Settings', () => {
-  it('rend les 5 onglets et le bouton enregistrer', () => {
+  it('rend les 6 onglets et le bouton enregistrer', () => {
     renderSettings()
 
-    expect(screen.getByRole('tab', { name: /modeles/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /grilles/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /modèles/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /rubriques/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /sources/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /cles api/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /clés api/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /branding/i })).toBeInTheDocument()
 
     expect(screen.getByRole('button', { name: /enregistrer/i })).toBeInTheDocument()

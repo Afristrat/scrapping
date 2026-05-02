@@ -31,7 +31,7 @@ const TREND_SECTIONS: TrendSection[] = [
     key: 'emerging',
     title: 'Émergents',
     Icon: Flame,
-    iconClass: 'text-green-600',
+    iconClass: 'text-primary',
     helper: 'Sujets en hausse anormale (z > 2). À investiguer en priorité.',
     emptyMessage: 'Aucun topic émergent pour le moment.',
   },
@@ -39,7 +39,7 @@ const TREND_SECTIONS: TrendSection[] = [
     key: 'declining',
     title: 'En déclin',
     Icon: TrendingDown,
-    iconClass: 'text-red-600',
+    iconClass: 'text-tertiary',
     helper: 'Sujets en chute anormale (z < -2). Peut indiquer une feature à dé-prioriser.',
     emptyMessage: 'Aucun topic en déclin pour le moment.',
   },
@@ -47,7 +47,7 @@ const TREND_SECTIONS: TrendSection[] = [
     key: 'stable',
     title: 'Stables',
     Icon: LineChartIcon,
-    iconClass: 'text-muted-foreground',
+    iconClass: 'text-on-surface-variant',
     helper: 'Sujets bien établis dans leur baseline normale.',
     emptyMessage: 'Aucun topic stable détecté.',
   },
@@ -55,7 +55,7 @@ const TREND_SECTIONS: TrendSection[] = [
     key: 'warming_up',
     title: 'En calibrage',
     Icon: Sprout,
-    iconClass: 'text-amber-600',
+    iconClass: 'text-secondary-container',
     helper: 'Moins de 10 runs : pas encore assez de données pour juger une tendance.',
     emptyMessage: 'Aucun topic en calibrage.',
   },
@@ -85,27 +85,27 @@ function zScoreTooltip(t: TopicWithRuns): string {
 function trendBadge(t: TopicWithRuns): React.ReactElement {
   if (t.trend === 'emerging') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-green-950 px-2 py-0.5 text-[10px] font-semibold text-green-400">
+      <span className="bg-primary-container text-on-primary-container inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold">
         <ArrowUp className="h-3 w-3" /> EMERGING z={t.z_score.toFixed(1)}
       </span>
     )
   }
   if (t.trend === 'declining') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-950 px-2 py-0.5 text-[10px] font-semibold text-red-400">
+      <span className="bg-tertiary-container text-on-tertiary-container inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold">
         <ArrowDown className="h-3 w-3" /> DECLINING z={t.z_score.toFixed(1)}
       </span>
     )
   }
   if (t.trend === 'warming_up') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">
+      <span className="border-outline-variant text-on-surface-variant bg-secondary-fixed inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]">
         warming up ({t.baseline_n}/10)
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">
+    <span className="border-outline-variant text-on-surface-variant bg-surface-variant inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]">
       <ArrowRight className="h-3 w-3" /> stable z={t.z_score.toFixed(1)}
     </span>
   )
@@ -121,14 +121,14 @@ function SuggestedAction({ topic }: { topic: TopicWithRuns }): React.ReactElemen
   }
   if (topic.trend === 'declining') {
     return (
-      <span className="text-[11px] text-muted-foreground italic">
+      <span className="text-on-surface-variant text-[11px] italic">
         Action suggérée : ignorer pour l&apos;instant.
       </span>
     )
   }
   if (topic.trend === 'warming_up') {
     return (
-      <span className="text-[11px] text-muted-foreground italic">
+      <span className="text-on-surface-variant text-[11px] italic">
         Action suggérée : continuer à laisser tourner.
       </span>
     )
@@ -142,21 +142,21 @@ function TopicCard({ topic }: { topic: TopicWithRuns }): React.ReactElement {
     <div
       data-testid="topic-card"
       className={cn(
-        'rounded-lg border bg-card p-3',
-        topic.trend === 'emerging' && 'border-l-[3px] border-l-green-600',
-        topic.trend === 'declining' && 'border-l-[3px] border-l-red-600',
-        topic.trend === 'warming_up' && 'border-l-[3px] border-l-amber-500',
+        'border-outline-variant bg-surface-container-lowest rounded-xl border p-4 shadow-sm transition-shadow hover:shadow-md',
+        topic.trend === 'emerging' && 'border-l-primary border-l-4',
+        topic.trend === 'declining' && 'border-l-tertiary border-l-4',
+        topic.trend === 'warming_up' && 'border-l-secondary-container border-l-4',
       )}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span title={zScoreTooltip(topic)} className="cursor-help">
             {trendBadge(topic)}
           </span>
-          <span className="text-sm font-semibold">{topic.name}</span>
-          {topic.is_seed && <span className="text-[10px] text-muted-foreground">seed</span>}
+          <span className="text-on-surface text-sm font-semibold">{topic.name}</span>
+          {topic.is_seed && <span className="text-on-surface-variant text-[10px]">seed</span>}
         </div>
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-on-surface-variant text-[10px]">
           {topic.total_signal_count} signaux
         </span>
       </div>
@@ -164,14 +164,14 @@ function TopicCard({ topic }: { topic: TopicWithRuns }): React.ReactElement {
       {topic.runs.length > 0 && <TopicSparklines runs={topic.runs} />}
 
       {lastRun?.top_signal_title && (
-        <div className="text-[11px] text-muted-foreground mt-2 truncate">
+        <div className="text-on-surface-variant mt-2 truncate text-[11px]">
           Top signal : « {lastRun.top_signal_title} » — score{' '}
           {lastRun.top_signal_score?.toFixed(0) ?? '?'}
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground" title={zScoreTooltip(topic)}>
+      <div className="border-outline-variant/50 mt-3 flex items-center justify-between border-t pt-3">
+        <span className="text-on-surface-variant text-[11px]" title={zScoreTooltip(topic)}>
           {(() => {
             const pct = formatPercentDelta(topic)
             if (topic.trend === 'warming_up') {
@@ -191,8 +191,8 @@ function TopicCard({ topic }: { topic: TopicWithRuns }): React.ReactElement {
 
 function SourcesLegend(): React.ReactElement {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-3 py-2">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="border-outline-variant bg-surface-container-lowest flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2 shadow-sm">
+      <span className="text-on-surface-variant text-[10px] font-semibold tracking-[0.05em] uppercase">
         Sources
       </span>
       {SOURCES.map((s) => {
@@ -210,7 +210,7 @@ function SourcesLegend(): React.ReactElement {
           </span>
         )
       })}
-      <span className="text-[10px] text-muted-foreground">
+      <span className="text-on-surface-variant text-[10px]">
         Les sparklines de chaque card affichent l&apos;évolution par source sur les 30 derniers
         runs.
       </span>
@@ -234,17 +234,19 @@ export default function Topics(): React.ReactElement {
   }
 
   return (
-    <div className="container max-w-5xl py-8 space-y-6">
-      <header className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
+    <div className="space-y-8">
+      <header className="space-y-4">
+        <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
           <div>
-            <h1 className="text-xl font-bold">Topics — {topics.length} actifs</h1>
-            <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-              Les topics sont des regroupements thématiques de tes signaux scrapés. Un topic en
-              hausse (<span className="font-mono">z &gt; 2</span>) signale un sujet qui sort du
-              bruit habituel — c&apos;est ton signal d&apos;opportunité. Un topic en baisse (
-              <span className="font-mono">z &lt; -2</span>) reflète un sujet qui retombe — peut
-              indiquer une mode passagère.
+            <h1 className="text-on-surface text-3xl font-bold tracking-tight">
+              Topics — {topics.length} actifs
+            </h1>
+            <p className="text-on-surface-variant mt-2 max-w-3xl text-sm">
+              Suivi 90 jours glissants. Algorithme Welford z-score. Un topic en hausse (
+              <span className="text-on-surface font-mono">z &gt; 2</span>) signale un sujet qui sort
+              du bruit habituel. Un topic en baisse (
+              <span className="text-on-surface font-mono">z &lt; -2</span>) reflète un sujet qui
+              retombe.
             </p>
           </div>
           <TopicHelpDialog />
@@ -253,10 +255,10 @@ export default function Topics(): React.ReactElement {
         <SourcesLegend />
       </header>
 
-      {isLoading && <div className="text-sm text-muted-foreground">Chargement…</div>}
+      {isLoading && <div className="text-on-surface-variant text-sm">Chargement…</div>}
 
       {!isLoading && topics.length === 0 && (
-        <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
+        <div className="border-outline-variant bg-surface-container-lowest text-on-surface-variant rounded-xl border p-6 text-sm shadow-sm">
           Aucun topic encore identifié. Lance le pipeline pour générer des signaux.
         </div>
       )}
@@ -269,18 +271,20 @@ export default function Topics(): React.ReactElement {
             <section
               key={section.key}
               data-testid={`trend-section-${section.key}`}
-              className="space-y-2"
+              className="space-y-3"
             >
               <div className="flex items-center gap-2">
-                <section.Icon className={cn('h-4 w-4', section.iconClass)} />
-                <h2 className="text-sm font-semibold">{section.title}</h2>
-                <span className="text-[10px] rounded-full border px-1.5 py-0.5 text-muted-foreground">
+                <section.Icon className={cn('h-5 w-5', section.iconClass)} />
+                <h2 className={cn('text-2xl font-bold tracking-tight', section.iconClass)}>
+                  {section.title}
+                </h2>
+                <span className="border-outline-variant text-on-surface-variant rounded-full border px-2 py-0.5 text-[10px]">
                   {items.length}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">{section.helper}</p>
+              <p className="text-on-surface-variant text-sm">{section.helper}</p>
               {items.length === 0 ? (
-                <div className="rounded-lg border border-dashed bg-card/50 p-4 text-xs italic text-muted-foreground">
+                <div className="border-outline-variant bg-surface-container-low/50 text-on-surface-variant rounded-xl border border-dashed p-4 text-xs italic">
                   {section.emptyMessage}
                 </div>
               ) : (

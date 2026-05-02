@@ -1,8 +1,16 @@
-import { ArrowRight, Building2, Check, Mail, Sparkles, Star, Users } from 'lucide-react'
+import {
+  ArrowRight,
+  BadgeCheck,
+  Building2,
+  CheckCircle2,
+  Mail,
+  Sparkles,
+  Star,
+  Users,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -106,7 +114,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
         'CSM dédié, onboarding sur-mesure',
         'SLA 99,9 %',
       ],
-      ctaLabel: 'Contactez-nous',
+      ctaLabel: 'Contacter les ventes',
       ctaHref: `mailto:${CONTACT_EMAIL}?subject=Kairos%20Enterprise`,
       ctaVariant: 'outline',
     },
@@ -173,7 +181,7 @@ const PRICING: Record<PricingMode, PricingByMode> = {
         'CSM dédié, onboarding sur-mesure',
         'SLA 99,9 %',
       ],
-      ctaLabel: 'Contactez-nous',
+      ctaLabel: 'Contacter les ventes',
       ctaHref: `mailto:${CONTACT_EMAIL}?subject=Kairos%20Enterprise%20BYOK`,
       ctaVariant: 'outline',
     },
@@ -203,83 +211,116 @@ function computeProTotal(seats: number, seatPricing: SeatPricing): number {
 interface PlanCardProps {
   plan: PlanContent
   icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+  variant?: 'standard' | 'recommended' | 'inverse'
   children?: React.ReactNode
 }
 
-function PlanCard({ plan, icon: Icon, children }: PlanCardProps): React.ReactElement {
+function PlanCard({
+  plan,
+  icon: Icon,
+  variant = 'standard',
+  children,
+}: PlanCardProps): React.ReactElement {
   const ctaVariant = plan.ctaVariant ?? 'default'
-  const recommended = plan.recommended === true
+  const recommended = variant === 'recommended'
+  const inverse = variant === 'inverse'
+
+  const containerClasses = cn(
+    'relative flex h-full flex-col gap-5 rounded-2xl p-8 shadow-md transition-shadow',
+    inverse && 'bg-inverse-surface text-inverse-on-surface overflow-hidden',
+    recommended &&
+      'bg-surface-container-lowest border-2 border-primary shadow-lg md:-translate-y-4',
+    !inverse && !recommended && 'bg-surface-container-lowest border border-outline-variant',
+  )
+
+  const iconWrapClasses = cn(
+    'flex h-10 w-10 items-center justify-center rounded-md',
+    inverse && 'bg-white/10 text-inverse-primary',
+    recommended && 'bg-primary-fixed text-on-primary-fixed',
+    !inverse && !recommended && 'bg-surface-container-high text-on-surface-variant',
+  )
+
+  const titleClasses = inverse ? 'text-inverse-on-surface' : 'text-on-surface'
+  const pitchClasses = inverse ? 'text-white/70' : 'text-on-surface-variant'
+  const priceClasses = inverse ? 'text-inverse-on-surface' : 'text-on-surface'
+  const featureTextClasses = inverse ? 'text-white/85' : 'text-on-surface'
+  const checkClasses = inverse
+    ? 'text-primary-fixed-dim'
+    : recommended
+      ? 'text-primary'
+      : 'text-primary'
 
   return (
-    <div
-      className={cn(
-        'relative flex h-full flex-col gap-5 rounded-2xl border bg-white p-6 shadow-sm transition-shadow',
-        recommended
-          ? 'border-emerald-500 shadow-md ring-1 ring-emerald-500/20'
-          : 'border-slate-200',
-      )}
-    >
-      {plan.badge ? (
-        <Badge
-          className={cn(
-            'absolute -top-3 left-6 gap-1',
-            recommended ? 'bg-emerald-600 text-white hover:bg-emerald-600' : '',
-          )}
-        >
-          {recommended ? <Star className="h-3 w-3" aria-hidden /> : null}
+    <div className={containerClasses}>
+      {recommended && plan.badge ? (
+        <span className="bg-primary text-on-primary absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full px-4 py-1 text-xs font-semibold tracking-[0.05em] uppercase shadow">
+          <Star className="h-3 w-3 fill-current" aria-hidden />
           {plan.badge}
-        </Badge>
+        </span>
       ) : null}
 
-      <div className="flex items-center gap-3">
+      {/* Subtle gradient overlay for inverse plan */}
+      {inverse ? (
         <div
-          className={cn(
-            'flex h-10 w-10 items-center justify-center rounded-md',
-            recommended ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700',
-          )}
-        >
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-900/40 via-transparent to-transparent"
+          aria-hidden
+        />
+      ) : null}
+
+      <div className="relative z-10 flex items-center gap-3">
+        <div className={iconWrapClasses}>
           <Icon className="h-5 w-5" aria-hidden />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">{plan.name}</h3>
-          <p className="text-sm text-slate-500">{plan.pitch}</p>
+          <h3 className={cn('text-xl font-semibold tracking-[-0.01em]', titleClasses)}>
+            {plan.name}
+          </h3>
+          <p className={cn('text-sm', pitchClasses)}>{plan.pitch}</p>
         </div>
       </div>
 
-      <div>
+      <div className="relative z-10">
         <p className="flex items-baseline gap-1.5">
-          <span className="text-3xl font-semibold tracking-tight text-slate-900">
+          <span className={cn('text-3xl font-bold tracking-[-0.02em] sm:text-4xl', priceClasses)}>
             {plan.priceLabel}
           </span>
           {plan.priceSuffix ? (
-            <span className="text-sm text-slate-500">{plan.priceSuffix}</span>
+            <span className={cn('text-sm', pitchClasses)}>{plan.priceSuffix}</span>
           ) : null}
         </p>
         {plan.description ? (
-          <p className="mt-2 text-sm text-slate-600">{plan.description}</p>
+          <p className={cn('mt-2 text-sm leading-relaxed', pitchClasses)}>{plan.description}</p>
         ) : null}
       </div>
 
-      {children}
+      {children ? <div className="relative z-10">{children}</div> : null}
 
-      <ul className="flex flex-col gap-2 text-sm text-slate-700">
+      <ul className="relative z-10 flex flex-col gap-2.5 text-sm">
         {plan.features.map((f) => (
-          <li key={f} className="flex items-start gap-2">
-            <Check
-              className={cn(
-                'mt-0.5 h-4 w-4 shrink-0',
-                recommended ? 'text-emerald-600' : 'text-slate-500',
-              )}
-              aria-hidden
-            />
+          <li key={f} className={cn('flex items-start gap-2', featureTextClasses)}>
+            <CheckCircle2 className={cn('mt-0.5 h-4 w-4 shrink-0', checkClasses)} aria-hidden />
             <span>{f}</span>
           </li>
         ))}
       </ul>
 
-      <div className="mt-auto pt-2">
+      <div className="relative z-10 mt-auto pt-2">
         {plan.ctaTo !== undefined ? (
-          <Button asChild size="lg" variant={ctaVariant} className="w-full gap-2">
+          <Button
+            asChild
+            size="lg"
+            variant={ctaVariant}
+            className={cn(
+              'w-full gap-2 rounded-xl',
+              recommended && 'bg-primary text-on-primary hover:bg-primary-container shadow-sm',
+              inverse &&
+                'bg-surface-container-lowest text-on-surface hover:bg-surface-container shadow-sm',
+              !inverse &&
+                !recommended &&
+                ctaVariant === 'outline' &&
+                'border-outline text-on-surface',
+            )}
+          >
             <Link to={plan.ctaTo}>
               {plan.ctaLabel}
               <ArrowRight className="h-4 w-4" aria-hidden />
@@ -287,7 +328,17 @@ function PlanCard({ plan, icon: Icon, children }: PlanCardProps): React.ReactEle
           </Button>
         ) : null}
         {plan.ctaHref !== undefined ? (
-          <Button asChild size="lg" variant={ctaVariant} className="w-full gap-2">
+          <Button
+            asChild
+            size="lg"
+            variant={ctaVariant}
+            className={cn(
+              'w-full gap-2 rounded-xl',
+              inverse &&
+                'bg-surface-container-lowest text-on-surface hover:bg-surface-container shadow-sm',
+              !inverse && ctaVariant === 'outline' && 'border-outline text-on-surface',
+            )}
+          >
             <a href={plan.ctaHref}>
               <Mail className="h-4 w-4" aria-hidden />
               {plan.ctaLabel}
@@ -313,15 +364,12 @@ function ProSeatConfigurator({
   discountLabel,
 }: ProSeatConfiguratorProps): React.ReactElement {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium text-slate-700">
-          Seats : <span className="font-semibold text-slate-900">{seats}</span>
+    <div className="bg-surface-container-low border-outline-variant flex flex-col gap-3 rounded-lg border p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-on-surface-variant text-[11px] font-semibold tracking-[0.05em] uppercase">
+          Nombre de sièges
         </span>
-        <span className="text-sm font-semibold text-emerald-700">
-          {formatEuro(total)}
-          <span className="text-xs font-normal text-slate-500"> /mois</span>
-        </span>
+        <span className="text-primary text-base font-semibold">{seats}</span>
       </div>
       <Slider
         min={MIN_SEATS}
@@ -336,7 +384,17 @@ function ProSeatConfigurator({
         }}
         aria-label="Nombre de seats"
       />
-      <p className="text-xs text-slate-500">{discountLabel}</p>
+      <div className="text-on-surface-variant flex justify-between text-xs">
+        <span>{MIN_SEATS}</span>
+        <span>{MAX_SEATS}+</span>
+      </div>
+      <div className="bg-primary-container/10 mt-1 flex items-center justify-between gap-3 rounded p-2">
+        <span className="text-primary inline-flex items-center gap-1.5 text-sm font-semibold">
+          <BadgeCheck className="h-4 w-4" aria-hidden />
+          {formatEuro(total)} <span className="font-normal opacity-70">/mois</span>
+        </span>
+        <span className="text-on-surface-variant text-[11px]">{discountLabel}</span>
+      </div>
     </div>
   )
 }
@@ -362,91 +420,99 @@ export function PricingTable(): React.ReactElement {
   }
 
   return (
-    <section id="pricing" className="border-b border-slate-100 bg-slate-50">
-      <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
-        <div className="mb-10 max-w-3xl">
-          <p className="text-sm font-semibold tracking-wider text-blue-700 uppercase">Pricing</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-            Trois paliers visibles. Un configurateur sous le capot.
+    <section id="pricing" className="bg-surface w-full py-24">
+      <div className="mx-auto w-full max-w-[72rem] px-6">
+        <div className="mb-16 text-center">
+          <p className="text-primary mb-3 text-xs font-semibold tracking-[0.05em] uppercase">
+            Tarifs
+          </p>
+          <h2 className="text-on-surface mb-4 text-3xl font-bold tracking-[-0.02em] sm:text-4xl">
+            Choisissez votre stack.
           </h2>
-          <p className="mt-3 text-slate-600">
-            Choisissez votre mode — Maison ou BYOK — puis ajustez la taille de votre équipe. Le
-            tarif s'adapte. Les 12 SKUs détaillés (par segment et seats) émergent du configurateur
-            après inscription.
+          <p className="text-on-surface-variant mx-auto max-w-2xl text-lg leading-relaxed">
+            Optimisez votre veille IA avec nos plans flexibles. Choisissez notre infrastructure LLM
+            Maison clé en main, ou utilisez vos propres clés (BYOK) pour un contrôle total des
+            coûts.
           </p>
         </div>
 
         <Tabs
           value={mode}
           onValueChange={(v) => setMode(v as PricingMode)}
-          className="mb-8 items-center"
+          className="mb-12 items-center"
         >
-          <TabsList className="h-11 rounded-full bg-slate-200/70 p-1">
+          <TabsList className="bg-surface-variant h-11 rounded-lg p-1 shadow-sm">
             <TabsTrigger
               value="maison"
-              className="rounded-full px-5 data-[state=active]:bg-white data-[state=active]:text-emerald-700"
+              className="data-[state=active]:bg-surface-container-lowest data-[state=active]:text-primary text-on-surface-variant rounded-md px-5 font-semibold transition-all data-[state=active]:shadow-sm"
             >
               LLM Maison (tout-inclus)
             </TabsTrigger>
             <TabsTrigger
               value="byok"
-              className="rounded-full px-5 data-[state=active]:bg-white data-[state=active]:text-blue-700"
+              className="data-[state=active]:bg-surface-container-lowest data-[state=active]:text-primary text-on-surface-variant rounded-md px-5 font-semibold transition-all data-[state=active]:shadow-sm"
             >
-              BYOK (apportez vos clés)
+              BYOK (vos clés)
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="maison" className="mt-6">
-            <p className="mx-auto max-w-3xl text-center text-sm text-slate-600">
-              <span className="font-medium text-slate-800">Mode Maison</span> : nous gérons les LLM
-              (Haiku ou Sonnet selon palier), vous payez un forfait. Idéal pour démarrer vite, sans
-              gérer de clés ni de monitoring multi-providers.
+            <p className="text-on-surface-variant mx-auto max-w-3xl text-center text-sm leading-relaxed">
+              <span className="text-on-surface font-semibold">Mode Maison</span> : nous gérons les
+              LLM (Haiku ou Sonnet selon palier), vous payez un forfait. Idéal pour démarrer vite,
+              sans gérer de clés ni de monitoring multi-providers.
             </p>
           </TabsContent>
           <TabsContent value="byok" className="mt-6">
-            <p className="mx-auto max-w-3xl text-center text-sm text-slate-600">
-              <span className="font-medium text-slate-800">Mode BYOK</span> : vous apportez vos clés
-              OpenRouter / Anthropic / OpenAI / Mistral / 6 autres. Vous gardez le contrôle de vos
-              modèles et de vos données — recommandé pour cas enterprise et data-sensible.
+            <p className="text-on-surface-variant mx-auto max-w-3xl text-center text-sm leading-relaxed">
+              <span className="text-on-surface font-semibold">Mode BYOK</span> : vous apportez vos
+              clés OpenRouter / Anthropic / OpenAI / Mistral / 6 autres. Vous gardez le contrôle de
+              vos modèles et de vos données — recommandé pour cas enterprise et data-sensible.
             </p>
           </TabsContent>
         </Tabs>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <PlanCard plan={PRICING[mode].solo} icon={Sparkles} />
-          <PlanCard plan={proPlanWithComputedPrice} icon={Users}>
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+          <PlanCard plan={PRICING[mode].solo} icon={Sparkles} variant="standard" />
+          <PlanCard plan={proPlanWithComputedPrice} icon={Users} variant="recommended">
             <ProSeatConfigurator
               seats={seats}
               onChange={setSeats}
               total={proTotal}
               discountLabel={proPlan.seatPricing.discountLabel}
             />
-            <p className="-mt-1 text-xs text-slate-500">
+            <p className="text-on-surface-variant -mt-1 text-xs">
               Adapté à VC, avocats, newsletters, brands, CTOs — configurez selon votre profil après
               inscription.
             </p>
           </PlanCard>
-          <PlanCard plan={PRICING[mode].enterprise} icon={Building2} />
+          <PlanCard plan={PRICING[mode].enterprise} icon={Building2} variant="inverse" />
         </div>
 
-        <div className="mt-10 flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-white p-6 text-center sm:flex-row sm:justify-between sm:text-left">
+        <div className="bg-surface-container-lowest border-outline-variant mt-12 flex flex-col items-center gap-4 rounded-2xl border p-6 text-center sm:flex-row sm:justify-between sm:text-left">
           <div>
-            <p className="text-sm font-semibold text-slate-900">
+            <p className="text-on-surface text-base font-semibold">
               Vous êtes VC, cabinet d'avocats, éditeur média ou brand ?
             </p>
-            <p className="text-sm text-slate-600">
-              Nous proposons des bundles dédiés (tenant isolé, custom rubrics, CSM). Démo en 30
-              minutes.
+            <p className="text-on-surface-variant mt-1 text-sm">
+              Bundles dédiés (tenant isolé, custom rubrics, CSM). Démo en 30 minutes.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button asChild variant="default" className="gap-2">
+            <Button
+              asChild
+              className="bg-primary text-on-primary hover:bg-primary-container gap-2 rounded-xl shadow-sm"
+            >
               <Link to="/pricing">
                 Configurer ma stack
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
             </Button>
-            <Button asChild variant="outline" className="gap-2">
+            <Button
+              asChild
+              variant="outline"
+              className="border-outline text-on-surface bg-surface-container-high hover:bg-surface-container-highest gap-2 rounded-xl"
+            >
               <a href={`mailto:${CONTACT_EMAIL}?subject=Kairos%20-%20Demande%20de%20d%C3%A9mo`}>
                 <Mail className="h-4 w-4" aria-hidden />
                 Contactez-nous

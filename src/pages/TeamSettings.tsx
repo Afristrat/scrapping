@@ -44,14 +44,8 @@ import type { Database } from '@/types/database'
 import { cn } from '@/lib/utils'
 
 // =============================================================================
-// Wave 6 — Sub-wave 6.3 — S6-TeamPage
-// Page /settings/team : liste des membres de l'organisation, invitations en
-// cours, et gestion des rôles. Visible par tous les membres ; les actions
-// d'écriture (inviter, retirer, changer rôle) sont gated sur owner/admin.
-//
-// Sécurité : les RLS et les edge fns invite-member / remove-member font la
-// vraie validation. Le frontend cache simplement les boutons pour les rôles
-// non autorisés (UX, pas sécurité).
+// Wave 7.5 — Refonte design Material You / Stitch Kairos.
+// La logique (RLS, hooks, mutations) est conservée à l'identique.
 // =============================================================================
 
 type OrgRole = Database['public']['Enums']['org_role']
@@ -70,16 +64,16 @@ const ROLE_LABEL: Record<OrgRole, string> = {
 }
 
 const ROLE_BADGE: Record<OrgRole, string> = {
-  owner: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
-  admin: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  member: 'bg-slate-100 text-slate-700 hover:bg-slate-100',
-  viewer: 'bg-slate-50 text-slate-600 hover:bg-slate-50',
+  owner: 'bg-tertiary-fixed text-on-tertiary-fixed-variant hover:bg-tertiary-fixed',
+  admin: 'bg-secondary-fixed text-on-secondary-fixed-variant hover:bg-secondary-fixed',
+  member: 'bg-surface-container-high text-on-surface hover:bg-surface-container-high',
+  viewer: 'bg-surface-container text-on-surface-variant hover:bg-surface-container',
 }
 
 const STATUS_BADGE: Record<InvitationView['status'], string> = {
-  pending: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  accepted: 'bg-green-100 text-green-800 hover:bg-green-100',
-  expired: 'bg-slate-200 text-slate-600 hover:bg-slate-200',
+  pending: 'bg-secondary-fixed text-on-secondary-fixed-variant hover:bg-secondary-fixed',
+  accepted: 'bg-primary-fixed text-on-primary-fixed-variant hover:bg-primary-fixed',
+  expired: 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high',
 }
 
 const STATUS_LABEL: Record<InvitationView['status'], string> = {
@@ -142,55 +136,86 @@ export default function TeamSettings(): React.ReactElement {
 
   const seatsUsed = members?.length ?? 0
   const seatsTotal = subscription?.seats ?? null
+  const seatsPct =
+    seatsTotal !== null
+      ? Math.min(100, Math.round((seatsUsed / Math.max(1, seatsTotal)) * 100))
+      : null
 
   if (!orgId) {
     return (
-      <Card className="mx-auto max-w-3xl border-dashed p-8 text-center text-sm text-slate-500">
-        Sélectionnez une organisation pour gérer son équipe.
+      <Card className="border-outline-variant bg-surface-container-lowest mx-auto max-w-3xl border-dashed p-8 text-center">
+        <p className="text-on-surface-variant text-sm">
+          Sélectionnez une organisation pour gérer son équipe.
+        </p>
       </Card>
     )
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <header className="space-y-1">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
-          <Users className="h-6 w-6" /> Équipe
-        </h1>
-        <p className="text-sm text-slate-500">
-          Gérez les membres de votre organisation et leurs rôles.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-on-surface flex items-center gap-2 text-2xl font-semibold tracking-[-0.01em]">
+            <Users className="text-primary h-6 w-6" aria-hidden="true" />
+            Équipe
+          </h1>
+          <p className="text-on-surface-variant mt-1 text-sm">
+            Gérez les membres de votre organisation et leurs rôles.
+          </p>
+        </div>
+        {canManage && (
+          <Button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById('invite-email')
+              el?.focus()
+            }}
+            className="bg-primary text-on-primary hover:bg-primary-container h-10 gap-2 rounded-lg"
+          >
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
+            Inviter un membre
+          </Button>
+        )}
       </header>
 
-      {/* Section A — Membres */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-base">Membres</CardTitle>
-            <p className="mt-1 text-xs text-slate-500">
-              {seatsTotal !== null
-                ? `${seatsUsed} / ${seatsTotal} sièges utilisés`
-                : `${seatsUsed} membre${seatsUsed > 1 ? 's' : ''}`}
-            </p>
-          </div>
-          {seatsTotal !== null && (
-            <div className="w-40">
-              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={cn(
-                    'h-full rounded-full transition-all',
-                    seatsUsed >= seatsTotal ? 'bg-red-500' : 'bg-emerald-500',
-                  )}
-                  style={{
-                    width: `${Math.min(100, Math.round((seatsUsed / Math.max(1, seatsTotal)) * 100))}%`,
-                  }}
-                />
+      {/* Barre de progression seats */}
+      {seatsTotal !== null && (
+        <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
+          <CardContent className="p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <div>
+                <p className="text-on-surface-variant text-xs font-semibold tracking-[0.08em] uppercase">
+                  Sièges utilisés
+                </p>
+                <p className="text-on-surface mt-1 text-xl font-semibold tabular-nums">
+                  {seatsUsed}{' '}
+                  <span className="text-on-surface-variant text-sm">/ {seatsTotal}</span>
+                </p>
               </div>
-              <p className="mt-1 text-right text-[10px] tracking-wide text-slate-400 uppercase">
-                Sièges
-              </p>
+              <span className="text-on-surface-variant text-xs tabular-nums">{seatsPct ?? 0}%</span>
             </div>
-          )}
+            <div className="bg-surface-container mt-3 h-2 overflow-hidden rounded-full">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all',
+                  seatsUsed >= seatsTotal ? 'bg-error' : 'bg-primary',
+                )}
+                style={{ width: `${seatsPct ?? 0}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Section A — Membres */}
+      <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
+        <CardHeader>
+          <CardTitle className="text-on-surface text-base font-semibold">Membres</CardTitle>
+          <p className="text-on-surface-variant mt-1 text-xs">
+            {seatsTotal === null
+              ? `${seatsUsed} membre${seatsUsed > 1 ? 's' : ''}`
+              : `${seatsUsed} sur ${seatsTotal} sièges`}
+          </p>
         </CardHeader>
         <CardContent className="p-0">
           {loadingMembers ? (
@@ -200,11 +225,11 @@ export default function TeamSettings(): React.ReactElement {
               ))}
             </div>
           ) : !members || members.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-500">Aucun membre.</p>
+            <p className="text-on-surface-variant p-6 text-center text-sm">Aucun membre.</p>
           ) : (
             <div className="overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
+                <thead className="bg-surface-container-low text-on-surface-variant text-left text-xs font-semibold tracking-[0.05em] uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Email</th>
                     <th className="w-44 px-4 py-2.5">Rôle</th>
@@ -212,22 +237,24 @@ export default function TeamSettings(): React.ReactElement {
                     <th className="w-20 px-4 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-outline-variant divide-y">
                   {members.map((m) => {
                     const isSelf = m.user_id === currentUserId
                     const canEditMember = canManage && !isSelf && (isOwner || m.role !== 'owner')
                     return (
-                      <tr key={m.user_id} className="align-middle hover:bg-slate-50/50">
+                      <tr key={m.user_id} className="hover:bg-surface-container-low align-middle">
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
-                            <span className="text-slate-700">
+                            <span className="text-on-surface">
                               {m.email ?? (
-                                <span className="font-mono text-xs text-slate-400">
+                                <span className="text-on-surface-variant font-mono text-xs">
                                   {m.user_id.slice(0, 8)}…
                                 </span>
                               )}
                             </span>
-                            {isSelf && <span className="text-xs text-slate-400">(vous)</span>}
+                            {isSelf && (
+                              <span className="text-on-surface-variant text-xs">(vous)</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -256,7 +283,7 @@ export default function TeamSettings(): React.ReactElement {
                           )}
                         </td>
                         <td
-                          className="px-4 py-3 text-xs text-slate-500"
+                          className="text-on-surface-variant px-4 py-3 text-xs"
                           title={format(new Date(m.joined_at), 'yyyy-MM-dd HH:mm')}
                         >
                           {formatDistanceToNow(new Date(m.joined_at), {
@@ -271,9 +298,9 @@ export default function TeamSettings(): React.ReactElement {
                               size="sm"
                               onClick={() => setPendingRemoval(m)}
                               aria-label={`Retirer ${m.email ?? m.user_id}`}
-                              className="h-8 w-8 p-0 text-slate-500 hover:text-red-600"
+                              className="text-on-surface-variant hover:text-error h-8 w-8 p-0"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
                             </Button>
                           )}
                         </td>
@@ -289,12 +316,13 @@ export default function TeamSettings(): React.ReactElement {
 
       {/* Section B — Inviter un nouveau membre */}
       {canManage && (
-        <Card>
+        <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UserPlus className="h-4 w-4" /> Inviter un nouveau membre
+            <CardTitle className="text-on-surface flex items-center gap-2 text-base font-semibold">
+              <UserPlus className="text-primary h-4 w-4" aria-hidden="true" /> Inviter un nouveau
+              membre
             </CardTitle>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="text-on-surface-variant mt-1 text-xs">
               Le membre recevra un email pour rejoindre l’organisation. Lien valable 7 jours.
             </p>
           </CardHeader>
@@ -305,7 +333,10 @@ export default function TeamSettings(): React.ReactElement {
               className="flex flex-col gap-3 sm:flex-row sm:items-end"
             >
               <div className="flex-1">
-                <Label htmlFor="invite-email" className="mb-1 block text-xs">
+                <Label
+                  htmlFor="invite-email"
+                  className="text-on-surface-variant mb-1 block text-xs"
+                >
                   Email
                 </Label>
                 <Input
@@ -313,16 +344,17 @@ export default function TeamSettings(): React.ReactElement {
                   type="email"
                   autoComplete="email"
                   placeholder="collaborateur@exemple.com"
+                  className="border-outline-variant bg-surface-container-lowest h-10 rounded-lg"
                   {...inviteForm.register('email')}
                 />
                 {inviteForm.formState.errors.email && (
-                  <p className="mt-1 text-xs text-red-600">
+                  <p className="text-error mt-1 text-xs">
                     {inviteForm.formState.errors.email.message}
                   </p>
                 )}
               </div>
               <div className="w-full sm:w-44">
-                <Label htmlFor="invite-role" className="mb-1 block text-xs">
+                <Label htmlFor="invite-role" className="text-on-surface-variant mb-1 block text-xs">
                   Rôle
                 </Label>
                 <Select
@@ -337,25 +369,29 @@ export default function TeamSettings(): React.ReactElement {
                       <SelectItem key={opt.value} value={opt.value}>
                         <div className="flex flex-col">
                           <span>{opt.label}</span>
-                          <span className="text-[10px] text-slate-500">{opt.hint}</span>
+                          <span className="text-on-surface-variant text-[10px]">{opt.hint}</span>
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" disabled={inviteMutation.isPending} className="gap-2 sm:w-auto">
-                <Mail className="h-4 w-4" />
+              <Button
+                type="submit"
+                disabled={inviteMutation.isPending}
+                className="bg-primary text-on-primary hover:bg-primary-container h-10 gap-2 rounded-lg sm:w-auto"
+              >
+                <Mail className="h-4 w-4" aria-hidden="true" />
                 {inviteMutation.isPending ? 'Envoi…' : "Envoyer l'invitation"}
               </Button>
             </form>
             {inviteMutation.data && !inviteMutation.data.email_sent && (
-              <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs">
-                <p className="font-medium text-amber-900">
+              <div className="border-tertiary-fixed bg-tertiary-fixed/40 text-on-tertiary-fixed-variant mt-4 rounded-lg border p-3 text-xs">
+                <p className="font-medium">
                   Email automatique non envoyé — partagez ce lien manuellement :
                 </p>
                 <div className="mt-2 flex items-center gap-2">
-                  <code className="flex-1 truncate rounded bg-white px-2 py-1 font-mono text-[11px] text-slate-700">
+                  <code className="bg-surface-container-lowest text-on-surface flex-1 truncate rounded px-2 py-1 font-mono text-[11px]">
                     {inviteMutation.data.accept_url}
                   </code>
                   <Button
@@ -363,16 +399,14 @@ export default function TeamSettings(): React.ReactElement {
                     variant="outline"
                     size="sm"
                     onClick={() => copyToClipboard(inviteMutation.data.accept_url)}
-                    className="gap-1"
+                    className="border-outline-variant gap-1"
                   >
-                    <Copy className="h-3 w-3" />
+                    <Copy className="h-3 w-3" aria-hidden="true" />
                     Copier
                   </Button>
                 </div>
                 {inviteMutation.data.email_error && (
-                  <p className="mt-2 text-[11px] text-amber-800">
-                    Détail : {inviteMutation.data.email_error}
-                  </p>
+                  <p className="mt-2 text-[11px]">Détail : {inviteMutation.data.email_error}</p>
                 )}
               </div>
             )}
@@ -382,10 +416,12 @@ export default function TeamSettings(): React.ReactElement {
 
       {/* Section C — Invitations en cours */}
       {canManage && (
-        <Card>
+        <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Invitations</CardTitle>
-            <p className="mt-1 text-xs text-slate-500">
+            <CardTitle className="text-on-surface text-base font-semibold">
+              Invitations en cours
+            </CardTitle>
+            <p className="text-on-surface-variant mt-1 text-xs">
               Suivi des invitations envoyées (en attente, acceptées, expirées).
             </p>
           </CardHeader>
@@ -397,89 +433,93 @@ export default function TeamSettings(): React.ReactElement {
                 ))}
               </div>
             ) : !invitations || invitations.length === 0 ? (
-              <p className="p-6 text-center text-sm text-slate-500">Aucune invitation en cours.</p>
+              <p className="text-on-surface-variant p-6 text-center text-sm">
+                Aucune invitation en cours.
+              </p>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
-                  <tr>
-                    <th className="px-4 py-2.5">Email</th>
-                    <th className="w-32 px-4 py-2.5">Rôle</th>
-                    <th className="w-32 px-4 py-2.5">Statut</th>
-                    <th className="w-40 px-4 py-2.5">Envoyée</th>
-                    <th className="w-32 px-4 py-2.5">Expire</th>
-                    <th className="w-24 px-4 py-2.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {invitations.map((inv) => (
-                    <tr key={inv.id} className="align-middle hover:bg-slate-50/50">
-                      <td className="px-4 py-3 text-slate-700">{inv.email}</td>
-                      <td className="px-4 py-3">
-                        <Badge className={cn('font-normal', ROLE_BADGE[inv.role])}>
-                          {ROLE_LABEL[inv.role]}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge className={cn('font-normal', STATUS_BADGE[inv.status])}>
-                          {STATUS_LABEL[inv.status]}
-                        </Badge>
-                      </td>
-                      <td
-                        className="px-4 py-3 text-xs text-slate-500"
-                        title={format(new Date(inv.created_at), 'yyyy-MM-dd HH:mm')}
-                      >
-                        {formatDistanceToNow(new Date(inv.created_at), {
-                          addSuffix: true,
-                          locale: fr,
-                        })}
-                      </td>
-                      <td
-                        className="px-4 py-3 text-xs text-slate-500"
-                        title={format(new Date(inv.expires_at), 'yyyy-MM-dd HH:mm')}
-                      >
-                        {inv.status === 'accepted'
-                          ? '—'
-                          : inv.status === 'expired'
-                            ? 'Expirée'
-                            : inv.expires_in_days !== null
-                              ? `Dans ${inv.expires_in_days} j`
-                              : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {inv.status === 'pending' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                copyToClipboard(
-                                  `${window.location.origin}/accept-invitation/${inv.token}`,
-                                )
-                              }
-                              aria-label="Copier le lien"
-                              className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {inv.status !== 'accepted' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => revokeMutation.mutate({ id: inv.id })}
-                              disabled={revokeMutation.isPending}
-                              aria-label="Révoquer l'invitation"
-                              className="h-8 w-8 p-0 text-slate-500 hover:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-container-low text-on-surface-variant text-left text-xs font-semibold tracking-[0.05em] uppercase">
+                    <tr>
+                      <th className="px-4 py-2.5">Email</th>
+                      <th className="w-32 px-4 py-2.5">Rôle</th>
+                      <th className="w-32 px-4 py-2.5">Statut</th>
+                      <th className="w-40 px-4 py-2.5">Envoyée</th>
+                      <th className="w-32 px-4 py-2.5">Expire</th>
+                      <th className="w-24 px-4 py-2.5 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-outline-variant divide-y">
+                    {invitations.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-surface-container-low align-middle">
+                        <td className="text-on-surface px-4 py-3">{inv.email}</td>
+                        <td className="px-4 py-3">
+                          <Badge className={cn('font-normal', ROLE_BADGE[inv.role])}>
+                            {ROLE_LABEL[inv.role]}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge className={cn('font-normal', STATUS_BADGE[inv.status])}>
+                            {STATUS_LABEL[inv.status]}
+                          </Badge>
+                        </td>
+                        <td
+                          className="text-on-surface-variant px-4 py-3 text-xs"
+                          title={format(new Date(inv.created_at), 'yyyy-MM-dd HH:mm')}
+                        >
+                          {formatDistanceToNow(new Date(inv.created_at), {
+                            addSuffix: true,
+                            locale: fr,
+                          })}
+                        </td>
+                        <td
+                          className="text-on-surface-variant px-4 py-3 text-xs"
+                          title={format(new Date(inv.expires_at), 'yyyy-MM-dd HH:mm')}
+                        >
+                          {inv.status === 'accepted'
+                            ? '—'
+                            : inv.status === 'expired'
+                              ? 'Expirée'
+                              : inv.expires_in_days !== null
+                                ? `Dans ${inv.expires_in_days} j`
+                                : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {inv.status === 'pending' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  copyToClipboard(
+                                    `${window.location.origin}/accept-invitation/${inv.token}`,
+                                  )
+                                }
+                                aria-label="Copier le lien"
+                                className="text-on-surface-variant hover:text-on-surface h-8 w-8 p-0"
+                              >
+                                <Copy className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                            )}
+                            {inv.status !== 'accepted' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => revokeMutation.mutate({ id: inv.id })}
+                                disabled={revokeMutation.isPending}
+                                aria-label="Révoquer l'invitation"
+                                className="text-on-surface-variant hover:text-error h-8 w-8 p-0"
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -496,7 +536,7 @@ export default function TeamSettings(): React.ReactElement {
             <AlertDialogDescription>
               {pendingRemoval ? (
                 <>
-                  <span className="font-medium">
+                  <span className="text-on-surface font-medium">
                     {pendingRemoval.email ?? pendingRemoval.user_id}
                   </span>{' '}
                   perdra immédiatement l’accès à l’organisation. Cette action est journalisée dans
@@ -517,7 +557,7 @@ export default function TeamSettings(): React.ReactElement {
                 }
               }}
               disabled={removeMutation.isPending}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-error text-on-error hover:bg-error/90"
             >
               {removeMutation.isPending ? 'Suppression…' : 'Retirer'}
             </AlertDialogAction>

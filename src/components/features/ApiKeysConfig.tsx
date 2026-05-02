@@ -47,7 +47,7 @@ function getBadgeState(key: UserApiKey | undefined, isChecking: boolean): BadgeS
 function StateBadge({ state }: { state: BadgeState }) {
   if (state === 'checking') {
     return (
-      <Badge className="border-slate-200 bg-slate-100 text-slate-600">
+      <Badge className="bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high border-transparent">
         <Loader2 className="mr-1 h-3 w-3 animate-spin" />
         Vérification…
       </Badge>
@@ -55,7 +55,7 @@ function StateBadge({ state }: { state: BadgeState }) {
   }
   if (state === 'verified') {
     return (
-      <Badge className="border-emerald-200 bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+      <Badge className="bg-primary-fixed text-on-primary-fixed hover:bg-primary-fixed border-transparent">
         <CheckCircle2 className="mr-1 h-3 w-3" />
         Vérifiée
       </Badge>
@@ -63,14 +63,14 @@ function StateBadge({ state }: { state: BadgeState }) {
   }
   if (state === 'invalid') {
     return (
-      <Badge className="border-red-200 bg-red-100 text-red-700 hover:bg-red-100">
+      <Badge className="bg-error-container text-on-error-container hover:bg-error-container border-transparent">
         <AlertCircle className="mr-1 h-3 w-3" />
         Invalide
       </Badge>
     )
   }
   return (
-    <Badge className="border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-100">
+    <Badge className="bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high border-transparent">
       Manquante
     </Badge>
   )
@@ -185,22 +185,27 @@ function ProviderCard({ providerId, label, hint, existingKey, showBaseUrl }: Pro
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="bg-surface-container-low border-outline-variant rounded-lg border p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-900">{label}</span>
+          <span className="text-on-surface text-sm font-semibold">{label}</span>
           <StateBadge state={badgeState} />
         </div>
         {existingKey?.masked_key && (
-          <span className="font-mono text-[11px] text-slate-500">{existingKey.masked_key}</span>
+          <span className="text-on-surface-variant font-mono text-[11px]">
+            {existingKey.masked_key}
+          </span>
         )}
       </div>
 
-      {hint && <p className="mb-3 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="text-on-surface-variant mb-3 text-xs">{hint}</p>}
 
       <div className="space-y-3">
         <div className="space-y-1.5">
-          <Label htmlFor={`api-key-${providerId}`} className="text-xs">
+          <Label
+            htmlFor={`api-key-${providerId}`}
+            className="text-on-surface-variant text-[11px] font-semibold tracking-[0.05em] uppercase"
+          >
             {existingKey ? 'Remplacer la clé' : 'Clé API'}
           </Label>
           <Input
@@ -221,7 +226,10 @@ function ProviderCard({ providerId, label, hint, existingKey, showBaseUrl }: Pro
 
         {showBaseUrl && (
           <div className="space-y-1.5">
-            <Label htmlFor={`api-baseurl-${providerId}`} className="text-xs">
+            <Label
+              htmlFor={`api-baseurl-${providerId}`}
+              className="text-on-surface-variant text-[11px] font-semibold tracking-[0.05em] uppercase"
+            >
               Base URL
             </Label>
             <Input
@@ -231,7 +239,7 @@ function ProviderCard({ providerId, label, hint, existingKey, showBaseUrl }: Pro
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder={OLLAMA_DEFAULT_BASE_URL}
             />
-            <p className="text-[11px] text-slate-500">
+            <p className="text-on-surface-variant text-[11px]">
               Endpoint Ollama. Par défaut <code>{OLLAMA_DEFAULT_BASE_URL}</code> (Docker host).
             </p>
           </div>
@@ -284,7 +292,7 @@ function ProviderCard({ providerId, label, hint, existingKey, showBaseUrl }: Pro
               variant="ghost"
               onClick={handleDelete}
               disabled={remove.isPending}
-              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              className="text-error hover:bg-error-container/40 hover:text-error"
             >
               <Trash2 className="mr-1 h-3 w-3" />
               Supprimer
@@ -292,7 +300,7 @@ function ProviderCard({ providerId, label, hint, existingKey, showBaseUrl }: Pro
           )}
 
           {existingKey?.last_validated_at && (
-            <span className="ml-auto text-[11px] text-slate-500">
+            <span className="text-on-surface-variant ml-auto text-[11px]">
               Testée le{' '}
               {new Date(existingKey.last_validated_at).toLocaleDateString('fr-FR', {
                 day: '2-digit',
@@ -354,14 +362,14 @@ export function ApiKeysConfig() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-slate-200 bg-slate-50 shadow-none">
+      <Card className="border-outline-variant bg-surface-container-low shadow-none">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base text-slate-900">
-            <ShieldAlert className="h-4 w-4 text-slate-600" />
+          <CardTitle className="text-on-surface flex items-center gap-2 text-base">
+            <ShieldAlert className="text-on-surface-variant h-4 w-4" />
             Vos clés sont partagées au sein de l'organisation
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0 text-xs leading-relaxed text-slate-600">
+        <CardContent className="text-on-surface-variant pt-0 text-xs leading-relaxed">
           Toutes les clés API sont visibles et utilisables par les membres de votre organisation
           courante. Elles sont stockées dans <code>user_api_keys</code> (RLS-protégées) et lues
           uniquement par les Edge Functions Supabase — aucun proxy intermédiaire. Si une clé devient
@@ -370,13 +378,13 @@ export function ApiKeysConfig() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-surface-container-lowest border-outline-variant">
         <CardHeader>
-          <CardTitle className="text-base">Providers LLM (BYOK)</CardTitle>
+          <CardTitle className="text-on-surface text-base">Providers LLM (BYOK)</CardTitle>
         </CardHeader>
         <CardContent className={cn('space-y-3')}>
           {llmProviders.length === 0 && (
-            <p className="text-xs text-slate-500">Chargement de la liste des providers…</p>
+            <p className="text-on-surface-variant text-xs">Chargement de la liste des providers…</p>
           )}
           {llmProviders.map((p: LLMProviderUI) => (
             <ProviderCard
@@ -391,9 +399,9 @@ export function ApiKeysConfig() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-300">
+      <Card className="bg-surface-container-lowest border-outline-variant">
         <CardHeader>
-          <CardTitle className="text-base">Apify (scraping X / Reddit)</CardTitle>
+          <CardTitle className="text-on-surface text-base">Apify (scraping X / Reddit)</CardTitle>
         </CardHeader>
         <CardContent>
           <ProviderCard

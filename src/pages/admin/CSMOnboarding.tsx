@@ -11,6 +11,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { toast } from 'sonner'
+
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -37,28 +38,9 @@ import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 
 // =============================================================================
-// Wave 6 — Sub-wave 6.5 — Story S6-CSMOnboarding
-//
-// Sub-page /admin/csm — réservée aux super-admins Kairos (app_admins).
-// Permet à toi (founder) ou un futur CSM hire de suivre l'avancement de
-// l'onboarding pour chaque tenant Enterprise actif.
-//
-// Source de vérité du workflow : docs/enterprise/csm-playbook.md
-//
-// Sécurité : double gate (frontend + RLS).
-//   1. Hook `useIsAppAdmin()` → cache l'UI aux non-admins.
-//   2. Table `csm_onboardings` est protégée par RLS `is_app_admin()` —
-//      même si un non-admin bypasse le frontend, Postgres refusera SELECT.
-//
-// Note typage : la table `csm_onboardings` n'est pas encore dans
-// `src/types/database.ts` (régénération nécessaire après push). Cast
-// minimal `unknown` au point d'entrée `.from(...)` — pattern documenté
-// dans `useAuditLog.ts`.
+// Wave 7.5 — Refonte design Material You / Stitch Kairos.
+// Sécurité (RLS + double gate) inchangée. Re-skin uniquement.
 // =============================================================================
-
-// -----------------------------------------------------------------------------
-// Types
-// -----------------------------------------------------------------------------
 
 type OnboardingStep = 'kickoff_done_at' | 'training_done_at' | 'month_1_check_at' | 'qbr_done_at'
 
@@ -118,21 +100,14 @@ const STATUS_LABELS: Record<OnboardingStatus, string> = {
 }
 
 const STATUS_TONE: Record<OnboardingStatus, string> = {
-  kickoff_pending: 'bg-slate-100 text-slate-700',
-  kickoff_done: 'bg-amber-100 text-amber-800',
-  training_done: 'bg-blue-100 text-blue-800',
-  month_1: 'bg-indigo-100 text-indigo-800',
-  qbr_done: 'bg-emerald-100 text-emerald-800',
+  kickoff_pending: 'bg-surface-container-high text-on-surface-variant',
+  kickoff_done: 'bg-tertiary-fixed text-on-tertiary-fixed-variant',
+  training_done: 'bg-secondary-fixed text-on-secondary-fixed-variant',
+  month_1: 'bg-secondary-fixed-dim text-on-secondary-fixed',
+  qbr_done: 'bg-primary-fixed text-on-primary-fixed-variant',
 }
 
-// Tampon « churn risk » : un onboarding est considéré à risque si :
-//   - NPS < 0 explicitement saisi, OU
-//   - kickoff fait mais training jamais validé après 21 jours.
 const CHURN_TRAINING_GRACE_DAYS = 21
-
-// -----------------------------------------------------------------------------
-// Helpers (purs — testables si besoin)
-// -----------------------------------------------------------------------------
 
 function deriveStatus(row: CsmOnboardingRow): OnboardingStatus {
   if (row.qbr_done_at) return 'qbr_done'
@@ -155,10 +130,6 @@ function isChurnRisk(row: CsmOnboardingRow): boolean {
   }
   return false
 }
-
-// -----------------------------------------------------------------------------
-// Page
-// -----------------------------------------------------------------------------
 
 export default function CSMOnboarding(): React.ReactElement {
   const { data: isAdmin, isLoading: isAdminLoading } = useIsAppAdmin()
@@ -196,13 +167,13 @@ export default function CSMOnboarding(): React.ReactElement {
 
   if (onboardingsQuery.isError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-800">
-        <p className="font-medium">Échec du chargement des onboardings.</p>
-        <p className="mt-1 text-xs text-red-700">{onboardingsQuery.error.message}</p>
+      <div className="border-error/40 bg-error-container text-on-error-container rounded-xl border p-6 text-sm">
+        <p className="font-semibold">Échec du chargement des onboardings.</p>
+        <p className="mt-1 text-xs">{onboardingsQuery.error.message}</p>
         <Button
           size="sm"
           variant="outline"
-          className="mt-3"
+          className="border-outline-variant text-on-surface mt-3"
           onClick={() => onboardingsQuery.refetch()}
         >
           Réessayer
@@ -262,16 +233,22 @@ function CSMOnboardingBody({
   }, [rows, enterpriseOrgs])
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <header className="flex items-start justify-between">
+    <div className="mx-auto w-full max-w-[80rem] space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Onboarding CSM Enterprise</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-on-surface text-2xl font-semibold tracking-[-0.01em]">
+            Onboarding CSM Enterprise
+          </h1>
+          <p className="text-on-surface-variant mt-1 text-sm">
             Suivi des contrats Enterprise — réservé aux super-admins.
           </p>
         </div>
-        <Button onClick={() => setAddOpen(true)} disabled={eligibleOrgs.length === 0}>
-          <Plus className="mr-2 h-4 w-4" /> Ajouter un tenant
+        <Button
+          onClick={() => setAddOpen(true)}
+          disabled={eligibleOrgs.length === 0}
+          className="bg-primary text-on-primary hover:bg-primary-container h-10 gap-2 rounded-lg"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" /> Ajouter un onboarding
         </Button>
       </header>
 
@@ -285,41 +262,45 @@ function CSMOnboardingBody({
           }
           tone={
             metrics.avg_time_to_onboarded_days === null
-              ? 'slate'
+              ? 'neutral'
               : metrics.avg_time_to_onboarded_days <= 14
-                ? 'emerald'
-                : 'amber'
+                ? 'primary'
+                : 'tertiary'
           }
           hint="Cible : ≤ 14 j (kickoff → training)"
         />
         <MetricCard
           label="Tenants à risque churn"
           value={String(metrics.churn_risk_count)}
-          tone={metrics.churn_risk_count === 0 ? 'emerald' : 'red'}
+          tone={metrics.churn_risk_count === 0 ? 'primary' : 'error'}
           hint="NPS < 0 ou training en retard > 21 j"
         />
         <MetricCard
           label="NPS moyen"
           value={metrics.avg_nps !== null ? metrics.avg_nps.toFixed(1) : '—'}
-          tone={metrics.avg_nps === null ? 'slate' : metrics.avg_nps >= 30 ? 'emerald' : 'amber'}
+          tone={
+            metrics.avg_nps === null ? 'neutral' : metrics.avg_nps >= 30 ? 'primary' : 'tertiary'
+          }
           hint="Cible : ≥ +30"
         />
       </section>
 
-      <Card>
+      <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
         <CardHeader>
-          <CardTitle className="text-base">Tenants en onboarding ({rows.length})</CardTitle>
+          <CardTitle className="text-on-surface text-base font-semibold">
+            Tenants en onboarding ({rows.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-500">
-              Aucun tenant Enterprise en cours d'onboarding. Cliquer sur « Ajouter un tenant » pour
-              démarrer.
+            <p className="text-on-surface-variant py-8 text-center text-sm">
+              Aucun tenant Enterprise en cours d’onboarding. Cliquez sur «&nbsp;Ajouter un
+              onboarding&nbsp;» pour démarrer.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <div className="border-outline-variant overflow-x-auto rounded-lg border">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
+                <thead className="bg-surface-container-low text-on-surface-variant text-left text-xs font-semibold tracking-[0.05em] uppercase">
                   <tr>
                     <th className="px-3 py-2.5">Organisation</th>
                     <th className="px-3 py-2.5">Statut</th>
@@ -332,7 +313,7 @@ function CSMOnboardingBody({
                     <th className="px-3 py-2.5 text-right">Durée (j)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-outline-variant divide-y">
                   {rows.map((row) => (
                     <OnboardingRow key={row.org_id} row={row} />
                   ))}
@@ -348,31 +329,32 @@ function CSMOnboardingBody({
   )
 }
 
-// -----------------------------------------------------------------------------
-// Sub-components
-// -----------------------------------------------------------------------------
-
 function OnboardingRow({ row }: { row: OnboardingView }): React.ReactElement {
   const churnRisk = isChurnRisk(row)
   return (
-    <tr className={cn('transition-colors hover:bg-slate-50', churnRisk && 'bg-red-50/40')}>
-      <td className="px-3 py-2 font-medium text-slate-900">
+    <tr
+      className={cn(
+        'hover:bg-surface-container-low transition-colors',
+        churnRisk && 'bg-error-container/30',
+      )}
+    >
+      <td className="text-on-surface px-3 py-2 font-medium">
         <div className="flex flex-col">
           <span>{row.org_name}</span>
-          <code className="text-xs text-slate-500">{row.org_slug}</code>
+          <code className="text-on-surface-variant text-xs">{row.org_slug}</code>
         </div>
       </td>
       <td className="px-3 py-2">
         <span
           className={cn(
-            'inline-block rounded px-2 py-0.5 text-xs font-medium',
+            'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
             STATUS_TONE[row.status],
           )}
         >
           {STATUS_LABELS[row.status]}
         </span>
         {churnRisk && (
-          <span className="ml-2 inline-block rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+          <span className="bg-error-container text-on-error-container ml-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium">
             Churn risk
           </span>
         )}
@@ -385,7 +367,7 @@ function OnboardingRow({ row }: { row: OnboardingView }): React.ReactElement {
       <td className="px-3 py-2 text-right">
         <NpsEditor row={row} />
       </td>
-      <td className="px-3 py-2 text-right font-mono text-xs text-slate-600">
+      <td className="text-on-surface-variant px-3 py-2 text-right font-mono text-xs">
         {row.time_to_onboarded_days !== null ? row.time_to_onboarded_days : '—'}
       </td>
     </tr>
@@ -425,8 +407,10 @@ function StepToggle({
     <button
       type="button"
       className={cn(
-        'inline-flex items-center justify-center rounded p-1 transition-colors',
-        done ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-300 hover:bg-slate-100',
+        'inline-flex items-center justify-center rounded-full p-1 transition-colors',
+        done
+          ? 'text-primary hover:bg-primary-fixed/40'
+          : 'text-outline-variant hover:bg-surface-container',
         mutation.isPending && 'opacity-50',
       )}
       disabled={mutation.isPending}
@@ -434,7 +418,11 @@ function StepToggle({
       aria-label={`${STEP_LABELS[step]} ${done ? 'fait' : 'à faire'}`}
       title={value ? new Date(value).toLocaleDateString('fr-FR') : 'Non franchi'}
     >
-      {done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+      {done ? (
+        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+      ) : (
+        <Circle className="h-5 w-5" aria-hidden="true" />
+      )}
     </button>
   )
 }
@@ -468,7 +456,7 @@ function NpsEditor({ row }: { row: OnboardingView }): React.ReactElement {
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="font-mono text-xs text-slate-700 hover:underline"
+        className="text-on-surface hover:text-primary font-mono text-xs hover:underline"
       >
         {row.nps_score !== null ? row.nps_score : '—'}
       </button>
@@ -484,12 +472,12 @@ function NpsEditor({ row }: { row: OnboardingView }): React.ReactElement {
         max={100}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="h-7 w-16 text-right font-mono text-xs"
+        className="border-outline-variant h-7 w-16 text-right font-mono text-xs"
       />
       <Button
         size="sm"
         variant="outline"
-        className="h-7 px-2 text-xs"
+        className="border-outline-variant h-7 px-2 text-xs"
         onClick={() => {
           const trimmed = draft.trim()
           if (trimmed === '') {
@@ -554,9 +542,9 @@ function AddTenantDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Ajouter un tenant à l'onboarding</DialogTitle>
+          <DialogTitle>Ajouter un onboarding</DialogTitle>
           <DialogDescription>
-            Sélectionner une organization Enterprise et assigner un CSM responsable.
+            Sélectionnez une organization Enterprise et assignez un CSM responsable.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -588,16 +576,18 @@ function AddTenantDialog({
               placeholder="uuid auth.users — laisser vide si non assigné"
               value={csmId}
               onChange={(e) => setCsmId(e.target.value)}
+              className="border-outline-variant bg-surface-container-lowest"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Notes initiales (optionnel)</Label>
             <Textarea
               id="notes"
-              placeholder="Contexte deal, contact principal, particularités..."
+              placeholder="Contexte deal, contact principal, particularités…"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
+              className="border-outline-variant bg-surface-container-lowest"
             />
           </div>
         </div>
@@ -605,8 +595,12 @@ function AddTenantDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annuler
           </Button>
-          <Button onClick={() => mutation.mutate()} disabled={!orgId || mutation.isPending}>
-            <UserPlus className="mr-2 h-4 w-4" /> Ajouter
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={!orgId || mutation.isPending}
+            className="bg-primary text-on-primary hover:bg-primary-container"
+          >
+            <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" /> Ajouter
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -618,26 +612,35 @@ interface MetricCardProps {
   label: string
   value: string
   hint?: string
-  tone: 'emerald' | 'amber' | 'red' | 'slate'
+  tone: 'primary' | 'tertiary' | 'error' | 'neutral'
 }
 
 function MetricCard({ label, value, hint, tone }: MetricCardProps): React.ReactElement {
   const toneClasses: Record<MetricCardProps['tone'], string> = {
-    emerald: 'text-emerald-600',
-    amber: 'text-amber-600',
-    red: 'text-red-600',
-    slate: 'text-slate-700',
+    primary: 'text-primary',
+    tertiary: 'text-tertiary',
+    error: 'text-error',
+    neutral: 'text-on-surface',
   }
-  const Icon = tone === 'red' || tone === 'amber' ? TrendingDown : TrendingUp
+  const Icon = tone === 'error' || tone === 'tertiary' ? TrendingDown : TrendingUp
   return (
-    <Card>
+    <Card className="bg-surface-container-lowest border-outline-variant rounded-xl border shadow-md">
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</p>
-          <Icon className={cn('h-4 w-4', toneClasses[tone])} />
+          <p className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase">
+            {label}
+          </p>
+          <Icon className={cn('h-4 w-4', toneClasses[tone])} aria-hidden="true" />
         </div>
-        <p className={cn('mt-2 text-2xl font-semibold', toneClasses[tone])}>{value}</p>
-        {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+        <p
+          className={cn(
+            'mt-2 text-2xl font-semibold tracking-[-0.01em] tabular-nums',
+            toneClasses[tone],
+          )}
+        >
+          {value}
+        </p>
+        {hint && <p className="text-on-surface-variant mt-1 text-xs">{hint}</p>}
       </CardContent>
     </Card>
   )
@@ -646,23 +649,23 @@ function MetricCard({ label, value, hint, tone }: MetricCardProps): React.ReactE
 function AccessDeniedView(): React.ReactElement {
   return (
     <div className="mx-auto max-w-md py-16 text-center">
-      <ShieldAlert className="mx-auto h-12 w-12 text-slate-400" />
-      <h1 className="mt-4 text-xl font-semibold text-slate-900">Accès refusé</h1>
-      <p className="mt-2 text-sm text-slate-600">
+      <div className="bg-error-container text-on-error-container mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full">
+        <ShieldAlert className="h-7 w-7" aria-hidden="true" />
+      </div>
+      <h1 className="text-on-surface mt-4 text-xl font-semibold tracking-[-0.01em]">
+        Accès refusé
+      </h1>
+      <p className="text-on-surface-variant mt-2 text-sm">
         Cette page est réservée aux administrateurs de la plateforme Kairos.
       </p>
       <Link to="/dashboard">
-        <Button className="mt-6" variant="default">
+        <Button className="bg-primary text-on-primary hover:bg-primary-container mt-6 h-11 rounded-lg">
           Retour au dashboard
         </Button>
       </Link>
     </div>
   )
 }
-
-// -----------------------------------------------------------------------------
-// Hooks de données
-// -----------------------------------------------------------------------------
 
 function useOnboardingsQuery(enabled: boolean) {
   return useQuery<OnboardingView[], Error>({
@@ -671,8 +674,6 @@ function useOnboardingsQuery(enabled: boolean) {
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const client = supabase as unknown as { from: (t: string) => any }
-      // Jointure manuelle : on récupère d'abord les onboardings, puis les
-      // organizations correspondantes (la table organizations EST typée).
       const { data: onboardings, error } = await client
         .from('csm_onboardings')
         .select('*')
@@ -720,10 +721,6 @@ function useEnterpriseOrgsQuery(enabled: boolean) {
     },
   })
 }
-
-// -----------------------------------------------------------------------------
-// Métriques agrégées
-// -----------------------------------------------------------------------------
 
 interface GlobalMetrics {
   avg_time_to_onboarded_days: number | null

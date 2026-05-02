@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -37,24 +36,33 @@ export function TagInput({ value, onChange, placeholder }: Props) {
           }}
           placeholder={placeholder}
         />
-        <Button type="button" variant="outline" onClick={add}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={add}
+          className="border-outline-variant gap-1"
+        >
+          <Plus className="h-3.5 w-3.5" />
           Ajouter
         </Button>
       </div>
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {value.map((tag) => (
-            <Badge key={tag} variant="secondary" className="gap-1">
+            <span
+              key={tag}
+              className="bg-surface-container text-on-surface-variant inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+            >
               {tag}
               <button
                 type="button"
                 onClick={() => remove(tag)}
-                className="text-slate-500 hover:text-slate-900"
+                className="text-on-surface-variant hover:text-error focus-visible:ring-primary/40 -mr-0.5 rounded-full p-0.5 focus-visible:ring-2 focus-visible:outline-none"
                 aria-label={`Retirer ${tag}`}
               >
                 <X className="h-3 w-3" />
               </button>
-            </Badge>
+            </span>
           ))}
         </div>
       )}
