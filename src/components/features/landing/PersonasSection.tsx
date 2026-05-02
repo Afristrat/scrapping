@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { ArrowRight } from 'lucide-react'
+import { FALLBACK_RATES, useExchangeRates } from '@/hooks/useExchangeRates'
+import { type ExchangeRates, priceInCurrency } from '@/lib/pricing'
+import { CURRENCIES, type CurrencyCode, useCurrencyStore } from '@/stores/currency'
 
 interface Persona {
   icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
@@ -10,9 +13,11 @@ interface Persona {
   headline: string
   subline: string
   maisonLabel: string
-  maisonPrice: string
+  /** Prix Maison en EUR (converti à l'affichage). */
+  maisonPriceEur: number
   byokLabel: string
-  byokPrice: string
+  /** Prix BYOK en EUR (converti à l'affichage). */
+  byokPriceEur: number
   /** Solo card est légèrement déclassée visuellement. */
   muted?: boolean
   /** Note additionnelle (essai 14 j sur Solo par exemple). */
@@ -27,9 +32,9 @@ const PERSONAS: Persona[] = [
     subline:
       'Sources tier 1 IA, alertes lifecycle, suivi de cohortes de chercheurs, mémoire des acteurs émergents.',
     maisonLabel: 'Maison (Sonnet inclus)',
-    maisonPrice: '599 €',
+    maisonPriceEur: 599,
     byokLabel: 'BYOK (votre Opus)',
-    byokPrice: '999 €',
+    byokPriceEur: 999,
   },
   {
     icon: Scale,
@@ -38,9 +43,9 @@ const PERSONAS: Persona[] = [
     subline:
       'Sources EU AI Office, AAAI, FAccT. Cross-source corroboration. Audit log et export PDF.',
     maisonLabel: 'Maison',
-    maisonPrice: '399 €',
+    maisonPriceEur: 399,
     byokLabel: 'BYOK',
-    byokPrice: '699 €',
+    byokPriceEur: 699,
   },
   {
     icon: Newspaper,
@@ -49,9 +54,9 @@ const PERSONAS: Persona[] = [
     subline:
       'Backtest illimité de vos grilles éditoriales, webhooks Slack/Teams, API read+write, branding white-label.',
     maisonLabel: 'Maison (3 sièges)',
-    maisonPrice: '499 €',
+    maisonPriceEur: 499,
     byokLabel: 'BYOK (3 sièges)',
-    byokPrice: '799 €',
+    byokPriceEur: 799,
   },
   {
     icon: Megaphone,
@@ -60,9 +65,9 @@ const PERSONAS: Persona[] = [
     subline:
       'Author reputation, sentiment, alerting Slack temps réel. Tenant isolé et rubriques confidentielles.',
     maisonLabel: 'Maison',
-    maisonPrice: '499 €',
+    maisonPriceEur: 499,
     byokLabel: 'BYOK',
-    byokPrice: '799 €',
+    byokPriceEur: 799,
   },
   {
     icon: Code2,
@@ -71,9 +76,9 @@ const PERSONAS: Persona[] = [
     subline:
       'Rubriques RAG / agents / local LLM curatées, intégration Ollama / vLLM auto-hosted en BYOK.',
     maisonLabel: 'Maison (5 sièges)',
-    maisonPrice: '149 €',
+    maisonPriceEur: 149,
     byokLabel: 'BYOK (5 sièges)',
-    byokPrice: '249 €',
+    byokPriceEur: 249,
   },
   {
     icon: Rocket,
@@ -82,27 +87,40 @@ const PERSONAS: Persona[] = [
     subline:
       "Une rubrique, 100 signaux/jour, mémoire 30 j. Funnel d'entrée pour découvrir l'outil.",
     maisonLabel: 'Maison Haiku',
-    maisonPrice: '49 €',
+    maisonPriceEur: 49,
     byokLabel: 'BYOK',
-    byokPrice: '99 €',
+    byokPriceEur: 99,
     muted: true,
     note: 'Essai 14 j sans carte requise.',
   },
 ]
 
-function PersonaCard({ persona }: { persona: Persona }): React.ReactElement {
+function getLocaleForCurrency(code: CurrencyCode): string {
+  return CURRENCIES.find((c) => c.code === code)?.locale ?? 'fr-FR'
+}
+
+interface PersonaCardProps {
+  persona: Persona
+  currency: CurrencyCode
+  rates: ExchangeRates
+}
+
+function PersonaCard({ persona, currency, rates }: PersonaCardProps): React.ReactElement {
   const {
     icon: Icon,
     segment,
     headline,
     subline,
     maisonLabel,
-    maisonPrice,
+    maisonPriceEur,
     byokLabel,
-    byokPrice,
+    byokPriceEur,
     muted,
     note,
   } = persona
+  const locale = getLocaleForCurrency(currency)
+  const maisonPrice = priceInCurrency(maisonPriceEur, currency, rates, locale)
+  const byokPrice = priceInCurrency(byokPriceEur, currency, rates, locale)
   const iconWrapClasses = muted
     ? 'bg-surface-container-highest text-on-surface-variant'
     : 'bg-primary-fixed text-on-primary-fixed'
@@ -148,6 +166,10 @@ function PersonaCard({ persona }: { persona: Persona }): React.ReactElement {
 }
 
 export function PersonasSection(): React.ReactElement {
+  const currency = useCurrencyStore((s) => s.currency)
+  const { data: rates } = useExchangeRates()
+  const safeRates = rates ?? FALLBACK_RATES
+
   return (
     <section
       id="personas"
@@ -169,7 +191,7 @@ export function PersonasSection(): React.ReactElement {
 
         <div className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {PERSONAS.map((p) => (
-            <PersonaCard key={p.segment} persona={p} />
+            <PersonaCard key={p.segment} persona={p} currency={currency} rates={safeRates} />
           ))}
         </div>
 

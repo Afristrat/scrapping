@@ -14,8 +14,7 @@ import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-
-const CONTACT_EMAIL = 'contact@kairos.ai-mpower.com'
+import { useContactEmail } from '@/hooks/useAppSettings'
 
 interface Stat {
   label: string
@@ -163,6 +162,7 @@ function CaseStudyCard({ caseStudy }: CaseStudyCardProps): React.ReactElement {
 }
 
 export default function CaseStudies(): React.ReactElement {
+  const contactEmail = useContactEmail()
   return (
     <div className="bg-white">
       <section className="border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white">
@@ -203,9 +203,9 @@ export default function CaseStudies(): React.ReactElement {
           </p>
           <div className="mt-2 flex flex-wrap justify-center gap-3">
             <Button asChild className="gap-2">
-              <a href={`mailto:${CONTACT_EMAIL}?subject=Kairos%20-%20Design%20partner`}>
+              <a href={`mailto:${contactEmail}?subject=Kairos%20-%20Design%20partner`}>
                 <Mail className="h-4 w-4" aria-hidden />
-                {CONTACT_EMAIL}
+                {contactEmail}
               </a>
             </Button>
             <Button asChild variant="outline" className="gap-2">

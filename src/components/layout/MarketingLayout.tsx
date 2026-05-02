@@ -1,31 +1,16 @@
 import { Link, Outlet } from 'react-router-dom'
 
 import { KairosLogo } from '@/components/icons/KairosLogo'
+import { CurrencyPicker } from '@/components/layout/CurrencyPicker'
 import { Button } from '@/components/ui/button'
 import { useAppName } from '@/hooks/useAppName'
+import { useContactEmail } from '@/hooks/useAppSettings'
 import { useAuthStore } from '@/stores/auth'
-
-const GITHUB_URL = 'https://github.com/Afristrat/scrapping'
-const CONTACT_EMAIL = 'hello@kairos.ai-mpower.com'
-
-function GithubIcon({ className }: { className?: string }): React.ReactElement {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-      width={16}
-      height={16}
-    >
-      <path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.97 3.22 9.18 7.69 10.67.56.1.77-.24.77-.54v-1.9c-3.13.68-3.79-1.51-3.79-1.51-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 .03 1.96-.81 2.32-1.52-.81-.21-1.65-.86-1.65-2.21 0-.49.18-.89.48-1.21-.05-.21-.21-1.04.05-2.18 0 0 .39-.13 1.27.46.37-.1.76-.16 1.16-.16.4 0 .79.06 1.16.16.88-.59 1.27-.46 1.27-.46.26 1.14.1 1.97.05 2.18.3.32.48.72.48 1.21 0 1.35-.84 2-1.65 2.21.5.43.97 1.27.97 2.43v3.6c0 .3.21.65.78.54 4.46-1.49 7.68-5.7 7.68-10.67C23.25 5.48 18.27.5 12 .5z" />
-    </svg>
-  )
-}
 
 export function MarketingLayout(): React.ReactElement {
   const session = useAuthStore((s) => s.session)
   const appName = useAppName()
+  const contactEmail = useContactEmail()
 
   return (
     <div className="bg-surface text-on-surface flex min-h-screen flex-col">
@@ -58,18 +43,10 @@ export function MarketingLayout(): React.ReactElement {
             <a href="/#faq" className="hover:text-primary text-sm font-medium transition-colors">
               FAQ
             </a>
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-primary inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
-            >
-              <GithubIcon className="h-4 w-4" />
-              GitHub
-            </a>
           </nav>
 
           <div className="flex items-center gap-3">
+            <CurrencyPicker />
             {session ? (
               <Button
                 asChild
@@ -154,17 +131,6 @@ export function MarketingLayout(): React.ReactElement {
               </p>
               <ul className="mt-4 flex flex-col gap-2 text-sm text-white/70">
                 <li>
-                  <a
-                    href={GITHUB_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-inverse-primary inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    <GithubIcon className="h-4 w-4" />
-                    GitHub
-                  </a>
-                </li>
-                <li>
                   <a href="#" className="hover:text-inverse-primary transition-colors">
                     Documentation
                   </a>
@@ -181,7 +147,7 @@ export function MarketingLayout(): React.ReactElement {
                 </li>
                 <li>
                   <a
-                    href={`mailto:${CONTACT_EMAIL}`}
+                    href={`mailto:${contactEmail}`}
                     className="hover:text-inverse-primary transition-colors"
                   >
                     Nous contacter
