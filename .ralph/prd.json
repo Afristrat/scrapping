@@ -1148,16 +1148,17 @@
       "id": "S-10A.6",
       "wave": "10.A",
       "title": "Edge fn enrich-signal sync (topic + persona)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 6,
       "effort": "L",
       "dependencies": ["S-10A.1", "S-10A.3", "S-10A.4"],
       "filesCreate": [
         "supabase/functions/enrich-signal/index.ts",
-        "supabase/functions/enrich-signal/index.test.ts"
+        "supabase/functions/enrich-signal/enrich.ts",
+        "supabase/functions/enrich-signal/enrich.test.ts"
       ],
-      "filesModify": [],
+      "filesModify": ["src/hooks/usePersonas.ts"],
       "acceptanceCriteria": [
         "POST signal_ids",
         "2 calls parallels Haiku (topic + persona)",
@@ -1166,7 +1167,22 @@
         "Logs llm_costs task=enrich:topic",
         "Triggered par llm-score-batch",
         "Tests Deno 5 cas"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "commit": "7ac9e96",
+        "files_created": [
+          "supabase/functions/enrich-signal/index.ts",
+          "supabase/functions/enrich-signal/enrich.ts",
+          "supabase/functions/enrich-signal/enrich.test.ts"
+        ],
+        "files_modified": ["src/hooks/usePersonas.ts"],
+        "deno_tests": "6/6 pass",
+        "typecheck": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "195/195 pass",
+        "deploy": "ok (Supabase project crplceoptyeslqyfcqvj)"
+      }
     },
     {
       "id": "S-10A.7",
