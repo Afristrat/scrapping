@@ -1,7 +1,7 @@
 {
   "project": "zlatan-scrap",
   "version": "0.3.0",
-  "objective": "Eliminate technical and supervision debt — refactor BYOK to single dispatch, drop legacy, fix lint, add CI, implement digest properly. Wave 4 : durcir le moteur admin (tests + vraie cascade {{run:<kind>}}).",
+  "objective": "Eliminate technical and supervision debt â€” refactor BYOK to single dispatch, drop legacy, fix lint, add CI, implement digest properly. Wave 4 : durcir le moteur admin (tests + vraie cascade {{run:<kind>}}).",
   "context": {
     "branch": "feat/topic-tracking-minio",
     "supabase_project_ref": "crplceoptyeslqyfcqvj",
@@ -25,7 +25,7 @@
     },
     {
       "id": "S-Lint",
-      "title": "Fix: 3 lint errors préexistants",
+      "title": "Fix: 3 lint errors prÃ©existants",
       "passes": true,
       "commit": "67842e9",
       "wave": 1
@@ -39,7 +39,7 @@
     },
     {
       "id": "S-Split",
-      "title": "Optim: Vite code-splitting (1.2MB → 5 chunks)",
+      "title": "Optim: Vite code-splitting (1.2MB â†’ 5 chunks)",
       "passes": true,
       "commit": "ecff577",
       "wave": 1
@@ -60,7 +60,7 @@
     },
     {
       "id": "S-DeadCode",
-      "title": "Cleanup: purge constantes mortes (no-op après S-A)",
+      "title": "Cleanup: purge constantes mortes (no-op aprÃ¨s S-A)",
       "passes": true,
       "commit": null,
       "wave": 2
@@ -74,7 +74,7 @@
     },
     {
       "id": "S-Digest",
-      "title": "Feature: digest edge fn + UI complète",
+      "title": "Feature: digest edge fn + UI complÃ¨te",
       "passes": true,
       "commit": "082cf38",
       "wave": 2
@@ -104,7 +104,7 @@
     },
     {
       "id": "S-AdminCompose",
-      "title": "Feature: cascade automatique {{run:<kind>}} (vraie synthèse multi-sources)",
+      "title": "Feature: cascade automatique {{run:<kind>}} (vraie synthÃ¨se multi-sources)",
       "passes": true,
       "commit": "56d45f8",
       "wave": 4,
@@ -119,7 +119,7 @@
         ],
         "validation": {
           "typecheck": "0 errors",
-          "lint": "0 new warnings (Settings.tsx:65 préexistant hors scope)",
+          "lint": "0 new warnings (Settings.tsx:65 prÃ©existant hors scope)",
           "vitest": "44/44 pass",
           "deno_test": "24/24 pass",
           "build": "ok (1.72s)"
@@ -143,16 +143,16 @@
       "design_notes": [
         "Opt-in via body { compose_chain: true, max_age_hours?: number }",
         "Default max_age_hours = 6 ; default max_depth = 3",
-        "Cycle detection : Set<task_kind> visited transmis en récursion",
-        "Cascade exécute le prompt parent du task_kind (pas n'importe lequel) et persiste le run en DB comme un appel normal",
-        "Si plusieurs prompts ont le même task_kind, prendre celui avec display_order le plus bas (premier seed)",
+        "Cycle detection : Set<task_kind> visited transmis en rÃ©cursion",
+        "Cascade exÃ©cute le prompt parent du task_kind (pas n'importe lequel) et persiste le run en DB comme un appel normal",
+        "Si plusieurs prompts ont le mÃªme task_kind, prendre celui avec display_order le plus bas (premier seed)",
         "Logger composed_chain: [{ kind, source: 'cached'|'cascade', run_id, age_hours }] dans logs.payload",
-        "Frontend: checkbox ‘Composer la chaîne’ dans Run dialog + warning coût N×"
+        "Frontend: checkbox â€˜Composer la chaÃ®neâ€™ dans Run dialog + warning coÃ»t NÃ—"
       ]
     },
     {
       "id": "S-MoatHunter",
-      "title": "Brief stratégique moat-hunter v2 (analogies inter-industries + analyse conjointe pricing)",
+      "title": "Brief stratÃ©gique moat-hunter v2 (analogies inter-industries + analyse conjointe pricing)",
       "passes": true,
       "commit": null,
       "wave": 5,
@@ -160,12 +160,12 @@
       "metadata": {
         "files_created": ["docs/strategy/2026-05-02-moats-and-value-capture.md"],
         "deliverables": [
-          "Job universel (niveau 3) défini",
-          "15 analogies inter-industries scorées (Top 5 features moat à 13-14/15)",
-          "6 segments business avec WTP (VC 599-999€, Avocats 399-699€, Newsletter 499-799€, Brand 499-799€, CTO 149-249€, Solo 49-99€)",
-          "Analyse conjointe v2 : 8 attributs × 4 niveaux × 6 segments = utility coefficients",
-          "12 SKUs (6 segments × 2 modes Maison/BYOK) avec marges brutes 64-99%",
-          "MRR cible an 1 = 132 k€/mois = 1,58 M€ ARR"
+          "Job universel (niveau 3) dÃ©fini",
+          "15 analogies inter-industries scorÃ©es (Top 5 features moat Ã  13-14/15)",
+          "6 segments business avec WTP (VC 599-999â‚¬, Avocats 399-699â‚¬, Newsletter 499-799â‚¬, Brand 499-799â‚¬, CTO 149-249â‚¬, Solo 49-99â‚¬)",
+          "Analyse conjointe v2 : 8 attributs Ã— 4 niveaux Ã— 6 segments = utility coefficients",
+          "12 SKUs (6 segments Ã— 2 modes Maison/BYOK) avec marges brutes 64-99%",
+          "MRR cible an 1 = 132 kâ‚¬/mois = 1,58 Mâ‚¬ ARR"
         ]
       }
     },
@@ -194,10 +194,10 @@
           "build": "ok"
         },
         "design_notes": [
-          "Sticky bar `sticky top-0 z-10` au-dessus de la table, apparaît si selection > 0",
-          "useState<Set<string>> + useMemo dérivé pour purger auto les ids absents",
-          "AlertDialog shadcn (vs confirm() natif) pour cohérence UX",
-          "RLS gère la sécurité (cascade scores via FK ON DELETE CASCADE)"
+          "Sticky bar `sticky top-0 z-10` au-dessus de la table, apparaÃ®t si selection > 0",
+          "useState<Set<string>> + useMemo dÃ©rivÃ© pour purger auto les ids absents",
+          "AlertDialog shadcn (vs confirm() natif) pour cohÃ©rence UX",
+          "RLS gÃ¨re la sÃ©curitÃ© (cascade scores via FK ON DELETE CASCADE)"
         ]
       }
     },
@@ -230,21 +230,21 @@
           "build": "ok"
         },
         "root_cause": [
-          "JSON.parse(raw) silent catch → parsed = {} sur output non-JSON pur",
+          "JSON.parse(raw) silent catch â†’ parsed = {} sur output non-JSON pur",
           "Number(s.score) || 0 transforme NaN en 0 silencieux",
-          "Placeholder { score: 0, reasoning: '(LLM batch missed)' } écrit en DB pour signaux absents → faux positifs"
+          "Placeholder { score: 0, reasoning: '(LLM batch missed)' } Ã©crit en DB pour signaux absents â†’ faux positifs"
         ],
         "fix": [
           "Nouveau parser parseScoringResponse avec strip markdown fence, extractFirstJsonObject bracket-aware",
           "coerceScore retourne null (pas 0) sur NaN/Infinity/n/a",
-          "ScoreParseError levé si parsing impossible → log llm-score-batch:parse_fail avec preview 2k chars",
-          "Aucune row score=0 placeholder écrite : signaux missed restent unscored, récupérables via unscored_signals RPC"
+          "ScoreParseError levÃ© si parsing impossible â†’ log llm-score-batch:parse_fail avec preview 2k chars",
+          "Aucune row score=0 placeholder Ã©crite : signaux missed restent unscored, rÃ©cupÃ©rables via unscored_signals RPC"
         ],
         "ux": [
           "ScoreCell : couleurs slate/orange/blue/emerald selon score",
-          "HoverCard avec score + raison + modèle + rubric + distance temporelle FR",
-          "Bouton ↻ inline visible si score 0/null + spinner pendant mutation",
-          "Flash bg-emerald-100 1.5s au succès (pattern React 19 store-previous-prop)",
+          "HoverCard avec score + raison + modÃ¨le + rubric + distance temporelle FR",
+          "Bouton â†» inline visible si score 0/null + spinner pendant mutation",
+          "Flash bg-emerald-100 1.5s au succÃ¨s (pattern React 19 store-previous-prop)",
           "Bulk : bouton Dashboard chunking 30 ids"
         ]
       }
@@ -270,14 +270,14 @@
         "validation": {
           "typecheck": "0 errors",
           "lint": "0 new warnings",
-          "vitest": "48/48 (AppLayout.test adapté)",
+          "vitest": "48/48 (AppLayout.test adaptÃ©)",
           "build": "ok"
         },
         "routing": {
           "/": "Home (public, MarketingLayout)",
           "/login": "Login (public, sanitizeNext open-redirect protection)",
           "/signup": "Signup (public)",
-          "/dashboard": "Dashboard (ProtectedRoute → /login?next=)",
+          "/dashboard": "Dashboard (ProtectedRoute â†’ /login?next=)",
           "logout": "redirect /"
         }
       }
@@ -307,11 +307,11 @@
           "build": "ok (712ms)"
         },
         "design_notes": [
-          "PricingTable avec toggle Tabs Maison/BYOK + slider seats Pro 5-25 dégressif (-15% Maison, -10% BYOK)",
+          "PricingTable avec toggle Tabs Maison/BYOK + slider seats Pro 5-25 dÃ©gressif (-15% Maison, -10% BYOK)",
           "Format euros via Intl.NumberFormat('fr-FR')",
-          "Tier Pro mis en avant : badge Recommandé + ring + shadow emerald",
-          "6 personas avec ligne tarif Maison/BYOK séparée (couleurs emerald vs blue)",
-          "FAQ via <details><summary> natifs (pas Accordion shadcn pour rester léger)",
+          "Tier Pro mis en avant : badge RecommandÃ© + ring + shadow emerald",
+          "6 personas avec ligne tarif Maison/BYOK sÃ©parÃ©e (couleurs emerald vs blue)",
+          "FAQ via <details><summary> natifs (pas Accordion shadcn pour rester lÃ©ger)",
           "Total Home.tsx : 51 lignes orchestrateur (sections modulaires landing/*)"
         ]
       }
@@ -349,8 +349,8 @@
       "acceptanceCriteria": [
         "Bouton Email",
         "mailto: avec subject + body url-encoded",
-        "Body tronqué 1500 chars + lien si overflow",
-        "Tests encoding chars spéciaux"
+        "Body tronquÃ© 1500 chars + lien si overflow",
+        "Tests encoding chars spÃ©ciaux"
       ]
     },
     {
@@ -375,7 +375,7 @@
     {
       "id": "S-S0.4",
       "wave": "sprint-0",
-      "title": "Bouton Télécharger .md",
+      "title": "Bouton TÃ©lÃ©charger .md",
       "passes": true,
       "agentModel": "haiku",
       "priority": 4,
@@ -387,14 +387,14 @@
         "Bouton Download",
         "Blob + ancre + click prog",
         "Filename kairos-brief-YYYY-MM-DD-HH-mm.md",
-        "Helper réutilisable",
+        "Helper rÃ©utilisable",
         "Tests"
       ]
     },
     {
       "id": "S-S0.5",
       "wave": "sprint-0",
-      "title": "Cleanup footer Digest actions groupées",
+      "title": "Cleanup footer Digest actions groupÃ©es",
       "passes": true,
       "agentModel": "sonnet",
       "priority": 5,
@@ -403,8 +403,8 @@
       "filesCreate": [],
       "filesModify": ["src/pages/Digest.tsx", "src/pages/Digest.test.tsx"],
       "acceptanceCriteria": [
-        "Footer 2 zones : Actions (gauche, 6 boutons) + Métadonnées (droite)",
-        "Boutons compacts icônes lucide",
+        "Footer 2 zones : Actions (gauche, 6 boutons) + MÃ©tadonnÃ©es (droite)",
+        "Boutons compacts icÃ´nes lucide",
         "Responsive wrap mobile",
         "Hover/active Material You",
         "Tests RTL 6 boutons + responsive"
@@ -425,7 +425,7 @@
         "Bouton Exporter PDF",
         "window.print() + @media print CSS",
         "Cache sidebar/header/autres briefs",
-        "En-tête simple Kairos · date · N signaux",
+        "En-tÃªte simple Kairos Â· date Â· N signaux",
         "A4 margins raisonnables",
         "Note Wave 11 = branded edge fn",
         "Tests CSS print rules"
@@ -445,7 +445,7 @@
         "Table score_runs PK uuid + FK signal_id/org_id/user_id",
         "Indexes (signal_id, org_id)",
         "RLS org-scoped",
-        "scores étendu : score_consensus, score_variance, models_used",
+        "scores Ã©tendu : score_consensus, score_variance, models_used",
         "Backfill 1 row par scores existant",
         "Types regen"
       ]
@@ -466,16 +466,16 @@
       "filesModify": ["src/pages/Settings.tsx"],
       "acceptanceCriteria": [
         "settings.consensus_models text[] default ARRAY[]",
-        "Multi-select 2-3 modèles",
+        "Multi-select 2-3 modÃ¨les",
         "Validation len 2-3 distincts",
-        "Mention Coût × N",
+        "Mention CoÃ»t Ã— N",
         "Hook mutation"
       ]
     },
     {
       "id": "S-9.1.3",
       "wave": "9.1",
-      "title": "Edge fn llm-score-batch extension N modèles",
+      "title": "Edge fn llm-score-batch extension N modÃ¨les",
       "passes": true,
       "agentModel": "sonnet",
       "priority": 3,
@@ -483,7 +483,7 @@
       "filesCreate": ["supabase/functions/llm-score-batch/index.test.ts"],
       "filesModify": ["supabase/functions/llm-score-batch/index.ts"],
       "acceptanceCriteria": [
-        "N appels Promise.all à dispatch-llm",
+        "N appels Promise.all Ã  dispatch-llm",
         "Insert N rows score_runs",
         "Calcul moyenne+variance update scores",
         "Best-effort 1 fail = continue",
@@ -549,7 +549,7 @@
       "acceptanceCriteria": [
         "POST avec rubric_id, prompt, criteria, max_signals",
         "Cap 100 signaux",
-        "Cap 1 simultané pg_advisory_lock",
+        "Cap 1 simultanÃ© pg_advisory_lock",
         "Lit signaux 30j org",
         "Pas de persist",
         "Retourne array delta",
@@ -574,8 +574,8 @@
       "acceptanceCriteria": [
         "Mutation POST",
         "Cost estimate via provider_models pricing",
-        "Cost displayed pré-run",
-        "Confirm dialog si > 5€",
+        "Cost displayed prÃ©-run",
+        "Confirm dialog si > 5â‚¬",
         "Tests"
       ]
     },
@@ -591,7 +591,7 @@
       "filesModify": ["src/App.tsx"],
       "acceptanceCriteria": [
         "Route /settings/rubrics/backtest",
-        "Form prompt + critères JSON",
+        "Form prompt + critÃ¨res JSON",
         "Bouton avec cost",
         "Loader + stream signaux",
         "Bouton Adopter upsert"
@@ -611,16 +611,16 @@
       ],
       "filesModify": [],
       "acceptanceCriteria": [
-        "Tableau 2 cols current/backtested trié |delta|",
+        "Tableau 2 cols current/backtested triÃ© |delta|",
         "Histogramme Recharts",
-        "Top 20 promus + rétrogradés",
+        "Top 20 promus + rÃ©trogradÃ©s",
         "KPIs"
       ]
     },
     {
       "id": "S-9.2.5",
       "wave": "9.2",
-      "title": "Cap simultané + queueing UI",
+      "title": "Cap simultanÃ© + queueing UI",
       "passes": true,
       "agentModel": "haiku",
       "priority": 5,
@@ -628,7 +628,7 @@
       "filesCreate": [],
       "filesModify": ["src/hooks/useBacktestRubric.ts"],
       "acceptanceCriteria": [
-        "2e backtest = toast warning + bouton désactivé",
+        "2e backtest = toast warning + bouton dÃ©sactivÃ©",
         "Status En cours ETA",
         "Annuler via cancel mutation",
         "Lock release garanti"
@@ -652,7 +652,7 @@
         "Types regen"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.3.2",
@@ -670,11 +670,11 @@
       "acceptanceCriteria": [
         "POST signal_id, reason",
         "Insert + audit_log signal.flag",
-        "Réponse ok flag_id",
+        "RÃ©ponse ok flag_id",
         "Tests Deno"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.3.3",
@@ -700,7 +700,7 @@
         "IVFFlat index"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.3.4",
@@ -717,13 +717,13 @@
       "filesModify": [],
       "acceptanceCriteria": [
         "Trouve signal_flags ts < 14j",
-        "Signaux fenêtre 14j URL identique OU cosine > 0.85",
+        "Signaux fenÃªtre 14j URL identique OU cosine > 0.85",
         "Insert signal_relations",
         "pg_cron daily 4am",
         "Logs"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.3.5",
@@ -740,19 +740,19 @@
       ],
       "filesModify": ["src/components/features/SignalTable.tsx"],
       "acceptanceCriteria": [
-        "Bouton 👎",
+        "Bouton ðŸ‘Ž",
         "Dialog 4 raisons + textarea",
         "Mutation",
         "Toast confirm",
         "Tests"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.3.6",
       "wave": "9.3",
-      "title": "Dashboard badge contested + score minoré",
+      "title": "Dashboard badge contested + score minorÃ©",
       "passes": false,
       "agentModel": "sonnet",
       "priority": 6,
@@ -765,14 +765,14 @@
       "filesModify": ["src/components/features/SignalTable.tsx"],
       "acceptanceCriteria": [
         "Hook signal_id set flagged direct OU relation",
-        "Badge orange contesté",
+        "Badge orange contestÃ©",
         "Score - settings.contested_penalty default 30 + strikethrough",
         "Setting",
-        "Filter Masquer contestés",
+        "Filter Masquer contestÃ©s",
         "Tests"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.4.1",
@@ -792,7 +792,7 @@
         "Types regen"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.4.2",
@@ -808,15 +808,15 @@
       ],
       "filesModify": ["supabase/functions/llm-score-batch/index.ts"],
       "acceptanceCriteria": [
-        "Signal score>=70 sans cluster fenêtre 24-48h",
-        "Embedding cosine > 0.80 ET source différente",
-        "Crée ou ajoute cluster",
+        "Signal score>=70 sans cluster fenÃªtre 24-48h",
+        "Embedding cosine > 0.80 ET source diffÃ©rente",
+        "CrÃ©e ou ajoute cluster",
         "Triggered par scoring batch",
         "Logs",
         "Tests"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.4.3",
@@ -834,7 +834,7 @@
         "Tests SQL"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.4.4",
@@ -856,7 +856,7 @@
         "Tests"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.4.5",
@@ -872,13 +872,13 @@
       ],
       "filesModify": ["src/components/features/SignalTable.tsx"],
       "acceptanceCriteria": [
-        "Badge vert ✓ 3 sources",
+        "Badge vert âœ“ 3 sources",
         "Badge gris 1 source unique",
         "Tooltip cluster autres signaux",
         "Smoke browser"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.5.1",
@@ -899,7 +899,7 @@
         "Types regen"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.5.2",
@@ -917,13 +917,13 @@
       "filesModify": [],
       "acceptanceCriteria": [
         "authors sample_size >=5 dans 90j",
-        "n_top + 0.5*n_corroborated - 0.7*n_flagged / n_total clampé [0,1]",
+        "n_top + 0.5*n_corroborated - 0.7*n_flagged / n_total clampÃ© [0,1]",
         "Update authors",
         "pg_cron daily 3am UTC",
         "Logs"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.5.3",
@@ -936,14 +936,14 @@
       "filesCreate": ["supabase/migrations/20260503000010_authors_backfill.sql"],
       "filesModify": [],
       "acceptanceCriteria": [
-        "Extract authors raw_payload rétroactif",
+        "Extract authors raw_payload rÃ©troactif",
         "Insert idempotent UNIQUE",
         "Update signals.author_id JOIN",
-        "Lance recompute 1×",
+        "Lance recompute 1Ã—",
         "Re-runable"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.5.4",
@@ -960,13 +960,13 @@
       ],
       "acceptanceCriteria": [
         "Lookup author_id reputation",
-        "Si exist : score × √(0.5 + 0.5×reputation)",
+        "Si exist : score Ã— âˆš(0.5 + 0.5Ã—reputation)",
         "Si pas reputation : no-op",
         "Logs score_raw, factor, final dans score_runs",
         "Tests Deno 3 cas"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-9.5.5",
@@ -983,14 +983,14 @@
       ],
       "filesModify": ["src/components/features/SignalTable.tsx"],
       "acceptanceCriteria": [
-        "Hover handle = tooltip étoile + sample size",
+        "Hover handle = tooltip Ã©toile + sample size",
         "Hook",
         "Filter reputation min slider",
         "Trier par reputation",
         "Tests"
       ],
       "frozen": true,
-      "frozen_reason": "Pivot Second Cerveau 2026-05-03 — logique migree dans Wave 10 phase C"
+      "frozen_reason": "Pivot Second Cerveau 2026-05-03 â€” logique migree dans Wave 10 phase C"
     },
     {
       "id": "S-10A.1",
@@ -1447,7 +1447,7 @@
       "filesModify": [],
       "acceptanceCriteria": [
         "Batch 50 pending where pass_kind=entities",
-        "NER Haiku → entities + signal_entities",
+        "NER Haiku â†’ entities + signal_entities",
         "Dedup canonical_name",
         "Update queue status",
         "pg_cron 30min",
@@ -1870,7 +1870,161 @@
       "title": "Header brief enrichi avec langue + modele + cout",
       "passes": true,
       "commit": "2b18e0f",
-      "notes": "Affichage explicite Langue : EN · Modele : deepseek-v4-flash · Cout : 0,xxx €"
+      "notes": "Affichage explicite Langue : EN Â· Modele : deepseek-v4-flash Â· Cout : 0,xxx â‚¬"
+    },
+    {
+      "id": "S6-Schema",
+      "title": "DB schema organizations + organization_members + subscriptions + invitations",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.1"
+    },
+    {
+      "id": "S6-OrgIdColumn",
+      "title": "Migration org_id columns sur signals, scores, logs, settings, llm_costs",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.1"
+    },
+    {
+      "id": "S6-Backfill",
+      "title": "Backfill orgs depuis users existants + organisation par défaut",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.1"
+    },
+    {
+      "id": "S6-RLSRewrite",
+      "title": "RLS rewrite org-scoped sur toutes les tables + SECURITY DEFINER helpers",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.1"
+    },
+    {
+      "id": "S6-StripeSetup",
+      "title": "Stripe products + prices setup (stripe-bootstrap.ts) — script livré, secrets STRIPE_* non configurés",
+      "passes": false,
+      "wave": "6.2",
+      "blockedBy": "STRIPE_SECRET_KEY manquant"
+    },
+    {
+      "id": "S6-StripeWebhook",
+      "title": "Edge fn stripe-webhook (subscription lifecycle + invoice.paid)",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.2"
+    },
+    {
+      "id": "S6-MeteredUsage",
+      "title": "Edge fn record-usage + pg_cron quotidien (COG par org)",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.2"
+    },
+    {
+      "id": "S6-CheckoutFlow",
+      "title": "Edge fn create-checkout-session + hook useCheckout",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.2"
+    },
+    {
+      "id": "S6-OrgSelector",
+      "title": "Composant OrgSelector + Zustand store useOrgStore",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.3"
+    },
+    {
+      "id": "S6-OrgQueries",
+      "title": "Refacto hooks data pour filtrer par org_id",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.3"
+    },
+    {
+      "id": "S6-TeamPage",
+      "title": "Page /settings/team — membres, invitations, rôles",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.3"
+    },
+    {
+      "id": "S6-InvitationFlow",
+      "title": "Edge fn invite-member + accept-invitation + page /accept-invitation/:token",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.3"
+    },
+    {
+      "id": "S6-Configurator",
+      "title": "Page /pricing avec configurateur 4 questions + calcul prix live + CTA checkout",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.3"
+    },
+    {
+      "id": "S6-BYOKProvisioning",
+      "title": "UI Settings clés API — validation auto par provider + fallback Maison",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.4"
+    },
+    {
+      "id": "S6-AuditLog",
+      "title": "Table audit_log + edge fn middleware + page /settings/audit",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.4"
+    },
+    {
+      "id": "S6-TenantIsolated",
+      "title": "Edge fn provision-isolated-tenant (add-on Enterprise)",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.4"
+    },
+    {
+      "id": "S6-AdminCockpit",
+      "title": "Page /admin — métriques cross-tenant, COG, MRR, alertes outliers",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.4"
+    },
+    {
+      "id": "S6-SelfHostDocker",
+      "title": "docker-compose.enterprise.yml + scripts setup + docs self-host",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.5"
+    },
+    {
+      "id": "S6-CSMOnboarding",
+      "title": "Workflow onboarding CSM — page /admin/csm + checklist + csm_onboardings table",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.5"
+    },
+    {
+      "id": "S6-SLAMonitoring",
+      "title": "Edge fn health + page /status publique + monitoring uptime",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.5"
+    },
+    {
+      "id": "S6-LegalPack",
+      "title": "RGPD compliance pack — DPA template, processor list, EU AI Act matrix",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.5"
+    },
+    {
+      "id": "S6-MarketingSite",
+      "title": "Landing publique refonte — Home, Blog, CaseStudies, analytics ADR",
+      "passes": true,
+      "completedAt": "2026-05-02",
+      "wave": "6.5"
     }
   ],
   "completed_at": "2026-05-02T00:50:00Z",
@@ -1881,34 +2035,34 @@
   "wave_6_planned": {
     "title": "Multi-tenant org-level avec billing + 12 SKUs Stripe + configurateur par segment",
     "scope": [
-      "Schéma : organizations, organization_members (role, joined_at), subscriptions, subscription_seats, invitations",
-      "RLS rewrite : signals/scores/settings/digests/topics/admin_prompts → org_id IN (SELECT org_id FROM organization_members WHERE user_id = auth.uid())",
+      "SchÃ©ma : organizations, organization_members (role, joined_at), subscriptions, subscription_seats, invitations",
+      "RLS rewrite : signals/scores/settings/digests/topics/admin_prompts â†’ org_id IN (SELECT org_id FROM organization_members WHERE user_id = auth.uid())",
       "Migration backfill : 1 org par user existant + memberships role=owner",
       "Stripe Billing avec metered usage (Apify + LLM Maison consommation par tenant)",
-      "12 SKUs Stripe : 6 segments × Maison/BYOK (VC, Avocats, Newsletter, Brand, CTO, Solo)",
-      "Configurateur tenant : segment + seats + LLM mode → Stripe Checkout custom",
-      "Self-serve provisioning BYOK : UI clés Apify + LLM, validation, fallback Maison",
+      "12 SKUs Stripe : 6 segments Ã— Maison/BYOK (VC, Avocats, Newsletter, Brand, CTO, Solo)",
+      "Configurateur tenant : segment + seats + LLM mode â†’ Stripe Checkout custom",
+      "Self-serve provisioning BYOK : UI clÃ©s Apify + LLM, validation, fallback Maison",
       "Audit log + Compliance pack (add-on Avocats)",
-      "Tenant isolé (Postgres schema séparé OU projet Supabase dédié) — option add-on",
-      "Self-host Docker : packaging + doc + support contract — bundle Enterprise",
+      "Tenant isolÃ© (Postgres schema sÃ©parÃ© OU projet Supabase dÃ©diÃ©) â€” option add-on",
+      "Self-host Docker : packaging + doc + support contract â€” bundle Enterprise",
       "Tableau de bord admin : COG par tenant, marge brute live, alertes outliers",
-      "UI sélecteur d'org (header), page /settings/team, invitations email magic link",
+      "UI sÃ©lecteur d'org (header), page /settings/team, invitations email magic link",
       "Page /pricing publique avec configurateur"
     ],
     "stories_estimate": 22,
-    "rationale": "Refonte structurelle massive validée par l'analyse conjointe v2 : sans multi-tenant + 12 SKUs, plafond ARPU = 49€ (Solo). Avec : MRR cible 132k€/mois = 1.58M€ ARR an 1.",
+    "rationale": "Refonte structurelle massive validÃ©e par l'analyse conjointe v2 : sans multi-tenant + 12 SKUs, plafond ARPU = 49â‚¬ (Solo). Avec : MRR cible 132kâ‚¬/mois = 1.58Mâ‚¬ ARR an 1.",
     "ralph_loop_ready": true,
     "ready_to_dispatch": "Attendre GO explicite utilisateur avant dispatch"
   },
   "sprint_0_planned": {
-    "title": "Distribution table stakes — 6 boutons partage sur footer Digest",
+    "title": "Distribution table stakes â€” 6 boutons partage sur footer Digest",
     "stories_count": 6,
     "estimate_hours": 3,
-    "rationale": "Réponse immédiate au feedback founder « brief pas exploitable, ni partageable ». Aucune dépendance Wave 9. Peut sortir en parallèle dès le go.",
+    "rationale": "RÃ©ponse immÃ©diate au feedback founder Â« brief pas exploitable, ni partageable Â». Aucune dÃ©pendance Wave 9. Peut sortir en parallÃ¨le dÃ¨s le go.",
     "stories": ["S-S0.1", "S-S0.2", "S-S0.3", "S-S0.4", "S-S0.5", "S-S0.6"]
   },
   "wave_9_planned": {
-    "title": "Layer 1 — Signal qualification : 5 features moat (Multi-LLM consensus, Backtest, Negative propag, Cross-source, Author reputation)",
+    "title": "Layer 1 â€” Signal qualification : 5 features moat (Multi-LLM consensus, Backtest, Negative propag, Cross-source, Author reputation)",
     "source_doc": "docs/strategy/2026-05-02-moats-and-value-capture.md",
     "human_readable_prd": "docs/handoffs/2026-05-03-wave-9-moats-prd.md",
     "stories_count": 26,
@@ -1950,7 +2104,7 @@
     "ready_to_dispatch": "Attendre GO explicite utilisateur avant dispatch"
   },
   "wave_10_planned": {
-    "title": "Second Cerveau IA — Pivot conceptuel : Kairos = brique enrichissement, briefs = 1 vue parmi d autres",
+    "title": "Second Cerveau IA â€” Pivot conceptuel : Kairos = brique enrichissement, briefs = 1 vue parmi d autres",
     "source_doc": "docs/strategy/2026-05-02-moats-and-value-capture.md",
     "human_readable_prd": "docs/handoffs/2026-05-03-wave-10-second-cerveau-prd.md",
     "stories_count": 37,
@@ -1975,14 +2129,14 @@
       },
       {
         "id": "10.B",
-        "name": "Vues filtrables + /digest contextualisé",
+        "name": "Vues filtrables + /digest contextualisÃ©",
         "branch": "feat/wave-10B-views",
         "stories": ["S-10B.1", "S-10B.2", "S-10B.3", "S-10B.4", "S-10B.5", "S-10B.6"],
         "depends_on": "10.A"
       },
       {
         "id": "10.C",
-        "name": "Async enrichment + queue résiliente",
+        "name": "Async enrichment + queue rÃ©siliente",
         "branch": "feat/wave-10C-async",
         "stories": ["S-10C.1", "S-10C.2", "S-10C.3", "S-10C.4", "S-10C.5", "S-10C.6", "S-10C.7"],
         "depends_on": "10.A"
@@ -2047,7 +2201,7 @@
     "ready_to_dispatch": "Attendre GO explicite utilisateur apres relecture PRD"
   },
   "wave_11_planned": {
-    "title": "Wave 11 — Distribution premium (PDF brande + lien public sans auth)",
+    "title": "Wave 11 â€” Distribution premium (PDF brande + lien public sans auth)",
     "stories_count": 4,
     "status": "partiel : 4 stories livrees, suite en attente",
     "livered": ["S-11.1", "S-11.2", "S-11.3", "S-11.4"],
