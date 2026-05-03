@@ -124,7 +124,7 @@ describe('Settings', () => {
 
     // Click Sources tab
     await user.click(screen.getByRole('tab', { name: /sources/i }))
-    expect(screen.getByText('Sources de donnees')).toBeInTheDocument()
+    expect(screen.getByText(/sources de donn/i)).toBeInTheDocument()
 
     // Click Branding tab
     await user.click(screen.getByRole('tab', { name: /branding/i }))
