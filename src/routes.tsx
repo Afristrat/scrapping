@@ -28,6 +28,7 @@ import Signup from '@/pages/Signup'
 import StatusPage from '@/pages/StatusPage'
 import TeamSettings from '@/pages/TeamSettings'
 import Topics from '@/pages/Topics'
+import RubricBacktest from '@/pages/RubricBacktest'
 
 export const router = createBrowserRouter([
   // Public routes (with marketing layout)
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
           { path: '/settings', element: <Settings /> },
           { path: '/settings/team', element: <TeamSettings /> },
           { path: '/settings/audit', element: <AuditLog /> },
+          { path: '/settings/rubrics/backtest', element: <RubricBacktest /> },
           { path: '/logs', element: <Logs /> },
           { path: '/admin', element: <AdminCockpit /> },
           { path: '/admin/csm', element: <CSMOnboarding /> },
