@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AlertTriangle, FlaskConical } from 'lucide-react'
 import {
@@ -18,7 +19,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { BacktestComparator } from '@/components/features/BacktestComparator'
-import { useBacktestRubric, type BacktestResult, type BacktestRubricPayload } from '@/hooks/useBacktestRubric'
+import {
+  useBacktestRubric,
+  type BacktestResult,
+  type BacktestRubricPayload,
+} from '@/hooks/useBacktestRubric'
 import { useBacktestCostEstimate } from '@/hooks/useBacktestCostEstimate'
 import { useFormatCost } from '@/hooks/useFormatCost'
 import { useSettings } from '@/hooks/useSettings'
@@ -28,13 +33,20 @@ import { useCreateRubric } from '@/hooks/useRubrics'
 const CONFIRM_COST_THRESHOLD_USD = 5.5
 
 export default function RubricBacktest() {
+  const location = useLocation()
+  const prefill = location.state as {
+    rubric?: { prompt: string; criteria?: unknown; name?: string }
+  } | null
+
   const { data: settings } = useSettings()
   const formatCost = useFormatCost()
   const { cancel: cancelBacktest, ...backtestMutation } = useBacktestRubric()
   const createRubricMutation = useCreateRubric()
 
-  const [rubricPrompt, setRubricPrompt] = useState('')
-  const [criteriaRaw, setCriteriaRaw] = useState('')
+  const [rubricPrompt, setRubricPrompt] = useState(prefill?.rubric?.prompt ?? '')
+  const [criteriaRaw, setCriteriaRaw] = useState(
+    prefill?.rubric?.criteria ? JSON.stringify(prefill.rubric.criteria, null, 2) : '',
+  )
   const [criteriaError, setCriteriaError] = useState<string | null>(null)
   const [signalCount, setSignalCount] = useState(50)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -228,7 +240,8 @@ export default function RubricBacktest() {
               <div>
                 <p className="text-sm font-medium">Coût estimé</p>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  ~{tokensIn.toLocaleString('fr-FR')} tokens in · ~{tokensOut.toLocaleString('fr-FR')} tokens out
+                  ~{tokensIn.toLocaleString('fr-FR')} tokens in · ~
+                  {tokensOut.toLocaleString('fr-FR')} tokens out
                 </p>
               </div>
               <span
@@ -323,9 +336,8 @@ export default function RubricBacktest() {
           <AlertDialogHeader>
             <AlertDialogTitle>Coût estimé élevé</AlertDialogTitle>
             <AlertDialogDescription>
-              Ce backtest est estimé à{' '}
-              <strong className="text-foreground">{formattedCost}</strong> pour {signalCount}{' '}
-              signaux. Voulez-vous continuer ?
+              Ce backtest est estimé à <strong className="text-foreground">{formattedCost}</strong>{' '}
+              pour {signalCount} signaux. Voulez-vous continuer ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
