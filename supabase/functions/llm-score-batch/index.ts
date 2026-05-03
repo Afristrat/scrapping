@@ -98,7 +98,10 @@ async function callDispatchForModel(
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return json({ ok: true }, 204)
+  // HTTP 204 « No Content » INTERDIT un body — `json({...}, 204)` crashait
+  // Cloudflare/Deno avec un 500 silencieux au preflight, le navigateur recevait
+  // « Failed to fetch ». Retour Response sans body avec headers CORS uniquement.
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
   const auth = req.headers.get('Authorization')
