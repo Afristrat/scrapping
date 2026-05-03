@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { Save } from 'lucide-react'
@@ -15,6 +16,8 @@ import { SourcePrioritySliders } from '@/components/features/SourcePrioritySlide
 import { TagInput } from '@/components/features/TagInput'
 import { useSettings } from '@/hooks/useSettings'
 import { useUpdateSettings } from '@/hooks/useUpdateSettings'
+import { useUpdateConsensusModels } from '@/hooks/useUpdateConsensusModels'
+import { useProviderModels } from '@/hooks/useProviderModels'
 import {
   DEFAULT_APIFY_CONFIG,
   DEFAULT_SOURCE_PRIORITY,
@@ -39,6 +42,37 @@ const TASK_DESCRIPTIONS: Record<'scoring' | 'scraping' | 'monitoring' | 'digest'
 export default function Settings() {
   const { data: settings } = useSettings()
   const updateMutation = useUpdateSettings()
+  const updateConsensusMutation = useUpdateConsensusModels()
+  const { data: providerModels = [] } = useProviderModels()
+
+  // Consensus models local state (independent of the main form)
+  const [consensusModels, setConsensusModels] = useState<string[]>(
+    () => settings?.consensus_models ?? [],
+  )
+  // Sync when settings load
+  if (
+    settings?.consensus_models !== undefined &&
+    consensusModels.length === 0 &&
+    settings.consensus_models.length > 0
+  ) {
+    setConsensusModels(settings.consensus_models)
+  }
+
+  const consensusError =
+    consensusModels.length === 1 ? 'Sélectionnez 0 ou au moins 2 modèles distincts.' : null
+
+  const handleConsensusToggle = (modelId: string) => {
+    setConsensusModels((prev) => {
+      if (prev.includes(modelId)) return prev.filter((m) => m !== modelId)
+      if (prev.length >= 3) return prev // max 3
+      return [...prev, modelId]
+    })
+  }
+
+  const handleSaveConsensus = () => {
+    if (consensusModels.length === 1) return
+    updateConsensusMutation.mutate(consensusModels)
+  }
 
   const {
     control,
@@ -165,6 +199,74 @@ export default function Settings() {
                   )
                 })}
               </div>
+
+              {/* Section consensus scoring */}
+              <SectionCard>
+                <div className="mb-4 flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-on-surface text-lg font-semibold">
+                      Consensus scoring (BYOK avancé)
+                    </h3>
+                    <p className="text-on-surface-variant mt-0.5 text-sm leading-relaxed">
+                      Sélectionnez 2 ou 3 modèles distincts. Chaque signal sera scoré par chacun
+                      d'eux et le score final sera la moyenne (consensus).{' '}
+                      <span className="text-tertiary font-medium">
+                        Coût × {consensusModels.length > 0 ? consensusModels.length : 'N'} modèles
+                        sélectionnés.
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {providerModels.length === 0 && (
+                    <p className="text-on-surface-variant text-sm">
+                      Aucun modèle disponible — configurez vos clés API dans l'onglet «&nbsp;Clés
+                      API&nbsp;» puis rafraîchissez les modèles.
+                    </p>
+                  )}
+                  {providerModels.map((m) => {
+                    const id = `${m.provider}:${m.model_id}`
+                    const selected = consensusModels.includes(id)
+                    const disabledAdd = !selected && consensusModels.length >= 3
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={selected}
+                        disabled={disabledAdd}
+                        onClick={() => handleConsensusToggle(id)}
+                        className={[
+                          'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                          selected
+                            ? 'bg-primary text-on-primary border-primary'
+                            : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary bg-transparent',
+                          disabledAdd ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
+                        ].join(' ')}
+                      >
+                        {m.display_name ?? m.model_id}{' '}
+                        <span className="opacity-60">({m.provider})</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {consensusError && <p className="text-error mt-2 text-xs">{consensusError}</p>}
+                {consensusModels.length > 0 && (
+                  <p className="text-on-surface-variant mt-2 text-xs">
+                    Sélectionnés ({consensusModels.length}/3)&nbsp;: {consensusModels.join(', ')}
+                  </p>
+                )}
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    type="button"
+                    disabled={!!consensusError || updateConsensusMutation.isPending}
+                    onClick={handleSaveConsensus}
+                    className="bg-primary text-on-primary hover:bg-primary/90 gap-2 rounded-lg px-5"
+                  >
+                    <Save className="h-4 w-4" />
+                    {updateConsensusMutation.isPending ? 'Sauvegarde…' : 'Sauvegarder le consensus'}
+                  </Button>
+                </div>
+              </SectionCard>
             </TabsContent>
 
             {/* Onglet 2 : Rubriques de scoring */}

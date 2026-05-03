@@ -30,6 +30,7 @@ export interface Settings {
   source_priority: SourcePriority
   apify_config: ApifyConfig
   score_concurrency: number
+  consensus_models: string[]
   updated_at: string
 }
 
@@ -62,6 +63,7 @@ export function useSettings() {
         active_rubric_id: raw.active_rubric_id ?? null,
         language: raw.language ?? 'fr',
         score_concurrency: raw.score_concurrency ?? 20,
+        consensus_models: raw.consensus_models ?? [],
       }
     },
   })

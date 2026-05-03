@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import Settings from './Settings'
 import type { Settings as SettingsType } from '@/hooks/useSettings'
+import type { ProviderModel } from '@/hooks/useProviderModels'
 
 const MOCK_SETTINGS: SettingsType = {
   user_id: 'user-1',
@@ -31,8 +32,45 @@ const MOCK_SETTINGS: SettingsType = {
   },
   language: 'fr',
   score_concurrency: 20,
+  consensus_models: [],
   updated_at: '2026-04-30T00:00:00Z',
 }
+
+const MOCK_PROVIDER_MODELS: ProviderModel[] = [
+  {
+    user_id: 'user-1',
+    provider: 'openai',
+    model_id: 'gpt-4o',
+    display_name: 'GPT-4o',
+    context_window: 128000,
+    pricing_input_per_1m: 5,
+    pricing_output_per_1m: 15,
+    capabilities: [],
+    fetched_at: '2026-04-30T00:00:00Z',
+  },
+  {
+    user_id: 'user-1',
+    provider: 'anthropic',
+    model_id: 'claude-3-5-haiku',
+    display_name: 'Claude 3.5 Haiku',
+    context_window: 200000,
+    pricing_input_per_1m: 0.8,
+    pricing_output_per_1m: 4,
+    capabilities: [],
+    fetched_at: '2026-04-30T00:00:00Z',
+  },
+  {
+    user_id: 'user-1',
+    provider: 'mistral',
+    model_id: 'mistral-7b',
+    display_name: 'Mistral 7B',
+    context_window: 32768,
+    pricing_input_per_1m: 0.25,
+    pricing_output_per_1m: 0.25,
+    capabilities: [],
+    fetched_at: '2026-04-30T00:00:00Z',
+  },
+]
 
 const mockMutate = vi.fn()
 
@@ -56,8 +94,13 @@ vi.mock('@/hooks/useLLMProviders', () => ({
 }))
 
 vi.mock('@/hooks/useProviderModels', () => ({
-  useProviderModels: () => ({ data: [], isLoading: false }),
+  useProviderModels: () => ({ data: MOCK_PROVIDER_MODELS, isLoading: false }),
   useRefreshModels: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+}))
+
+const mockConsensusMutate = vi.fn()
+vi.mock('@/hooks/useUpdateConsensusModels', () => ({
+  useUpdateConsensusModels: () => ({ mutate: mockConsensusMutate, isPending: false }),
 }))
 
 vi.mock('@/hooks/useValidateApiKey', () => ({
@@ -101,6 +144,64 @@ function renderSettings() {
     </QueryClientProvider>,
   )
 }
+
+describe('Settings — consensus scoring', () => {
+  it("affiche la section consensus dans l'onglet Modèles", () => {
+    renderSettings()
+    expect(screen.getByText(/Consensus scoring \(BYOK avancé\)/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /GPT-4o/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Claude 3.5 Haiku/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Mistral 7B/i })).toBeInTheDocument()
+  })
+
+  it('sélectionner 2 modèles active le bouton sauvegarder', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /GPT-4o/i }))
+    await user.click(screen.getByRole('button', { name: /Claude 3.5 Haiku/i }))
+
+    // Le bouton sauvegarder consensus doit être actif (1 sélectionné = erreur, 2 = ok)
+    const saveBtn = screen.getByRole('button', { name: /sauvegarder le consensus/i })
+    expect(saveBtn).not.toBeDisabled()
+  })
+
+  it('sélectionner exactement 1 modèle affiche une erreur de validation', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /GPT-4o/i }))
+
+    expect(screen.getByText(/Sélectionnez 0 ou au moins 2 modèles distincts/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sauvegarder le consensus/i })).toBeDisabled()
+  })
+
+  it('ne permet pas de sélectionner plus de 3 modèles', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /GPT-4o/i }))
+    await user.click(screen.getByRole('button', { name: /Claude 3.5 Haiku/i }))
+    await user.click(screen.getByRole('button', { name: /Mistral 7B/i }))
+
+    // Le 4ème modèle n'existe pas dans le mock mais on vérifie que les 3 sont selected
+    expect(screen.getByText(/Sélectionnés \(3\/3\)/i)).toBeInTheDocument()
+  })
+
+  it('cliquer sauvegarder appelle useUpdateConsensusModels', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /GPT-4o/i }))
+    await user.click(screen.getByRole('button', { name: /Claude 3.5 Haiku/i }))
+    await user.click(screen.getByRole('button', { name: /sauvegarder le consensus/i }))
+
+    expect(mockConsensusMutate).toHaveBeenCalledWith([
+      'openai:gpt-4o',
+      'anthropic:claude-3-5-haiku',
+    ])
+  })
+})
 
 describe('Settings', () => {
   it('rend les 6 onglets et le bouton enregistrer', () => {
