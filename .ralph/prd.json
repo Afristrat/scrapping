@@ -996,7 +996,7 @@
       "id": "S-10A.1",
       "wave": "10.A",
       "title": "DB schema topics_taxonomy + RLS",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 1,
       "effort": "S",
@@ -1009,13 +1009,25 @@
         "RLS org-scoped",
         "Self-ref parent_id ON DELETE CASCADE",
         "Types regen"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.2",
       "wave": "10.A",
       "title": "Seed taxonomie commune (40-60 topics IPCRA-aware)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 2,
       "effort": "M",
@@ -1026,13 +1038,25 @@
         "Hierarchie Tech IA / Business / Vertical / Meta",
         "is_seeded=true",
         "Inserees pour chaque org existante"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.3",
       "wave": "10.A",
       "title": "DB schema personas (PARA Projects+Hats+Resources)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 3,
       "effort": "M",
@@ -1044,13 +1068,25 @@
         "RLS user-or-org-shared",
         "UNIQUE (org_id, key)",
         "Project a date_end Hat n en a pas"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.4",
       "wave": "10.A",
       "title": "DB schema signal_topics + signal_entities + signal_personas",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 4,
       "effort": "M",
@@ -1064,13 +1100,25 @@
         "Cascade delete depuis signals",
         "Indexes",
         "RLS org-scoped"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.5",
       "wave": "10.A",
       "title": "DB schema entities + dedup canonical names",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 5,
       "effort": "M",
@@ -1082,7 +1130,19 @@
         "UNIQUE (org_id, kind, canonical_name)",
         "Trigger increment signal_count",
         "RLS"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.6",
