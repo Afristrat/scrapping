@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react'
 
@@ -46,11 +46,13 @@ export default function AcceptInvitation(): React.ReactElement {
   const authLoading = useAuthStore((s) => s.loading)
 
   const ready = !authLoading && !!session && !!token
-  const [status, setStatus] = useState<Status>(ready ? { kind: 'pending' } : { kind: 'idle' })
+  const [status, setStatus] = useState<Status>({ kind: 'idle' })
+  const firedRef = useRef(false)
 
   useEffect(() => {
     if (!ready) return
-    if (status.kind !== 'pending') return
+    if (firedRef.current) return
+    firedRef.current = true
 
     let cancelled = false
     void (async () => {
