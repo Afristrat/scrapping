@@ -3,9 +3,11 @@ import {
   Settings as SettingsIcon,
   ScrollText,
   DollarSign,
+  FlaskConical,
   LogOut,
   Sparkles,
   TrendingUp,
+  UserPlus,
   Users,
   ShieldCheck,
   Crown,
@@ -26,6 +28,7 @@ const NAV = [
   { to: '/settings', label: 'Paramètres', icon: SettingsIcon },
   { to: '/settings/team', label: 'Équipe', icon: Users },
   { to: '/settings/audit', label: 'Audit log', icon: ShieldCheck },
+  { to: '/settings/rubrics/backtest', label: 'Backtest rubriques', icon: FlaskConical },
 ] as const
 
 export function Sidebar() {
@@ -87,6 +90,20 @@ export function Sidebar() {
             >
               <Sliders className="h-3.5 w-3.5" />
               Paramètres app
+            </Link>
+            <Link
+              to="/admin/csm"
+              className={cn(
+                'ml-9 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                pathname === '/admin/csm'
+                  ? 'bg-primary-fixed text-on-primary-fixed border-primary border-r-2'
+                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/30',
+              )}
+              aria-current={pathname === '/admin/csm' ? 'page' : undefined}
+              title="Onboarding clients Enterprise"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Onboarding CSM
             </Link>
           </>
         )}
