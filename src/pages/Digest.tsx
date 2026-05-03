@@ -1,6 +1,18 @@
 import { useMemo, useState } from 'react'
-import { Sparkles, Trash2, AlertTriangle } from 'lucide-react'
+import {
+  Sparkles,
+  Trash2,
+  AlertTriangle,
+  ClipboardCopy,
+  Mail,
+  X as IconX,
+  Share2,
+  Download,
+  FileText,
+} from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,6 +34,7 @@ import {
   type DigestRow,
 } from '@/hooks/useDigest'
 import { useFormatCost } from '@/hooks/useFormatCost'
+import { copyToClipboard, downloadAsMarkdown, formatDateForFilename } from '@/lib/download-utils'
 
 const WINDOW_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 24, label: '24 h' },
@@ -32,10 +45,32 @@ const WINDOW_OPTIONS: Array<{ value: number; label: string }> = [
 
 const RETRY_FALLBACK_SCORE = 30
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Extraire le premier H1 ou H2 du contenu Markdown. */
+function extractHeadline(content: string, fallback: string): string {
+  const match = content.match(/^#{1,2} (.+)$/m)
+  return match?.[1]?.trim() ?? fallback
+}
+
+/** Construire l'URL de partage d'un digest. */
+function buildShareUrl(digestId: string): string {
+  return `${window.location.origin}/digest?id=${digestId}`
+}
+
+// ---------------------------------------------------------------------------
+// Composant
+// ---------------------------------------------------------------------------
+
 export default function Digest(): React.ReactElement {
+  const [searchParams] = useSearchParams()
+  const urlId = searchParams.get('id')
+
   const [windowHours, setWindowHours] = useState<number>(24)
   const [minScoreRange, setMinScoreRange] = useState<number[]>([60])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(urlId)
 
   const digestsQuery = useDigests()
   const generate = useGenerateDigest()
@@ -67,8 +102,6 @@ export default function Digest(): React.ReactElement {
   }
 
   const digestError = generate.error instanceof DigestError ? generate.error : null
-  // On ne propose le retry que si on a constaté que le seuil bloque
-  // (au moins 1 signal scoré dans la fenêtre, mais aucun au-dessus du seuil).
   const canRetryWithLowerScore =
     digestError !== null &&
     digestError.code === 'no_signals' &&
@@ -93,6 +126,75 @@ export default function Digest(): React.ReactElement {
       },
     })
   }
+
+  // ---------------------------------------------------------------------------
+  // Actions Footer — US-S0.1 à S0.6
+  // ---------------------------------------------------------------------------
+
+  const handleCopyMarkdown = async (): Promise<void> => {
+    if (!selected) return
+    try {
+      await copyToClipboard(selected.content)
+      toast.success('Markdown copié dans le presse-papier')
+    } catch {
+      toast.error('Impossible de copier dans le presse-papier')
+    }
+  }
+
+  const handleEmail = (): void => {
+    if (!selected) return
+    const dateLabel = new Date(selected.generated_at).toLocaleDateString('fr-FR', {
+      dateStyle: 'long',
+    })
+    const subject = encodeURIComponent(
+      `Veille IA Kairos — ${dateLabel} — ${selected.signal_count} signaux`,
+    )
+    const shareUrl = buildShareUrl(selected.id)
+    const MAX_BODY = 1500
+    let body = selected.content
+    if (body.length > MAX_BODY) {
+      body = body.slice(0, MAX_BODY) + `\n\n[Brief complet : ${shareUrl}]`
+    }
+    const encodedBody = encodeURIComponent(body)
+    window.location.href = `mailto:?subject=${subject}&body=${encodedBody}`
+  }
+
+  const handleTweet = (): void => {
+    if (!selected) return
+    const dateLabel = new Date(selected.generated_at).toLocaleDateString('fr-FR', {
+      dateStyle: 'short',
+    })
+    const headline = extractHeadline(selected.content, `Veille IA Kairos — ${dateLabel}`)
+    const shareUrl = buildShareUrl(selected.id)
+    const tweetUrl =
+      `https://twitter.com/intent/tweet` +
+      `?text=${encodeURIComponent(headline)}` +
+      `&url=${encodeURIComponent(shareUrl)}`
+    window.open(tweetUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleLinkedIn = (): void => {
+    if (!selected) return
+    const shareUrl = buildShareUrl(selected.id)
+    const linkedInUrl =
+      `https://www.linkedin.com/sharing/share-offsite/` + `?url=${encodeURIComponent(shareUrl)}`
+    window.open(linkedInUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleDownloadMd = (): void => {
+    if (!selected) return
+    const datePart = formatDateForFilename(selected.generated_at)
+    const filename = `kairos-brief-${datePart}.md`
+    downloadAsMarkdown(selected.content, filename)
+  }
+
+  const handleExportPdf = (): void => {
+    window.print()
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="space-y-8">
@@ -291,6 +393,15 @@ export default function Digest(): React.ReactElement {
             </Card>
           ) : (
             <article className="border-outline-variant bg-surface-container-lowest overflow-hidden rounded-xl border shadow-md">
+              {/* En-tête synthétique visible uniquement à l'impression (US-S0.6) */}
+              <div className="print-only print-header">
+                Kairos ·{' '}
+                {new Date(selected.generated_at).toLocaleDateString('fr-FR', {
+                  dateStyle: 'long',
+                })}{' '}
+                · {selected.signal_count} signaux
+              </div>
+
               <div className="border-outline-variant bg-surface-bright flex flex-col items-start justify-between gap-3 border-b p-6 sm:flex-row sm:items-center">
                 <div>
                   <div className="mb-1 flex items-center gap-3">
@@ -310,6 +421,7 @@ export default function Digest(): React.ReactElement {
                   {selected.language}
                 </Badge>
               </div>
+
               <div className="prose prose-sm prose-slate max-w-none p-6">
                 <ReactMarkdown
                   components={{
@@ -361,18 +473,99 @@ export default function Digest(): React.ReactElement {
                 </ReactMarkdown>
               </div>
 
-              <footer className="bg-surface-container-low border-outline-variant text-on-surface-variant flex flex-wrap items-center gap-3 border-t px-6 py-3 text-xs">
-                <span>{selected.signal_count} signaux analysés</span>
-                <span>·</span>
-                <span>fenêtre {selected.window_hours} h</span>
-                <span>·</span>
-                <span>score ≥ {selected.min_score}</span>
-                <span>·</span>
-                <span className="font-mono">{selected.model_used ?? '—'}</span>
-                <span>·</span>
-                <span className="text-primary font-mono font-semibold">
-                  {formatCost(Number(selected.cost ?? 0), 5)}
-                </span>
+              {/* ----------------------------------------------------------------
+                  Footer restructuré (US-S0.5) :
+                  - Zone gauche : Actions (6 boutons compacts)
+                  - Zone droite : Métadonnées
+               ---------------------------------------------------------------- */}
+              <footer className="bg-surface-container-low border-outline-variant border-t px-6 py-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  {/* Zone gauche : Actions */}
+                  <div className="no-print flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyMarkdown}
+                      className="hover:bg-surface-container-low gap-1.5"
+                    >
+                      <ClipboardCopy className="h-3.5 w-3.5" aria-hidden="true" />
+                      Copier markdown
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleEmail}
+                      className="hover:bg-surface-container-low gap-1.5"
+                    >
+                      <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                      Email
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTweet}
+                      className="hover:bg-surface-container-low gap-1.5"
+                    >
+                      <IconX className="h-3.5 w-3.5" aria-hidden="true" />
+                      Tweet
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleLinkedIn}
+                      className="hover:bg-surface-container-low gap-1.5"
+                    >
+                      <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      LinkedIn
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadMd}
+                      className="hover:bg-surface-container-low gap-1.5"
+                    >
+                      <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                      Télécharger .md
+                    </Button>
+
+                    <div className="no-print">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportPdf}
+                        className="hover:bg-surface-container-low gap-1.5"
+                      >
+                        <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                        Exporter PDF
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Zone droite : Métadonnées */}
+                  <div className="text-on-surface-variant flex flex-wrap items-center gap-3 text-xs">
+                    <span>{selected.signal_count} signaux analysés</span>
+                    <span>·</span>
+                    <span>fenêtre {selected.window_hours} h</span>
+                    <span>·</span>
+                    <span>score ≥ {selected.min_score}</span>
+                    <span>·</span>
+                    <span className="font-mono">{selected.model_used ?? '—'}</span>
+                    <span>·</span>
+                    <span className="text-primary font-mono font-semibold">
+                      {formatCost(Number(selected.cost ?? 0), 5)}
+                    </span>
+                  </div>
+                </div>
               </footer>
             </article>
           )}

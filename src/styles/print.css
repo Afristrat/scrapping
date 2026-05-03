@@ -1,0 +1,65 @@
+/* ============================================================
+ * Kairos — Styles d'impression (PDF / window.print)
+ * ============================================================ */
+
+@media print {
+  /* Mise en page A4 */
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+
+  /* Masquer les éléments non pertinents pour l'impression */
+  header,
+  aside,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Fond blanc + texte noir pour tous les éléments */
+  body,
+  body * {
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Assurer que les liens restent lisibles */
+  a,
+  a:visited {
+    text-decoration: underline;
+    color: #000000 !important;
+  }
+
+  /* Éviter les coupures de page dans les blocs importants */
+  article,
+  section,
+  p,
+  h1,
+  h2,
+  h3,
+  h4 {
+    page-break-inside: avoid;
+  }
+
+  /* Afficher uniquement les éléments print-only */
+  .print-only {
+    display: block !important;
+  }
+
+  /* En-tête synthétique print */
+  .print-header {
+    font-size: 11pt;
+    font-weight: 600;
+    border-bottom: 1pt solid #000000;
+    padding-bottom: 6pt;
+    margin-bottom: 12pt;
+  }
+}
+
+/* En dehors du contexte print, cacher les éléments print-only */
+.print-only {
+  display: none;
+}
