@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
-import type { ScoreConsensus } from '@/types/scoring'
+import type { ScoreConsensus, ScoreRunEntry } from '@/types/scoring'
 
 /**
  * Calcule le niveau d'accord entre les modèles (agreement) à partir de la variance.
@@ -30,17 +30,33 @@ export function useScoreConsensus(signalId: string | null | undefined) {
     enabled: !!orgId && !!signalId,
     staleTime: 5 * 60 * 1000, // 5 min
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('scores')
-        .select('score_consensus, score_variance, models_used')
-        .eq('signal_id', signalId ?? '')
-        .eq('org_id', orgId ?? '')
-        .maybeSingle()
+      const [scoreRes, runsRes] = await Promise.all([
+        supabase
+          .from('scores')
+          .select('score_consensus, score_variance, models_used')
+          .eq('signal_id', signalId ?? '')
+          .eq('org_id', orgId ?? '')
+          .maybeSingle(),
+        supabase
+          .from('score_runs')
+          .select('model, provider, score, reasoning')
+          .eq('signal_id', signalId ?? '')
+          .eq('org_id', orgId ?? '')
+          .order('ts', { ascending: false }),
+      ])
 
-      if (error) throw error
+      if (scoreRes.error) throw scoreRes.error
+
+      const data = scoreRes.data
+      const runs: ScoreRunEntry[] = (runsRes.data ?? []).map((r) => ({
+        model: r.model,
+        provider: r.provider,
+        score: r.score,
+        reasoning: r.reasoning,
+      }))
 
       if (!data || data.score_consensus === null) {
-        return { consensus: null, variance: null, models: [], agreement: null }
+        return { consensus: null, variance: null, models: [], agreement: null, runs }
       }
 
       const consensus = data.score_consensus ?? null
@@ -52,6 +68,7 @@ export function useScoreConsensus(signalId: string | null | undefined) {
         variance,
         models,
         agreement: computeAgreement(variance),
+        runs,
       }
     },
   })
