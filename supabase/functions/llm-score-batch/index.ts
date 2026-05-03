@@ -26,8 +26,79 @@ interface DispatchResponse {
   provider_used?: string
 }
 
+interface ConsensusScoreResult {
+  model: string
+  provider: string
+  scores: Map<string, { score: number; reasoning: string }>
+  promptTokens: number
+  completionTokens: number
+  cost: number
+}
+
+/**
+ * Appelle dispatch-llm pour un modèle donné (format "provider:model_id").
+ * Retourne null si l'appel échoue (pour Promise.allSettled).
+ */
+async function callDispatchForModel(
+  supabaseUrl: string,
+  auth: string,
+  prompt: string,
+  signalCount: number,
+  modelSpec: string,
+  knownIds: Set<string>,
+): Promise<ConsensusScoreResult | null> {
+  const [provider, ...modelParts] = modelSpec.split(':')
+  const modelId = modelParts.join(':')
+
+  let dispatchResult: DispatchResponse
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
+      method: 'POST',
+      headers: { Authorization: auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task: 'scoring',
+        // Pass provider+model override so dispatch-llm uses the right model
+        provider_override: provider,
+        model_override: modelId,
+        messages: [{ role: 'user', content: prompt }],
+        options: {
+          max_tokens: Math.min(400 * signalCount, 8000),
+          response_format: { type: 'json_object' },
+        },
+      }),
+    })
+    dispatchResult = (await res.json()) as DispatchResponse
+  } catch {
+    return null
+  }
+
+  if (!dispatchResult.ok) return null
+
+  const raw = dispatchResult.content ?? ''
+  let parsedScores: Map<string, { score: number; reasoning: string }>
+  try {
+    const entries = parseScoringResponse(raw)
+    parsedScores = new Map()
+    for (const e of entries) {
+      if (knownIds.has(e.id)) parsedScores.set(e.id, { score: e.score, reasoning: e.reasoning })
+    }
+  } catch {
+    return null
+  }
+
+  const usage = dispatchResult.usage
+  return {
+    model: dispatchResult.model_used ?? modelId,
+    provider: dispatchResult.provider_used ?? provider,
+    scores: parsedScores,
+    promptTokens: usage?.prompt_tokens ?? 0,
+    completionTokens: usage?.completion_tokens ?? 0,
+    cost: usage?.cost ?? 0,
+  }
+}
+
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
+  if (req.method === 'OPTIONS') return json({ ok: true }, 204)
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
   const auth = req.headers.get('Authorization')
@@ -60,7 +131,10 @@ Deno.serve(async (req) => {
   const ids = body.signal_ids.slice(0, 30)
 
   const [signalsRes, settingsRes] = await Promise.all([
-    supabase.from('signals').select('id, source, title, raw_payload, signal_date').in('id', ids),
+    supabase
+      .from('signals')
+      .select('id, source, title, raw_payload, signal_date, org_id')
+      .in('id', ids),
     supabase.from('settings').select('*').eq('user_id', user.id).single(),
   ])
   if (signalsRes.error || !signalsRes.data) {
@@ -115,6 +189,226 @@ Deno.serve(async (req) => {
 
   const prompt = `${scoringPrompt}${criteriaBlock}\nTu vas scorer ${signals.length} signaux d'un coup. Pour CHAQUE signal, donne un score de 0 a 100 et une justification d'1 phrase courte.\n\nReponds en JSON strict (et UNIQUEMENT en JSON) :\n{"scores":[{"id":"<uuid du signal>","score":<0-100>,"reasoning":"<1 phrase>"},...]}\n\nSignaux a scorer :\n\n${itemsBlock}`
 
+  // Determine if consensus mode is active
+  const consensusModels: string[] = Array.isArray(settings.consensus_models)
+    ? settings.consensus_models
+    : []
+  const isConsensusMode = consensusModels.length >= 2
+
+  if (isConsensusMode) {
+    // ─────────────────────────────────────────────────────────────────────
+    // CONSENSUS MODE : score chaque signal avec N modèles en parallèle
+    // ─────────────────────────────────────────────────────────────────────
+    const knownIds = new Set(signals.map((s) => s.id))
+    const orgId = signals[0]?.org_id as string | undefined
+
+    // Lancer tous les appels dispatch en parallèle
+    const settled = await Promise.allSettled(
+      consensusModels.map((modelSpec) =>
+        callDispatchForModel(supabaseUrl, auth, prompt, signals.length, modelSpec, knownIds),
+      ),
+    )
+
+    const successResults: ConsensusScoreResult[] = settled
+      .filter(
+        (r): r is PromiseFulfilledResult<ConsensusScoreResult> =>
+          r.status === 'fulfilled' && r.value !== null,
+      )
+      .map((r) => r.value)
+
+    const failedCount = consensusModels.length - successResults.length
+
+    // Fallback si moins de 2 modèles ont réussi
+    if (successResults.length < 2) {
+      // On utilise le comportement original (dispatch-llm standard)
+      let dispatchResult: DispatchResponse
+      try {
+        const dispatchRes = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            task: 'scoring',
+            messages: [{ role: 'user', content: prompt }],
+            options: {
+              max_tokens: Math.min(400 * signals.length, 8000),
+              response_format: { type: 'json_object' },
+            },
+          }),
+        })
+        dispatchResult = (await dispatchRes.json()) as DispatchResponse
+      } catch (err) {
+        const formatted = formatError(err)
+        await supabase.from('logs').insert({
+          user_id: user.id,
+          action: 'llm:score-batch',
+          status: 'error',
+          payload: { stage: 'dispatch_fetch_fallback', count: signals.length, ...formatted },
+        })
+        return json({ error: 'dispatch_unreachable', ...formatted }, 502)
+      }
+
+      return await handleSingleDispatch(
+        supabase,
+        dispatchResult,
+        signals,
+        user.id,
+        auth,
+        supabaseUrl,
+        prompt,
+      )
+    }
+
+    // Insérer les score_runs individuels pour chaque modèle ayant réussi
+    const scoreRunsRows: Array<{
+      signal_id: string
+      org_id: string
+      user_id: string
+      model: string
+      provider: string
+      score: number
+      reasoning: string | null
+      prompt_tokens: number
+      completion_tokens: number
+      cost: number
+      ts: string
+    }> = []
+    const now = new Date().toISOString()
+
+    for (const result of successResults) {
+      for (const sig of signals) {
+        const v = result.scores.get(sig.id)
+        if (!v) continue
+        const sigOrgId = (sig.org_id as string | undefined) ?? orgId ?? ''
+        scoreRunsRows.push({
+          signal_id: sig.id,
+          org_id: sigOrgId,
+          user_id: user.id,
+          model: result.model,
+          provider: result.provider,
+          score: v.score,
+          reasoning: v.reasoning,
+          prompt_tokens: Math.round(result.promptTokens / signals.length),
+          completion_tokens: Math.round(result.completionTokens / signals.length),
+          cost: result.cost / signals.length,
+          ts: now,
+        })
+      }
+    }
+
+    if (scoreRunsRows.length > 0) {
+      const { error: runsErr } = await supabase.from('score_runs').insert(scoreRunsRows)
+      if (runsErr) {
+        const f = formatError(runsErr)
+        await supabase.from('logs').insert({
+          user_id: user.id,
+          action: 'llm:score-consensus',
+          status: 'error',
+          payload: { stage: 'db_insert_score_runs', count: scoreRunsRows.length, ...f },
+        })
+      }
+    }
+
+    // Calculer consensus + variance par signal
+    const scoreRows: Array<{
+      signal_id: string
+      user_id: string
+      score: number
+      reasoning: string
+      model_used: string
+      cost: number
+      score_consensus: number
+      score_variance: number
+      models_used: string[]
+    }> = []
+
+    let totalScored = 0
+    for (const sig of signals) {
+      const perModelScores = successResults
+        .map((r) => r.scores.get(sig.id))
+        .filter((v): v is { score: number; reasoning: string } => v !== undefined)
+
+      if (perModelScores.length === 0) continue
+
+      const scoreValues = perModelScores.map((v) => v.score)
+      const mean = scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length
+      const variance =
+        scoreValues.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / scoreValues.length
+      const modelsUsed = successResults.filter((r) => r.scores.has(sig.id)).map((r) => r.model)
+      const totalCostForSignal = successResults.reduce(
+        (acc, r) => acc + (r.scores.has(sig.id) ? r.cost / signals.length : 0),
+        0,
+      )
+      // Reasoning from the first model that scored this signal
+      const primaryReasoning = perModelScores[0].reasoning
+
+      scoreRows.push({
+        signal_id: sig.id,
+        user_id: user.id,
+        score: Math.round(mean),
+        reasoning: primaryReasoning,
+        model_used: modelsUsed[0] ?? 'consensus',
+        cost: totalCostForSignal,
+        score_consensus: Math.round(mean * 100) / 100,
+        score_variance: Math.round(variance * 10000) / 10000,
+        models_used: modelsUsed,
+      })
+      totalScored++
+    }
+
+    const { error: scoreErr } = await supabase
+      .from('scores')
+      .upsert(scoreRows, { onConflict: 'signal_id,user_id' })
+    if (scoreErr) {
+      const formatted = formatError(scoreErr)
+      await supabase.from('logs').insert({
+        user_id: user.id,
+        action: 'llm:score-consensus',
+        status: 'error',
+        payload: {
+          stage: 'db_upsert_scores',
+          count: signals.length,
+          ...formatted,
+          summary: summarizeError(scoreErr),
+        },
+      })
+      return json({ error: 'db_write_failed', ...formatted }, 500)
+    }
+
+    const totalCost = successResults.reduce((acc, r) => acc + r.cost, 0)
+
+    await supabase.from('logs').insert({
+      user_id: user.id,
+      action: 'llm:score-consensus',
+      status: 'ok',
+      payload: {
+        count: signals.length,
+        scored: totalScored,
+        missed: signals.length - totalScored,
+        models_requested: consensusModels.length,
+        models_succeeded: successResults.length,
+        models_failed: failedCount,
+        models_used: successResults.map((r) => r.model),
+        cost: totalCost,
+      },
+    })
+
+    return json(
+      {
+        batch_size: signals.length,
+        scored: totalScored,
+        missed: signals.length - totalScored,
+        cost: totalCost,
+        consensus: true,
+        models_used: successResults.map((r) => r.model),
+        models_failed: failedCount,
+      },
+      200,
+    )
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // MODE STANDARD (1 modèle ou consensus_models vide)
+  // ─────────────────────────────────────────────────────────────────────
   let dispatchResult: DispatchResponse
   try {
     const dispatchRes = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
@@ -150,17 +444,45 @@ Deno.serve(async (req) => {
     return json({ error: 'dispatch_unreachable', ...formatted }, 502)
   }
 
+  return await handleSingleDispatch(
+    supabase,
+    dispatchResult,
+    signals,
+    user.id,
+    auth,
+    supabaseUrl,
+    prompt,
+  )
+})
+
+/**
+ * Gère le flow standard (1 seul modèle) depuis la réponse dispatch-llm.
+ */
+async function handleSingleDispatch(
+  supabase: ReturnType<typeof createClient>,
+  dispatchResult: DispatchResponse,
+  signals: Array<{
+    id: string
+    source: string
+    title: string | null
+    raw_payload: unknown
+    signal_date: string | null
+  }>,
+  userId: string,
+  _auth: string,
+  _supabaseUrl: string,
+  _prompt: string,
+): Promise<Response> {
   if (!dispatchResult.ok) {
     const reason = dispatchResult.error ?? 'dispatch_failed'
     const detail = dispatchResult.detail
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
       action: 'llm:score-batch',
       status: 'error',
       payload: {
         stage: 'dispatch_call',
         count: signals.length,
-        prompt_chars: prompt.length,
         error: reason,
         detail,
         hint:
@@ -192,7 +514,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     const reason = err instanceof ScoreParseError ? err.message : 'unknown_parse_error'
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
       action: 'llm-score-batch:parse_fail',
       status: 'error',
       payload: {
@@ -205,13 +527,8 @@ Deno.serve(async (req) => {
         completion_tokens: completionTokens,
       },
     })
-    // Erreur métier (LLM a renvoyé du texte inexploitable) : on retourne 200
-    // pour que le frontend puisse afficher un toast clair plutôt qu'un
-    // « non-2xx status code » générique. Le coût LLM est tracé dans
-    // llm_costs car le call a bien eu lieu — l'utilisateur le verra dans
-    // /costs. Aucun signal n'est écrit en DB (pas de placeholder score=0).
     await supabase.from('llm_costs').insert({
-      user_id: user.id,
+      user_id: userId,
       task: 'scoring',
       model: dispatchModel,
       prompt_tokens: promptTokens,
@@ -232,18 +549,13 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Critical : do NOT insert placeholder rows for missed signals. A row
-  // with score=0 used to be written for every absent id, which polluted
-  // the dashboard with false-positive zeros. Missed ids stay unscored
-  // (visible in the UI as "—") and remain eligible for the next run via
-  // the `unscored_signals` RPC.
   const scoreRows = signals
     .filter((sig) => validById.has(sig.id))
     .map((sig) => {
       const v = validById.get(sig.id)!
       return {
         signal_id: sig.id,
-        user_id: user.id,
+        user_id: userId,
         score: v.score,
         reasoning: v.reasoning,
         model_used: dispatchModel,
@@ -257,7 +569,7 @@ Deno.serve(async (req) => {
   if (scoreErr) {
     const formatted = formatError(scoreErr)
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
       action: 'llm:score-batch',
       status: 'error',
       payload: {
@@ -271,7 +583,7 @@ Deno.serve(async (req) => {
   }
 
   await supabase.from('llm_costs').insert({
-    user_id: user.id,
+    user_id: userId,
     task: 'scoring',
     model: dispatchModel,
     prompt_tokens: promptTokens,
@@ -280,7 +592,7 @@ Deno.serve(async (req) => {
   })
 
   await supabase.from('logs').insert({
-    user_id: user.id,
+    user_id: userId,
     action: 'llm:score-batch',
     status: 'ok',
     payload: {
@@ -303,7 +615,7 @@ Deno.serve(async (req) => {
     },
     200,
   )
-})
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
