@@ -695,13 +695,76 @@ export type Database = {
           },
         ]
       }
+      score_runs: {
+        Row: {
+          completion_tokens: number | null
+          cost: number | null
+          id: string
+          model: string
+          org_id: string
+          prompt_tokens: number | null
+          provider: string
+          reasoning: string | null
+          score: number
+          signal_id: string
+          ts: string
+          user_id: string
+        }
+        Insert: {
+          completion_tokens?: number | null
+          cost?: number | null
+          id?: string
+          model: string
+          org_id: string
+          prompt_tokens?: number | null
+          provider: string
+          reasoning?: string | null
+          score: number
+          signal_id: string
+          ts?: string
+          user_id: string
+        }
+        Update: {
+          completion_tokens?: number | null
+          cost?: number | null
+          id?: string
+          model?: string
+          org_id?: string
+          prompt_tokens?: number | null
+          provider?: string
+          reasoning?: string | null
+          score?: number
+          signal_id?: string
+          ts?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_runs_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scores: {
         Row: {
           cost: number
           model_used: string
+          models_used: string[] | null
           org_id: string
           reasoning: string | null
           score: number
+          score_consensus: number | null
+          score_variance: number | null
           scored_at: string
           signal_id: string
           user_id: string
@@ -709,9 +772,12 @@ export type Database = {
         Insert: {
           cost?: number
           model_used: string
+          models_used?: string[] | null
           org_id?: string
           reasoning?: string | null
           score: number
+          score_consensus?: number | null
+          score_variance?: number | null
           scored_at?: string
           signal_id: string
           user_id: string
@@ -719,9 +785,12 @@ export type Database = {
         Update: {
           cost?: number
           model_used?: string
+          models_used?: string[] | null
           org_id?: string
           reasoning?: string | null
           score?: number
+          score_consensus?: number | null
+          score_variance?: number | null
           scored_at?: string
           signal_id?: string
           user_id?: string
@@ -1288,6 +1357,25 @@ export type Database = {
         }[]
       }
       is_app_admin: { Args: never; Returns: boolean }
+      list_app_admins: {
+        Args: never
+        Returns: {
+          email: string
+          granted_at: string
+          notes: string
+          user_id: string
+        }[]
+      }
+      list_org_members: {
+        Args: { p_org_id: string }
+        Returns: {
+          email: string
+          joined_at: string
+          org_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }[]
+      }
       seed_admin_prompts_for_org: {
         Args: { target_org_id: string }
         Returns: undefined
