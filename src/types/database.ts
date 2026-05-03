@@ -865,6 +865,7 @@ export type Database = {
           apify_config: Json
           arxiv_categories: string[]
           branding: Json
+          consensus_models: string[] | null
           daily_budget_usd: number
           language: string
           model_config: Json
@@ -883,6 +884,7 @@ export type Database = {
           apify_config?: Json
           arxiv_categories?: string[]
           branding?: Json
+          consensus_models?: string[] | null
           daily_budget_usd?: number
           language?: string
           model_config?: Json
@@ -901,6 +903,7 @@ export type Database = {
           apify_config?: Json
           arxiv_categories?: string[]
           branding?: Json
+          consensus_models?: string[] | null
           daily_budget_usd?: number
           language?: string
           model_config?: Json
