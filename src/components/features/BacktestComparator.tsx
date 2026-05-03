@@ -58,7 +58,7 @@ export function BacktestComparator({ results }: Props) {
     ).length
 
     const demoted = results.filter(
-      (r) => r.backtested_score < 70 && (r.current_score ?? 100) >= 70,
+      (r) => r.backtested_score < 70 && r.current_score !== null && r.current_score >= 70,
     ).length
 
     return { avgDelta, promoted, demoted, total: results.length }
@@ -96,6 +96,7 @@ export function BacktestComparator({ results }: Props) {
           <CardContent className="pt-4 pb-4">
             <p className="text-muted-foreground text-xs">Moyenne delta</p>
             <p
+              data-testid="kpi-avg-delta"
               className={`mt-1 text-2xl font-bold ${
                 kpis.avgDelta > 0
                   ? 'text-green-600 dark:text-green-400'
@@ -113,7 +114,10 @@ export function BacktestComparator({ results }: Props) {
         <Card>
           <CardContent className="pt-4 pb-4">
             <p className="text-muted-foreground text-xs">Nouveaux &gt; 70</p>
-            <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
+            <p
+              data-testid="kpi-promoted"
+              className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400"
+            >
               {kpis.promoted}
             </p>
           </CardContent>
@@ -122,7 +126,10 @@ export function BacktestComparator({ results }: Props) {
         <Card>
           <CardContent className="pt-4 pb-4">
             <p className="text-muted-foreground text-xs">Rétrogradés &lt; 70</p>
-            <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
+            <p
+              data-testid="kpi-demoted"
+              className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400"
+            >
               {kpis.demoted}
             </p>
           </CardContent>
@@ -131,7 +138,9 @@ export function BacktestComparator({ results }: Props) {
         <Card>
           <CardContent className="pt-4 pb-4">
             <p className="text-muted-foreground text-xs">Total signaux</p>
-            <p className="text-foreground mt-1 text-2xl font-bold">{kpis.total}</p>
+            <p data-testid="kpi-total" className="text-foreground mt-1 text-2xl font-bold">
+              {kpis.total}
+            </p>
           </CardContent>
         </Card>
       </div>
