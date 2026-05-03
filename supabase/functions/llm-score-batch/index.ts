@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError, summarizeError } from '../_shared/errors.ts'
 import { parseScoringResponse, ScoreParseError } from '../_shared/parse-score.ts'
+import { buildEnrichPayload, triggerEnrichSignal } from './enrich-trigger.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -258,6 +259,7 @@ Deno.serve(async (req) => {
         auth,
         supabaseUrl,
         prompt,
+        orgId,
       )
     }
 
@@ -379,6 +381,15 @@ Deno.serve(async (req) => {
 
     const totalCost = successResults.reduce((acc, r) => acc + r.cost, 0)
 
+    // Déclencher enrich-signal best-effort après scoring consensus
+    const consensusScoredIds = scoreRows.map((r) => r.signal_id)
+    const enrichPayloadConsensus = buildEnrichPayload(consensusScoredIds, orgId)
+    let enrichTriggeredConsensus = false
+    const enrichTriggeredAtConsensus = new Date().toISOString()
+    if (enrichPayloadConsensus !== null) {
+      enrichTriggeredConsensus = triggerEnrichSignal(supabaseUrl, auth, enrichPayloadConsensus)
+    }
+
     await supabase.from('logs').insert({
       user_id: user.id,
       action: 'llm:score-consensus',
@@ -392,6 +403,8 @@ Deno.serve(async (req) => {
         models_failed: failedCount,
         models_used: successResults.map((r) => r.model),
         cost: totalCost,
+        enrich_triggered: enrichTriggeredConsensus,
+        enrichTriggeredAt: enrichTriggeredConsensus ? enrichTriggeredAtConsensus : null,
       },
     })
 
@@ -404,6 +417,7 @@ Deno.serve(async (req) => {
         consensus: true,
         models_used: successResults.map((r) => r.model),
         models_failed: failedCount,
+        enrich_triggered: enrichTriggeredConsensus,
       },
       200,
     )
@@ -447,6 +461,7 @@ Deno.serve(async (req) => {
     return json({ error: 'dispatch_unreachable', ...formatted }, 502)
   }
 
+  const standardOrgId = signals[0]?.org_id as string | undefined
   return await handleSingleDispatch(
     supabase,
     dispatchResult,
@@ -455,6 +470,7 @@ Deno.serve(async (req) => {
     auth,
     supabaseUrl,
     prompt,
+    standardOrgId,
   )
 })
 
@@ -472,9 +488,10 @@ async function handleSingleDispatch(
     signal_date: string | null
   }>,
   userId: string,
-  _auth: string,
-  _supabaseUrl: string,
+  auth: string,
+  supabaseUrl: string,
   _prompt: string,
+  orgId?: string,
 ): Promise<Response> {
   if (!dispatchResult.ok) {
     const reason = dispatchResult.error ?? 'dispatch_failed'
@@ -594,6 +611,15 @@ async function handleSingleDispatch(
     cost: totalCost,
   })
 
+  // Déclencher enrich-signal best-effort après scoring standard
+  const scoredIds = scoreRows.map((r) => r.signal_id)
+  const enrichPayload = buildEnrichPayload(scoredIds, orgId)
+  let enrichTriggered = false
+  const enrichTriggeredAt = new Date().toISOString()
+  if (enrichPayload !== null) {
+    enrichTriggered = triggerEnrichSignal(supabaseUrl, auth, enrichPayload)
+  }
+
   await supabase.from('logs').insert({
     user_id: userId,
     action: 'llm:score-batch',
@@ -606,6 +632,8 @@ async function handleSingleDispatch(
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
       model: dispatchModel,
+      enrich_triggered: enrichTriggered,
+      enrichTriggeredAt: enrichTriggered ? enrichTriggeredAt : null,
     },
   })
 
@@ -615,6 +643,7 @@ async function handleSingleDispatch(
       scored: validById.size,
       missed: signals.length - validById.size,
       cost: totalCost,
+      enrich_triggered: enrichTriggered,
     },
     200,
   )

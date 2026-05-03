@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Archive, ArchiveRestore, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +18,15 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { supabase } from '@/lib/supabase'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 import { usePersonas, type PersonaRow, type PersonaKind } from '@/hooks/usePersonas'
+import {
+  SuggestionsPanel,
+  type Suggestions,
+  type SuggestedHat,
+  type SuggestedProject,
+} from '@/components/features/SuggestionsPanel'
 
 /** Génère un slug depuis un nom */
 function toSlug(name: string): string {
@@ -65,6 +74,7 @@ const emptyForm = (): PersonaFormValues => ({
 
 export function PersonasEditor() {
   const [showArchived, setShowArchived] = useState(false)
+  const orgId = useCurrentOrgId()
   const {
     data: personas = [],
     isLoading,
@@ -81,8 +91,84 @@ export function PersonasEditor() {
   const [form, setForm] = useState<PersonaFormValues>(emptyForm())
   const [keyManuallyEdited, setKeyManuallyEdited] = useState(false)
 
+  // État suggestions IA
+  const [isSuggesting, setIsSuggesting] = useState(false)
+  const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
+
   if (isLoading) {
     return <div className="text-on-surface-variant text-sm">Chargement des personas…</div>
+  }
+
+  /* ── Suggestions IA ──────────────────────────────────────────────────────── */
+
+  const handleSuggestAI = async () => {
+    if (!orgId) return
+    setIsSuggesting(true)
+    setSuggestions(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('suggest-personas', {
+        body: { org_id: orgId },
+      })
+      if (error) throw error
+      const result = data as { suggestions: Suggestions }
+      if (!result?.suggestions) throw new Error('Réponse inattendue du serveur')
+      setSuggestions(result.suggestions)
+    } catch (err) {
+      toast.error('Impossible de générer des suggestions', {
+        description: err instanceof Error ? err.message.slice(0, 200) : 'Erreur inconnue',
+      })
+    } finally {
+      setIsSuggesting(false)
+    }
+  }
+
+  const handleAcceptHat = (hat: SuggestedHat) => {
+    createPersona.mutate(
+      {
+        kind: 'hat',
+        name: hat.name,
+        key: hat.key,
+        context_md: hat.context_md || null,
+        is_shared: false,
+      },
+      {
+        onSuccess: () => {
+          // Retirer la suggestion acceptée du panneau
+          setSuggestions((prev) =>
+            prev ? { ...prev, hats: prev.hats.filter((h) => h.key !== hat.key) } : prev,
+          )
+        },
+      },
+    )
+  }
+
+  const handleAcceptProject = (project: SuggestedProject) => {
+    createPersona.mutate(
+      {
+        kind: 'project',
+        name: project.name,
+        key: project.key,
+        context_md: project.context_md || null,
+        date_start: project.date_start || null,
+        date_end: project.date_end || null,
+        is_shared: false,
+      },
+      {
+        onSuccess: () => {
+          setSuggestions((prev) =>
+            prev ? { ...prev, projects: prev.projects.filter((p) => p.key !== project.key) } : prev,
+          )
+        },
+      },
+    )
+  }
+
+  const handleIgnoreSuggestion = (kind: 'hat' | 'project', key: string) => {
+    setSuggestions((prev) => {
+      if (!prev) return prev
+      if (kind === 'hat') return { ...prev, hats: prev.hats.filter((h) => h.key !== key) }
+      return { ...prev, projects: prev.projects.filter((p) => p.key !== key) }
+    })
   }
 
   /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -354,17 +440,40 @@ export function PersonasEditor() {
   /* ── Rendu principal ─────────────────────────────────────────────────── */
   return (
     <div className="space-y-8">
-      {/* Toggle affichage archivées */}
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id="show-archived"
-          checked={showArchived}
-          onCheckedChange={(v) => setShowArchived(!!v)}
-        />
-        <Label htmlFor="show-archived" className="cursor-pointer text-sm">
-          Afficher les personas archivées
-        </Label>
+      {/* Barre d'actions en haut */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="show-archived"
+            checked={showArchived}
+            onCheckedChange={(v) => setShowArchived(!!v)}
+          />
+          <Label htmlFor="show-archived" className="cursor-pointer text-sm">
+            Afficher les personas archivées
+          </Label>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={isSuggesting || !orgId}
+          onClick={handleSuggestAI}
+          className="gap-1.5"
+        >
+          <Sparkles className="h-4 w-4" />
+          {isSuggesting ? 'Analyse en cours…' : 'Suggérer via IA'}
+        </Button>
       </div>
+
+      {/* Panneau suggestions IA */}
+      {suggestions !== null && (suggestions.hats.length > 0 || suggestions.projects.length > 0) && (
+        <SuggestionsPanel
+          suggestions={suggestions}
+          onAcceptHat={handleAcceptHat}
+          onAcceptProject={handleAcceptProject}
+          onIgnore={handleIgnoreSuggestion}
+        />
+      )}
 
       {ALL_KINDS.map(renderSection)}
     </div>

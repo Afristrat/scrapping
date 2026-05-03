@@ -1237,7 +1237,7 @@
       "id": "S-10A.9",
       "wave": "10.A",
       "title": "Edge fn suggest-personas (recommandations IA)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 9,
       "effort": "M",
@@ -1253,7 +1253,23 @@
         "Pre-rempli nom+key+context_md",
         "Accept/refuse individuel",
         "Tests"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "commit": "pending",
+        "files_created": [
+          "supabase/functions/suggest-personas/index.ts",
+          "supabase/functions/suggest-personas/suggest.ts",
+          "supabase/functions/suggest-personas/suggest.test.ts",
+          "src/components/features/SuggestionsPanel.tsx"
+        ],
+        "files_modified": ["src/components/features/PersonasEditor.tsx"],
+        "deno_tests": "5/5 pass",
+        "typecheck": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "195/195 pass",
+        "deploy": "ok (Supabase project crplceoptyeslqyfcqvj)"
+      }
     },
     {
       "id": "S-10A.10",
