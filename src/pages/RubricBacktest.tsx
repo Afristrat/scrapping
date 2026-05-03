@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { BacktestComparator } from '@/components/features/BacktestComparator'
-import { useBacktestRubric, type BacktestResult } from '@/hooks/useBacktestRubric'
+import { useBacktestRubric, type BacktestResult, type BacktestRubricPayload } from '@/hooks/useBacktestRubric'
 import { useBacktestCostEstimate } from '@/hooks/useBacktestCostEstimate'
 import { useFormatCost } from '@/hooks/useFormatCost'
 import { useSettings } from '@/hooks/useSettings'
@@ -30,7 +30,7 @@ const CONFIRM_COST_THRESHOLD_USD = 5.5
 export default function RubricBacktest() {
   const { data: settings } = useSettings()
   const formatCost = useFormatCost()
-  const backtestMutation = useBacktestRubric()
+  const { cancel: cancelBacktest, ...backtestMutation } = useBacktestRubric()
   const createRubricMutation = useCreateRubric()
 
   const [rubricPrompt, setRubricPrompt] = useState('')
@@ -99,26 +99,26 @@ export default function RubricBacktest() {
 
   const runBacktest = () => {
     const criteria = parsedCriteria()
-    backtestMutation.mutate(
-      {
-        rubric_prompt: rubricPrompt,
-        criteria: criteria ?? undefined,
-        max_signals: signalCount,
+    const payload: BacktestRubricPayload = {
+      rubric_prompt: rubricPrompt,
+      criteria: criteria ?? undefined,
+      max_signals: signalCount,
+    }
+    backtestMutation.mutate(payload, {
+      onSuccess: (data) => {
+        setResults(data)
+        toast.success(`Backtest terminé — ${data.length} signaux comparés`)
       },
-      {
-        onSuccess: (data) => {
-          setResults(data)
-          toast.success(`Backtest terminé — ${data.length} signaux comparés`)
-        },
-        onError: (err) => {
-          if (err.message === 'backtest_in_progress') {
-            toast.warning('Un backtest est déjà en cours pour ce compte.')
-          } else {
-            toast.error('Erreur lors du backtest', { description: err.message.slice(0, 200) })
-          }
-        },
+      onError: (err) => {
+        if (err.message === 'backtest_in_progress') {
+          // Le toast est déjà géré dans useBacktestRubric.onError
+        } else if (err.message === 'backtest_cancelled') {
+          toast.info('Backtest annulé')
+        } else {
+          toast.error('Erreur lors du backtest', { description: err.message.slice(0, 200) })
+        }
       },
-    )
+    })
   }
 
   const handleAdoptRubric = () => {
@@ -249,8 +249,8 @@ export default function RubricBacktest() {
             )}
           </div>
 
-          {/* Bouton lancer */}
-          <div className="flex items-center gap-3">
+          {/* Bouton lancer + Annuler */}
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={handleLaunch}
               disabled={backtestMutation.isPending || !rubricPrompt.trim()}
@@ -269,9 +269,19 @@ export default function RubricBacktest() {
               )}
             </Button>
             {backtestMutation.isPending && (
-              <p className="text-muted-foreground text-sm">
-                Durée estimée : {estimatedSeconds}s restantes
-              </p>
+              <>
+                <p className="text-muted-foreground text-sm">
+                  Durée estimée : ~{estimatedSeconds}s restantes
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={cancelBacktest}
+                  className="text-destructive hover:text-destructive"
+                >
+                  Annuler
+                </Button>
+              </>
             )}
           </div>
         </CardContent>
