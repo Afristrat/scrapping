@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   Clock,
   Mail,
+  Plus,
   ShieldAlert,
   TrendingDown,
   TrendingUp,
@@ -202,9 +203,20 @@ export default function AdminCockpit(): React.ReactElement {
             Vue cross-tenant — réservée aux super-admins de la plateforme.
           </p>
         </div>
-        <p className="text-on-surface-variant text-xs">
-          Mis à jour : {new Date(generated_at).toLocaleTimeString('fr-FR')}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-on-surface-variant text-xs">
+            Mis à jour : {new Date(generated_at).toLocaleTimeString('fr-FR')}
+          </p>
+          <Link to="/admin/csm">
+            <Button
+              size="sm"
+              className="bg-primary text-on-primary hover:bg-primary/90 gap-1.5 rounded-lg"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Onboarder un client
+            </Button>
+          </Link>
+        </div>
       </header>
 
       {/* A. KPI Cards */}

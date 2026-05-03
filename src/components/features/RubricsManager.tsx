@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Check, FlaskConical, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function RubricsManager({ activeRubricId }: Props) {
+  const navigate = useNavigate()
   const { data: rubrics, isLoading } = useRubrics()
   const createMutation = useCreateRubric()
   const updateMutation = useUpdateRubric()
@@ -129,6 +131,17 @@ export function RubricsManager({ activeRubricId }: Props) {
                   Activer
                 </Button>
               )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/settings/rubrics/backtest', { state: { rubric } })}
+                className="border-outline-variant gap-1 text-xs"
+                aria-label="Tester cette grille"
+              >
+                <FlaskConical className="h-3.5 w-3.5" />
+                Tester
+              </Button>
               <Button
                 type="button"
                 variant="outline"
