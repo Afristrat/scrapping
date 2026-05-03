@@ -1,5 +1,19 @@
 # PRD : Wave 9 — 5 features moat (cœur scoring)
 
+> **⚠️ STATUT 2026-05-03 — PARTIELLEMENT FREEZÉ POST-PIVOT SECOND CERVEAU**
+>
+> Wave 9.1 (Multi-LLM consensus) et 9.2 (Backtest rubrics) **livrées et mergées sur main** — restent valides comme attributs d'enrichissement.
+>
+> Wave 9.3 (Negative propagation), 9.4 (Cross-source corroboration) et 9.5 (Author Reputation) **freezées**. Leur logique est réintégrée dans le PRD Wave 10 Second Cerveau (`docs/handoffs/2026-05-03-wave-10-second-cerveau-prd.md`) :
+>
+> - 9.3 → US-10C.4 (clustering avec embeddings) + signal_flags potentiel en Phase E
+> - 9.4 → US-10C.4 (clustering pour cross-source corroboration via embeddings)
+> - 9.5 → US-10C.3 (compute-reputation hebdomadaire, intégré au modèle entities)
+>
+> Le scoring n'est plus LE moat. Le moat est désormais : taxonomie tenant + graph 90 j+ + vues paramétrables + historique d'exploitation.
+>
+> ---
+
 > **Date** : 2026-05-03
 > **Source d'analyse** : `docs/strategy/2026-05-02-moats-and-value-capture.md` (skill `moat-hunter`)
 > **Effort total estimé** : 26 user stories · 17-25 jours-agent (Sonnet 4.6 / Haiku 4.5)
