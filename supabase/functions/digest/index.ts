@@ -32,6 +32,11 @@ type Language = 'fr' | 'en' | 'es'
 interface RequestBody {
   window_hours?: number
   min_score?: number
+  /**
+   * Override langue settings utilisateur. Permet override per-brief depuis l UI
+   * `/digest` sans modifier les Settings globaux. Si absent, fallback settings.language.
+   */
+  language?: 'fr' | 'en' | 'es'
 }
 
 interface DispatchResponse {
@@ -109,7 +114,7 @@ Deno.serve(async (req: Request) => {
   const windowHours = clampInt(body.window_hours, 1, 24 * 30, DEFAULT_WINDOW_HOURS)
   const minScore = clampInt(body.min_score, 0, 100, DEFAULT_MIN_SCORE)
 
-  // ---- 1. Read user language from settings
+  // ---- 1. Resolve language : body override (per-brief) ou fallback settings
   const settingsRes = await supabase
     .from('settings')
     .select('language')
@@ -118,8 +123,9 @@ Deno.serve(async (req: Request) => {
   if (settingsRes.error || !settingsRes.data) {
     return json({ ok: false, error: 'settings_not_found' }, 404)
   }
+  // Priorité : body.language (override UI per-brief) > settings.language > 'fr'
   const language = normalizeLanguage(
-    (settingsRes.data as { language?: string | null }).language ?? null,
+    body.language ?? (settingsRes.data as { language?: string | null }).language ?? null,
   )
 
   // ---- 2. Fetch top scored signals on the window

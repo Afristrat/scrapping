@@ -34,8 +34,10 @@ import {
   useGenerateDigest,
   useDeleteDigest,
   DigestError,
+  type DigestLanguage,
   type DigestRow,
 } from '@/hooks/useDigest'
+import { useSettings } from '@/hooks/useSettings'
 import { useFormatCost } from '@/hooks/useFormatCost'
 import { copyToClipboard, downloadAsMarkdown, formatDateForFilename } from '@/lib/download-utils'
 
@@ -128,6 +130,14 @@ export default function Digest(): React.ReactElement {
   const generate = useGenerateDigest()
   const remove = useDeleteDigest()
   const formatCost = useFormatCost()
+  const { data: settings } = useSettings()
+  // Langue de génération : override par-brief depuis cette page, fallback settings global
+  const settingsLanguage = (settings?.language as DigestLanguage | undefined) ?? 'fr'
+  const [briefLanguage, setBriefLanguage] = useState<DigestLanguage>(settingsLanguage)
+  // Re-sync si settings.language change après le mount initial
+  if (briefLanguage !== settingsLanguage && !generate.isPending) {
+    // no-op, on garde le choix utilisateur per-brief
+  }
 
   const digests = useMemo<DigestRow[]>(() => digestsQuery.data ?? [], [digestsQuery.data])
   const selected = useMemo<DigestRow | null>(() => {
@@ -141,7 +151,11 @@ export default function Digest(): React.ReactElement {
 
   const minScore = minScoreRange[0] ?? 60
 
-  const submitGeneration = (params: { window_hours: number; min_score: number }): void => {
+  const submitGeneration = (params: {
+    window_hours: number
+    min_score: number
+    language: DigestLanguage
+  }): void => {
     generate.mutate(params, {
       onSuccess: (resp) => {
         setSelectedId(resp.digest_id)
@@ -150,7 +164,11 @@ export default function Digest(): React.ReactElement {
   }
 
   const handleGenerate = (): void => {
-    submitGeneration({ window_hours: windowHours, min_score: minScore })
+    submitGeneration({
+      window_hours: windowHours,
+      min_score: minScore,
+      language: briefLanguage,
+    })
   }
 
   const digestError = generate.error instanceof DigestError ? generate.error : null
@@ -167,7 +185,11 @@ export default function Digest(): React.ReactElement {
 
   const handleRetryWithLowerScore = (): void => {
     setMinScoreRange([retryScore])
-    submitGeneration({ window_hours: windowHours, min_score: retryScore })
+    submitGeneration({
+      window_hours: windowHours,
+      min_score: retryScore,
+      language: briefLanguage,
+    })
   }
 
   const handleDelete = (id: string): void => {
@@ -270,7 +292,7 @@ export default function Digest(): React.ReactElement {
               Fenêtre
             </label>
             <Select value={String(windowHours)} onValueChange={(v) => setWindowHours(Number(v))}>
-              <SelectTrigger id="window-hours" className="w-32">
+              <SelectTrigger id="window-hours" className="w-28">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -279,6 +301,28 @@ export default function Digest(): React.ReactElement {
                     {opt.label}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="brief-language"
+              className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
+            >
+              Langue
+            </label>
+            <Select
+              value={briefLanguage}
+              onValueChange={(v) => setBriefLanguage(v as DigestLanguage)}
+            >
+              <SelectTrigger id="brief-language" className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                <SelectItem value="en">🇬🇧 English</SelectItem>
+                <SelectItem value="es">🇪🇸 Español</SelectItem>
               </SelectContent>
             </Select>
           </div>
