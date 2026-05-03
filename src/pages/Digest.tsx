@@ -73,6 +73,30 @@ function extractConfidenceTag(children: React.ReactNode): {
   return { level, rest: [remaining, ...arr.slice(1)] }
 }
 
+/**
+ * Pre-process le markdown LLM pour normaliser les variations de format que
+ * le LLM émet malgré le prompt strict :
+ *   "[Likely] **insight**"   (tag hors du bold)   → "**[Likely] insight**"
+ *   "**[Likely]** insight"   (deux blocs strong)  → "**[Likely] insight**"
+ *
+ * Sans ce pre-process, le custom strong renderer ne détecte pas le tag et il
+ * s affiche en texte brut au lieu d un Badge coloré.
+ */
+const CONFIDENCE_TAG_REGEX_PART =
+  '(Almost certain|Very likely|Likely|Possible|Speculative|Quasi-certain|Très probable|Tres probable|Probable|Spéculatif|Speculatif|Casi seguro|Muy probable|Posible|Especulativo)'
+
+function normalizeConfidenceMarkers(content: string): string {
+  let normalized = content.replace(
+    new RegExp(`\\[${CONFIDENCE_TAG_REGEX_PART}\\]\\s+\\*\\*([^*]+)\\*\\*`, 'gi'),
+    '**[$1] $2**',
+  )
+  normalized = normalized.replace(
+    new RegExp(`\\*\\*\\[${CONFIDENCE_TAG_REGEX_PART}\\]\\*\\*\\s+([^\\n*]+)`, 'gi'),
+    '**[$1] $2**',
+  )
+  return normalized
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -526,7 +550,7 @@ export default function Digest(): React.ReactElement {
                     ),
                   }}
                 >
-                  {selected.content}
+                  {normalizeConfidenceMarkers(selected.content)}
                 </ReactMarkdown>
               </div>
 

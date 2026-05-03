@@ -79,7 +79,13 @@ export function useSignals(filters: SignalFilters) {
         q = q.not('scores', 'is', null).gte('scores.score', filters.minScore)
       }
 
-      const { data, error } = await q.order('scraped_at', { ascending: false }).limit(500)
+      // Limit assez large pour couvrir TOUT le corpus utilisateur typique
+      // (jusqu à 5000 signaux). Sinon, le tri par scraped_at DESC suivi de la
+      // limit faisait sauter les top scores des sources moins prolifiques :
+      // ex 640 Reddit + 108 ArXiv = 748 total → limit 500 coupait 248 ArXiv
+      // potentiellement haut score (95, 90). Le tri client-side par score
+      // remontait alors uniquement les Reddit récents.
+      const { data, error } = await q.order('scraped_at', { ascending: false }).limit(5000)
       if (error) throw error
 
       const rows: SignalRow[] = (data as unknown as RawSignal[]).map((s) => ({
