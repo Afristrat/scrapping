@@ -21,6 +21,12 @@ export interface DigestRow {
 export interface GenerateDigestArgs {
   window_hours?: number
   min_score?: number
+  /**
+   * Override la langue settings (« fr » par défaut). Permet à l'utilisateur
+   * de choisir la langue du brief directement sur la page /digest sans
+   * avoir à modifier ses Settings.
+   */
+  language?: DigestLanguage
 }
 
 export interface GenerateDigestResponse {
@@ -138,9 +144,10 @@ export function useGenerateDigest(): ReturnType<
       const token = sessionData.session?.access_token
       if (!token) throw new Error('not_authenticated')
 
-      const body: Record<string, number> = {}
+      const body: Record<string, number | string> = {}
       if (typeof args.window_hours === 'number') body.window_hours = args.window_hours
       if (typeof args.min_score === 'number') body.min_score = args.min_score
+      if (args.language) body.language = args.language
 
       const resp = await fetch(url, {
         method: 'POST',
