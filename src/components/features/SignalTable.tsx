@@ -16,6 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ConsensusBadge } from '@/components/features/ConsensusBadge'
 import { ScoreCell } from '@/components/features/ScoreCell'
 import { SOURCE_META } from '@/lib/source-meta'
 import { cn } from '@/lib/utils'
@@ -225,15 +226,18 @@ export function SignalTable({
                     />
                   </td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <ScoreCell
-                      signalId={r.id}
-                      score={r.score}
-                      reasoning={r.reasoning}
-                      modelUsed={r.model_used}
-                      scoredAt={r.scored_at}
-                      rubricName={activeRubricName ?? null}
-                      flashToken={flashedSignalIds?.has(r.id) ? flashedSignalIds : null}
-                    />
+                    <div className="flex flex-col items-start gap-1">
+                      <ScoreCell
+                        signalId={r.id}
+                        score={r.score}
+                        reasoning={r.reasoning}
+                        modelUsed={r.model_used}
+                        scoredAt={r.scored_at}
+                        rubricName={activeRubricName ?? null}
+                        flashToken={flashedSignalIds?.has(r.id) ? flashedSignalIds : null}
+                      />
+                      <ConsensusBadge signalId={r.id} />
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <Badge
