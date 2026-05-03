@@ -9,6 +9,7 @@ import {
   Share2,
   Download,
   FileText,
+  Link2,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -17,6 +18,7 @@ import { toast } from 'sonner'
 
 import { ConfidenceBadge } from '@/components/features/ConfidenceBadge'
 import { detectConfidenceLevel } from '@/lib/confidence-levels'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -262,8 +264,63 @@ export default function Digest(): React.ReactElement {
     downloadAsMarkdown(selected.content, filename)
   }
 
-  const handleExportPdf = (): void => {
-    window.print()
+  const handleCreatePublicShare = async (): Promise<void> => {
+    if (!selected) return
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) {
+        toast.error('Session expirée — reconnecte-toi')
+        return
+      }
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-public-share`
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ digest_id: selected.id }),
+      })
+      const data = (await r.json()) as { ok: boolean; url?: string; error?: string }
+      if (!data.ok || !data.url) {
+        toast.error(`Erreur lien public : ${data.error ?? 'inconnu'}`)
+        return
+      }
+      try {
+        await copyToClipboard(data.url)
+        toast.success('Lien public copié dans le presse-papier', {
+          description: data.url,
+        })
+      } catch {
+        toast.success(`Lien public créé : ${data.url}`)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+      toast.error(`Erreur lien public : ${msg.slice(0, 200)}`)
+    }
+  }
+
+  const handleExportPdf = async (): Promise<void> => {
+    if (!selected) return
+    try {
+      // Lazy load @react-pdf/renderer (700+ KB) uniquement au click
+      const [{ pdf }, { DigestPdf }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/features/DigestPdf'),
+      ])
+      toast.info('Génération du PDF en cours…')
+      const blob = await pdf(<DigestPdf digest={selected} />).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `kairos-brief-${formatDateForFilename(selected.generated_at)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('PDF téléchargé')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+      toast.error(`Échec génération PDF : ${msg.slice(0, 200)}`)
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -682,6 +739,20 @@ export default function Digest(): React.ReactElement {
                       <Download className="h-3.5 w-3.5" aria-hidden="true" />
                       Télécharger .md
                     </Button>
+
+                    <div className="no-print">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCreatePublicShare}
+                        className="hover:bg-surface-container-low gap-1.5"
+                        title="Génère un lien public partageable (sans login) — valide 30 jours"
+                      >
+                        <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        Lien public
+                      </Button>
+                    </div>
 
                     <div className="no-print">
                       <Button

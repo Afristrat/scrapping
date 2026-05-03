@@ -23,6 +23,7 @@ import OnboardingFirstRun from '@/pages/onboarding/OnboardingFirstRun'
 import OnboardingFlow from '@/pages/onboarding/OnboardingFlow'
 import OnboardingProfile from '@/pages/onboarding/OnboardingProfile'
 import PricingPublic from '@/pages/PricingPublic'
+import PublicShare from '@/pages/PublicShare'
 import Settings from '@/pages/Settings'
 import Signup from '@/pages/Signup'
 import StatusPage from '@/pages/StatusPage'
@@ -48,6 +49,8 @@ export const router = createBrowserRouter([
   { path: '/signup', element: <Signup /> },
   // Public invitation acceptance (auth gate handled inside the page)
   { path: '/accept-invitation/:token', element: <AcceptInvitation /> },
+  // Wave 11 — Lien public partagé (sans auth) pour briefs digest
+  { path: '/share/:slug', element: <PublicShare /> },
   // Auth-protected onboarding flow (post-signup wizard)
   {
     element: <ProtectedRoute />,
