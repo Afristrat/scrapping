@@ -1275,19 +1275,31 @@
       "id": "S-10A.10",
       "wave": "10.A",
       "title": "llm-score-batch trigger enrich-signal",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-03",
       "agentModel": "haiku",
       "priority": 10,
       "effort": "S",
       "dependencies": ["S-10A.6"],
-      "filesCreate": [],
+      "filesCreate": [
+        "supabase/functions/llm-score-batch/enrich-trigger.ts",
+        "supabase/functions/llm-score-batch/enrich-trigger.test.ts"
+      ],
       "filesModify": ["supabase/functions/llm-score-batch/index.ts"],
       "acceptanceCriteria": [
         "Apres scoring batch, call parallel /enrich-signal",
         "Best-effort si fail",
         "Logs timing",
         "Tests Deno"
-      ]
+      ],
+      "metadata": {
+        "commit": "b77ea82",
+        "deno_tests": "7/7 pass",
+        "typecheck": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "195/195 pass",
+        "deploy": "ok (Supabase project crplceoptyeslqyfcqvj)"
+      }
     },
     {
       "id": "S-10B.1",
