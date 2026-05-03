@@ -996,7 +996,7 @@
       "id": "S-10A.1",
       "wave": "10.A",
       "title": "DB schema topics_taxonomy + RLS",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 1,
       "effort": "S",
@@ -1009,13 +1009,25 @@
         "RLS org-scoped",
         "Self-ref parent_id ON DELETE CASCADE",
         "Types regen"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.2",
       "wave": "10.A",
       "title": "Seed taxonomie commune (40-60 topics IPCRA-aware)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 2,
       "effort": "M",
@@ -1026,13 +1038,25 @@
         "Hierarchie Tech IA / Business / Vertical / Meta",
         "is_seeded=true",
         "Inserees pour chaque org existante"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.3",
       "wave": "10.A",
       "title": "DB schema personas (PARA Projects+Hats+Resources)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 3,
       "effort": "M",
@@ -1044,13 +1068,25 @@
         "RLS user-or-org-shared",
         "UNIQUE (org_id, key)",
         "Project a date_end Hat n en a pas"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.4",
       "wave": "10.A",
       "title": "DB schema signal_topics + signal_entities + signal_personas",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 4,
       "effort": "M",
@@ -1064,13 +1100,25 @@
         "Cascade delete depuis signals",
         "Indexes",
         "RLS org-scoped"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.5",
       "wave": "10.A",
       "title": "DB schema entities + dedup canonical names",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 5,
       "effort": "M",
@@ -1082,22 +1130,35 @@
         "UNIQUE (org_id, kind, canonical_name)",
         "Trigger increment signal_count",
         "RLS"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "migrations": 5,
+        "tables": [
+          "topics_taxonomy",
+          "personas",
+          "entities",
+          "signal_topics",
+          "signal_entities",
+          "signal_personas"
+        ]
+      }
     },
     {
       "id": "S-10A.6",
       "wave": "10.A",
       "title": "Edge fn enrich-signal sync (topic + persona)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 6,
       "effort": "L",
       "dependencies": ["S-10A.1", "S-10A.3", "S-10A.4"],
       "filesCreate": [
         "supabase/functions/enrich-signal/index.ts",
-        "supabase/functions/enrich-signal/index.test.ts"
+        "supabase/functions/enrich-signal/enrich.ts",
+        "supabase/functions/enrich-signal/enrich.test.ts"
       ],
-      "filesModify": [],
+      "filesModify": ["src/hooks/usePersonas.ts"],
       "acceptanceCriteria": [
         "POST signal_ids",
         "2 calls parallels Haiku (topic + persona)",
@@ -1106,13 +1167,29 @@
         "Logs llm_costs task=enrich:topic",
         "Triggered par llm-score-batch",
         "Tests Deno 5 cas"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "commit": "7ac9e96",
+        "files_created": [
+          "supabase/functions/enrich-signal/index.ts",
+          "supabase/functions/enrich-signal/enrich.ts",
+          "supabase/functions/enrich-signal/enrich.test.ts"
+        ],
+        "files_modified": ["src/hooks/usePersonas.ts"],
+        "deno_tests": "6/6 pass",
+        "typecheck": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "195/195 pass",
+        "deploy": "ok (Supabase project crplceoptyeslqyfcqvj)"
+      }
     },
     {
       "id": "S-10A.7",
       "wave": "10.A",
       "title": "UI Settings editeur taxonomie (CRUD topics)",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-03",
       "agentModel": "sonnet",
       "priority": 7,
       "effort": "L",
@@ -1136,7 +1213,8 @@
       "id": "S-10A.8",
       "wave": "10.A",
       "title": "UI Settings editeur personas PARA",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-03",
       "agentModel": "sonnet",
       "priority": 8,
       "effort": "L",
@@ -1159,7 +1237,7 @@
       "id": "S-10A.9",
       "wave": "10.A",
       "title": "Edge fn suggest-personas (recommandations IA)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 9,
       "effort": "M",
@@ -1175,25 +1253,53 @@
         "Pre-rempli nom+key+context_md",
         "Accept/refuse individuel",
         "Tests"
-      ]
+      ],
+      "completedAt": "2026-05-03",
+      "metadata": {
+        "commit": "pending",
+        "files_created": [
+          "supabase/functions/suggest-personas/index.ts",
+          "supabase/functions/suggest-personas/suggest.ts",
+          "supabase/functions/suggest-personas/suggest.test.ts",
+          "src/components/features/SuggestionsPanel.tsx"
+        ],
+        "files_modified": ["src/components/features/PersonasEditor.tsx"],
+        "deno_tests": "5/5 pass",
+        "typecheck": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "195/195 pass",
+        "deploy": "ok (Supabase project crplceoptyeslqyfcqvj)"
+      }
     },
     {
       "id": "S-10A.10",
       "wave": "10.A",
       "title": "llm-score-batch trigger enrich-signal",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-03",
       "agentModel": "haiku",
       "priority": 10,
       "effort": "S",
       "dependencies": ["S-10A.6"],
-      "filesCreate": [],
+      "filesCreate": [
+        "supabase/functions/llm-score-batch/enrich-trigger.ts",
+        "supabase/functions/llm-score-batch/enrich-trigger.test.ts"
+      ],
       "filesModify": ["supabase/functions/llm-score-batch/index.ts"],
       "acceptanceCriteria": [
         "Apres scoring batch, call parallel /enrich-signal",
         "Best-effort si fail",
         "Logs timing",
         "Tests Deno"
-      ]
+      ],
+      "metadata": {
+        "commit": "b77ea82",
+        "deno_tests": "7/7 pass",
+        "typecheck": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "195/195 pass",
+        "deploy": "ok (Supabase project crplceoptyeslqyfcqvj)"
+      }
     },
     {
       "id": "S-10B.1",

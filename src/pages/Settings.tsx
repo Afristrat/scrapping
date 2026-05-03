@@ -11,9 +11,11 @@ import { ApiKeysConfig } from '@/components/features/ApiKeysConfig'
 import { ApifyConfigForm } from '@/components/features/ApifyConfigForm'
 import { BrandingForm } from '@/components/features/BrandingForm'
 import { ModelCascadeSelect, type ModelChoice } from '@/components/features/ModelCascadeSelect'
+import { PersonasEditor } from '@/components/features/PersonasEditor'
 import { RubricsManager } from '@/components/features/RubricsManager'
 import { SourcePrioritySliders } from '@/components/features/SourcePrioritySliders'
 import { TagInput } from '@/components/features/TagInput'
+import { TopicsTaxonomyEditor } from '@/components/features/TopicsTaxonomyEditor'
 import { useSettings } from '@/hooks/useSettings'
 import { useUpdateSettings } from '@/hooks/useUpdateSettings'
 import { useUpdateConsensusModels } from '@/hooks/useUpdateConsensusModels'
@@ -139,6 +141,8 @@ export default function Settings() {
                 { value: 'api-keys', label: 'Clés API' },
                 { value: 'admin', label: 'Prompts Admin' },
                 { value: 'branding', label: 'Branding' },
+                { value: 'topics', label: 'Topics' },
+                { value: 'para', label: 'PARA' },
               ].map((tab) => (
                 <TabsTrigger
                   key={tab.value}
@@ -441,6 +445,27 @@ export default function Settings() {
                   </FieldGroup>
                 </SectionCard>
               </div>
+            </TabsContent>
+            {/* Onglet 7 : Taxonomie Topics */}
+            <TabsContent value="topics" className="space-y-6 pt-8">
+              <SectionHeader
+                title="Taxonomie des topics"
+                description="Gérez l'arbre de sujets utilisé pour classifier les signaux. Double-cliquez sur un nom pour le renommer directement."
+              />
+              <SectionCard>
+                <TopicsTaxonomyEditor />
+              </SectionCard>
+            </TabsContent>
+
+            {/* Onglet 8 : Personas PARA */}
+            <TabsContent value="para" className="space-y-6 pt-8">
+              <SectionHeader
+                title="Personas PARA"
+                description="Organisez vos personas selon la méthode PARA (Inbox, Projects, Hats, Resources). Chaque persona peut être personnelle ou partagée avec toute l'organisation."
+              />
+              <SectionCard>
+                <PersonasEditor />
+              </SectionCard>
             </TabsContent>
           </Tabs>
 
