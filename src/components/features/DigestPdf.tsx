@@ -119,9 +119,11 @@ const styles = StyleSheet.create({
   whyMatters: {
     fontSize: 8,
     color: COLORS.onSurfaceVariant,
-    fontStyle: 'italic',
     marginTop: 1,
-    marginLeft: 0,
+    marginLeft: 12,
+    // Pas d italic : Inter n a pas de variant italic registered et
+    // @react-pdf/renderer ne synthetise pas. Indentation + couleur + prefix →
+    // suffisent pour distinguer visuellement.
   },
   citation: { fontSize: 7, color: COLORS.secondary, fontWeight: 600 },
   // Sources
