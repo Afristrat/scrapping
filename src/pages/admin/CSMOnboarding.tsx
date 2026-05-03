@@ -714,7 +714,7 @@ function useEnterpriseOrgsQuery(enabled: boolean) {
       const { data, error } = await supabase
         .from('organizations')
         .select('id, name, slug, plan')
-        .eq('plan', 'enterprise')
+        .in('plan', ['enterprise', 'pro', 'solo'])
         .order('name', { ascending: true })
       if (error) throw error
       return (data ?? []).map((o) => ({ id: o.id, name: o.name, slug: o.slug }))
