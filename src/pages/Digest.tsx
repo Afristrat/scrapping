@@ -466,10 +466,31 @@ export default function Digest(): React.ReactElement {
                   </div>
                   <p className="text-on-surface-variant text-xs">
                     {new Date(selected.generated_at).toLocaleString('fr-FR')} · Fenêtre{' '}
-                    {selected.window_hours} h
+                    {selected.window_hours} h · Score min {selected.min_score} ·{' '}
+                    {selected.signal_count} signaux
+                  </p>
+                  <p className="text-on-surface-variant mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <span className="font-medium">Langue :</span>
+                    <span className="text-on-surface font-mono uppercase">{selected.language}</span>
+                    <span className="text-outline">·</span>
+                    <span className="font-medium">Modèle :</span>
+                    <span className="text-on-surface font-mono">{selected.model_used ?? '—'}</span>
+                    {selected.cost != null && (
+                      <>
+                        <span className="text-outline">·</span>
+                        <span className="font-medium">Coût :</span>
+                        <span className="text-primary font-mono">
+                          {formatCost(Number(selected.cost), 5)}
+                        </span>
+                      </>
+                    )}
                   </p>
                 </div>
-                <Badge variant="outline" className="border-outline-variant uppercase">
+                <Badge
+                  variant="outline"
+                  className="border-outline-variant uppercase"
+                  title={`Brief généré en ${selected.language === 'fr' ? 'français' : selected.language === 'en' ? 'anglais' : 'espagnol'}`}
+                >
                   {selected.language}
                 </Badge>
               </div>
