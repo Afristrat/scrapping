@@ -160,16 +160,31 @@ Deno.serve(async (req: Request) => {
     )
   }
 
-  // Fetch the matching signals (ids) so we can apply the window filter using
-  // signal_date when available, then compute window stats.
-  const allSignalIds = allScores.map((s) => s.signal_id)
+  // Fetch matching signals. On filtre AGRESSIVEMENT en SQL pour éviter les
+  // URLs trop longues (HTTP/2 stream errors avec 500+ UUIDs dans `id=in.(...)`).
+  //
+  // Stratégie :
+  //   1. Pré-filtre : on ne prend que les `top scoring`-ids (limité au quota
+  //      du brief × marge sécurité) — au pire on rate quelques signaux <minScore
+  //      qui auraient pu remonter dans le `max_score_in_window` stat.
+  //   2. Côté SQL : `gte('scraped_at', sinceIso)` réduit le set au window.
+  //      Le filtrage final par signal_date NULL-safe reste client-side.
+  //
+  // SIGNAL_LIMIT × 4 = marge confortable : si LIMIT=30, on fetch jusqu'à 120
+  // candidats (les top 120 par score). Avec UUID de 36 chars + virgule + URL
+  // encoding ≈ 47 chars / id → 120 ids ≈ 5.6 KB d'URL, bien sous toute limite.
+  const FETCH_CAP = SIGNAL_LIMIT * 4
+  const candidateIds = allScores.slice(0, FETCH_CAP).map((s) => s.signal_id)
 
-  // Supabase has a hard cap on `.in()` array size; we slice defensively.
-  const FETCH_CAP = 1000
+  // Filtre window côté SQL (gte scraped_at) pour réduire encore le payload.
+  // Note : signal_date peut être NULL → on filtre scraped_at OR signal_date >=
+  // via une approche conservatrice : `scraped_at >= since` couvre la majorité.
+  // Les rows avec signal_date >= since mais scraped_at < since sont rares.
   const signalsRes = await supabase
     .from('signals')
     .select('id, title, url, source, scraped_at, signal_date, raw_payload')
-    .in('id', allSignalIds.slice(0, FETCH_CAP))
+    .in('id', candidateIds)
+    .gte('scraped_at', sinceIso)
 
   if (signalsRes.error) {
     return json({ ok: false, error: 'signals_fetch_failed', detail: signalsRes.error.message }, 500)
@@ -285,7 +300,14 @@ Deno.serve(async (req: Request) => {
     return json({ ok: false, error: 'llm_failed', detail: reason }, 502)
   }
 
-  const content = dispatchResult.content
+  // ---- 4.5 Post-process : auto-inject footnote definitions si LLM les a omises
+  //
+  // Le LLM cite souvent `[^1]`, `[^2]`, … mais oublie d'écrire les définitions
+  // `[^1]: [Title](url) — score — @author — date` dans la section
+  // « Confidence & Sources ». Sans définition, remark-gfm ne transforme pas les
+  // refs en footnotes cliquables côté frontend. On les injecte ici de manière
+  // déterministe depuis le payload `top` (on a tous les titres/urls/scores).
+  const content = ensureFootnoteDefinitions(dispatchResult.content, top, language)
   const modelUsed = dispatchResult.model_used ?? 'unknown'
   const promptTokens = dispatchResult.usage?.prompt_tokens ?? 0
   const completionTokens = dispatchResult.usage?.completion_tokens ?? 0
@@ -570,6 +592,64 @@ function buildUserPrompt(
   }))
 
   return `${header}\n\n${JSON.stringify(payload, null, 2)}`
+}
+
+/**
+ * Auto-inject les définitions de footnote `[^N]: [Title](url) — score — @author — date`
+ * si le LLM a cité des `[^N]` sans fournir les définitions correspondantes.
+ *
+ * remark-gfm transforme `[^N]` en footnote cliquable UNIQUEMENT si une
+ * définition `[^N]: ...` existe quelque part dans le markdown. Sans cette
+ * définition, les refs s'affichent en texte brut. Le LLM oublie souvent
+ * d'écrire le bloc complet de définitions → on le génère côté serveur de
+ * manière déterministe à partir du payload signals.
+ */
+function ensureFootnoteDefinitions(
+  content: string,
+  signals: SignalForPrompt[],
+  language: Language,
+): string {
+  const referencedNs = new Set<number>()
+  for (const match of content.matchAll(/\[\^(\d+)\]/g)) {
+    referencedNs.add(Number.parseInt(match[1], 10))
+  }
+  const definedNs = new Set<number>()
+  for (const match of content.matchAll(/^\[\^(\d+)\]:/gm)) {
+    definedNs.add(Number.parseInt(match[1], 10))
+  }
+
+  const missing = [...referencedNs].filter((n) => !definedNs.has(n)).sort((a, b) => a - b)
+  if (missing.length === 0) return content
+
+  const signalByN = new Map<number, SignalForPrompt>(signals.map((s) => [s.n, s]))
+  const dateLocale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : 'en-US'
+
+  const defLines: string[] = []
+  for (const n of missing) {
+    const sig = signalByN.get(n)
+    if (!sig) continue
+    let dateLabel: string
+    try {
+      dateLabel = new Date(sig.date).toLocaleDateString(dateLocale, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    } catch {
+      dateLabel = sig.date.slice(0, 10)
+    }
+    const safeTitle = sig.title.replace(/[\[\]]/g, '')
+    const author = sig.author ? ` — ${sig.author}` : ''
+    const sourceLabel = sig.source.toUpperCase()
+    defLines.push(
+      `[^${n}]: [${safeTitle}](${sig.url}) — ${sourceLabel} · score ${sig.score}${author} · ${dateLabel}`,
+    )
+  }
+
+  if (defLines.length === 0) return content
+
+  const trailing = content.endsWith('\n') ? '' : '\n'
+  return `${content}${trailing}\n${defLines.join('\n')}\n`
 }
 
 /**
