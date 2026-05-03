@@ -53,3 +53,6 @@ supabase/*.db
 __MACOSX/
 .DS_Store
 Stitch.zip
+e2e/.auth/
+test-results/
+playwright-report/
