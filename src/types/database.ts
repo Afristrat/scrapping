@@ -334,6 +334,53 @@ export type Database = {
           },
         ]
       }
+      entities: {
+        Row: {
+          aliases: string[] | null
+          canonical_name: string
+          external_url: string | null
+          first_seen_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["entity_kind"]
+          last_seen_at: string | null
+          metadata: Json | null
+          org_id: string
+          signal_count: number | null
+        }
+        Insert: {
+          aliases?: string[] | null
+          canonical_name: string
+          external_url?: string | null
+          first_seen_at?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["entity_kind"]
+          last_seen_at?: string | null
+          metadata?: Json | null
+          org_id: string
+          signal_count?: number | null
+        }
+        Update: {
+          aliases?: string[] | null
+          canonical_name?: string
+          external_url?: string | null
+          first_seen_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["entity_kind"]
+          last_seen_at?: string | null
+          metadata?: Json | null
+          org_id?: string
+          signal_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entities_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       health_checks: {
         Row: {
           checked_at: string
@@ -648,6 +695,59 @@ export type Database = {
           },
         ]
       }
+      personas: {
+        Row: {
+          context_md: string | null
+          created_at: string | null
+          date_end: string | null
+          date_start: string | null
+          id: string
+          is_archived: boolean | null
+          key: string
+          kind: Database["public"]["Enums"]["persona_kind"]
+          name: string
+          org_id: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          context_md?: string | null
+          created_at?: string | null
+          date_end?: string | null
+          date_start?: string | null
+          id?: string
+          is_archived?: boolean | null
+          key: string
+          kind: Database["public"]["Enums"]["persona_kind"]
+          name: string
+          org_id: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          context_md?: string | null
+          created_at?: string | null
+          date_end?: string | null
+          date_start?: string | null
+          id?: string
+          is_archived?: boolean | null
+          key?: string
+          kind?: Database["public"]["Enums"]["persona_kind"]
+          name?: string
+          org_id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_models: {
         Row: {
           capabilities: Json
@@ -688,6 +788,57 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "provider_models_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_shares: {
+        Row: {
+          created_at: string
+          created_by: string
+          digest_id: string
+          expires_at: string
+          id: string
+          last_viewed_at: string | null
+          org_id: string
+          slug: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          digest_id: string
+          expires_at?: string
+          id?: string
+          last_viewed_at?: string | null
+          org_id: string
+          slug: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          digest_id?: string
+          expires_at?: string
+          id?: string
+          last_viewed_at?: string | null
+          org_id?: string
+          slug?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_shares_digest_id_fkey"
+            columns: ["digest_id"]
+            isOneToOne: false
+            referencedRelation: "digests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_shares_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -753,6 +904,13 @@ export type Database = {
             referencedRelation: "signals"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "score_runs_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
         ]
       }
       scores: {
@@ -808,6 +966,13 @@ export type Database = {
             columns: ["signal_id"]
             isOneToOne: false
             referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scores_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
             referencedColumns: ["id"]
           },
         ]
@@ -934,8 +1099,151 @@ export type Database = {
           },
         ]
       }
+      signal_entities: {
+        Row: {
+          confidence: number
+          context_snippet: string | null
+          entity_id: string
+          mention_text: string | null
+          org_id: string
+          signal_id: string
+        }
+        Insert: {
+          confidence: number
+          context_snippet?: string | null
+          entity_id: string
+          mention_text?: string | null
+          org_id: string
+          signal_id: string
+        }
+        Update: {
+          confidence?: number
+          context_snippet?: string | null
+          entity_id?: string
+          mention_text?: string | null
+          org_id?: string
+          signal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_entities_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_entities_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_entities_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_personas: {
+        Row: {
+          org_id: string
+          persona_id: string
+          reasoning: string | null
+          relevance_score: number
+          signal_id: string
+        }
+        Insert: {
+          org_id: string
+          persona_id: string
+          reasoning?: string | null
+          relevance_score: number
+          signal_id: string
+        }
+        Update: {
+          org_id?: string
+          persona_id?: string
+          reasoning?: string | null
+          relevance_score?: number
+          signal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_personas_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_personas_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_personas_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_topics: {
+        Row: {
+          confidence: number
+          org_id: string
+          signal_id: string
+          source: string
+          topic_id: string
+        }
+        Insert: {
+          confidence: number
+          org_id: string
+          signal_id: string
+          source?: string
+          topic_id: string
+        }
+        Update: {
+          confidence?: number
+          org_id?: string
+          signal_id?: string
+          source?: string
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_topics_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_topics_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_topics_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics_taxonomy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signals: {
         Row: {
+          editorial_kind: string | null
+          enriched_at: string | null
           external_id: string
           id: string
           org_id: string
@@ -946,8 +1254,11 @@ export type Database = {
           title: string | null
           url: string | null
           user_id: string
+          weight: number | null
         }
         Insert: {
+          editorial_kind?: string | null
+          enriched_at?: string | null
           external_id: string
           id?: string
           org_id?: string
@@ -958,8 +1269,11 @@ export type Database = {
           title?: string | null
           url?: string | null
           user_id: string
+          weight?: number | null
         }
         Update: {
+          editorial_kind?: string | null
+          enriched_at?: string | null
           external_id?: string
           id?: string
           org_id?: string
@@ -970,6 +1284,7 @@ export type Database = {
           title?: string | null
           url?: string | null
           user_id?: string
+          weight?: number | null
         }
         Relationships: [
           {
@@ -1155,6 +1470,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "topic_signals_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "topic_signals_topic_id_fkey"
             columns: ["topic_id"]
             isOneToOne: false
@@ -1218,6 +1540,54 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      topics_taxonomy: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_seeded: boolean | null
+          name: string
+          org_id: string
+          parent_id: string | null
+          slug: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_seeded?: boolean | null
+          name: string
+          org_id: string
+          parent_id?: string | null
+          slug: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_seeded?: boolean | null
+          name?: string
+          org_id?: string
+          parent_id?: string | null
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "topics_taxonomy_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "topics_taxonomy_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "topics_taxonomy"
             referencedColumns: ["id"]
           },
         ]
@@ -1349,6 +1719,71 @@ export type Database = {
           },
         ]
       }
+      signals_enriched: {
+        Row: {
+          editorial_kind: string | null
+          enriched_at: string | null
+          external_id: string | null
+          id: string | null
+          org_id: string | null
+          raw_payload: Json | null
+          scraped_at: string | null
+          signal_date: string | null
+          source: Database["public"]["Enums"]["signal_source"] | null
+          title: string | null
+          top_entities: string[] | null
+          top_personas: string[] | null
+          topic_slugs: string[] | null
+          url: string | null
+          user_id: string | null
+          weight: number | null
+        }
+        Insert: {
+          editorial_kind?: string | null
+          enriched_at?: string | null
+          external_id?: string | null
+          id?: string | null
+          org_id?: string | null
+          raw_payload?: Json | null
+          scraped_at?: string | null
+          signal_date?: string | null
+          source?: Database["public"]["Enums"]["signal_source"] | null
+          title?: string | null
+          top_entities?: never
+          top_personas?: never
+          topic_slugs?: never
+          url?: string | null
+          user_id?: string | null
+          weight?: number | null
+        }
+        Update: {
+          editorial_kind?: string | null
+          enriched_at?: string | null
+          external_id?: string | null
+          id?: string | null
+          org_id?: string | null
+          raw_payload?: Json | null
+          scraped_at?: string | null
+          signal_date?: string | null
+          source?: Database["public"]["Enums"]["signal_source"] | null
+          title?: string | null
+          top_entities?: never
+          top_personas?: never
+          topic_slugs?: never
+          url?: string | null
+          user_id?: string | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signals_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       costs_by_day: {
@@ -1377,6 +1812,20 @@ export type Database = {
           org_id: string
           role: Database["public"]["Enums"]["org_role"]
           user_id: string
+        }[]
+      }
+      read_public_digest: {
+        Args: { p_slug: string }
+        Returns: {
+          content: string
+          digest_id: string
+          expires_at: string
+          generated_at: string
+          language: string
+          min_score: number
+          org_name: string
+          signal_count: number
+          window_hours: number
         }[]
       }
       seed_admin_prompts_for_org: {
@@ -1429,6 +1878,12 @@ export type Database = {
         | "pipeline.purge"
       audit_severity: "info" | "warning" | "critical"
       billing_mode: "maison" | "byok"
+      entity_kind:
+        | "person"
+        | "organization"
+        | "technology"
+        | "paper"
+        | "product"
       health_service: "db" | "minio" | "llm" | "apify"
       health_status: "ok" | "degraded" | "down"
       llm_task: "scraping" | "scoring" | "monitoring"
@@ -1441,6 +1896,7 @@ export type Database = {
         | "brand"
         | "cto_sme"
         | "solo"
+      persona_kind: "project" | "hat" | "resource" | "inbox"
       signal_source: "reddit" | "arxiv" | "x"
       subscription_status:
         | "active"
@@ -1602,12 +2058,14 @@ export const Constants = {
       ],
       audit_severity: ["info", "warning", "critical"],
       billing_mode: ["maison", "byok"],
+      entity_kind: ["person", "organization", "technology", "paper", "product"],
       health_service: ["db", "minio", "llm", "apify"],
       health_status: ["ok", "degraded", "down"],
       llm_task: ["scraping", "scoring", "monitoring"],
       org_plan: ["solo", "pro", "enterprise"],
       org_role: ["owner", "admin", "member", "viewer"],
       org_segment: ["vc_pe", "legal", "newsletter", "brand", "cto_sme", "solo"],
+      persona_kind: ["project", "hat", "resource", "inbox"],
       signal_source: ["reddit", "arxiv", "x"],
       subscription_status: [
         "active",
