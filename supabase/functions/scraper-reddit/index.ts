@@ -167,9 +167,17 @@ Deno.serve(async (req) => {
   }
 
   if (allRows.length > 0) {
+    // Dedup defensif par external_id (cf. scraper-x meme bug 21000 ON CONFLICT)
+    const seenExt = new Set<string>()
+    const dedupedRows: typeof allRows = []
+    for (const r of allRows) {
+      if (seenExt.has(r.external_id)) continue
+      seenExt.add(r.external_id)
+      dedupedRows.push(r)
+    }
     const { data: upserted, error: upErr } = await supabase
       .from('signals')
-      .upsert(allRows, { onConflict: 'user_id,source,external_id', ignoreDuplicates: false })
+      .upsert(dedupedRows, { onConflict: 'user_id,source,external_id', ignoreDuplicates: false })
       .select('id')
     if (upErr) errors.push({ reason: `db_upsert: ${upErr.message}` })
     else inserted = upserted?.length ?? 0

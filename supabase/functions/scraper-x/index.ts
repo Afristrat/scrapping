@@ -151,9 +151,24 @@ Deno.serve(async (req) => {
         })
 
       if (rows.length > 0) {
+        // Dedup par external_id — Apify peut retourner 2x le même tweet dans le
+        // batch (notamment quand il y a retweet ou quote). Sans dedup, l upsert
+        // ON CONFLICT plante avec « 21000 ON CONFLICT DO UPDATE command cannot
+        // affect row a second time » et 0 row inseree.
+        const seenExt = new Set<string>()
+        const dedupedRows: typeof rows = []
+        for (const r of rows) {
+          if (seenExt.has(r.external_id)) continue
+          seenExt.add(r.external_id)
+          dedupedRows.push(r)
+        }
+
         const { data: upserted, error: upErr } = await supabase
           .from('signals')
-          .upsert(rows, { onConflict: 'user_id,source,external_id', ignoreDuplicates: false })
+          .upsert(dedupedRows, {
+            onConflict: 'user_id,source,external_id',
+            ignoreDuplicates: false,
+          })
           .select('id')
         if (upErr) throw upErr
         inserted = upserted?.length ?? 0
