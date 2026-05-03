@@ -72,7 +72,7 @@ function renderCosts() {
 describe('Costs', () => {
   it('rend le titre, le total cost card et le breakdown', () => {
     renderCosts()
-    expect(screen.getByRole('heading', { level: 2, name: /couts/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: /co.ts/i })).toBeInTheDocument()
     expect(screen.getByText(/Coût total/i)).toBeInTheDocument()
     expect(screen.getAllByText(/anthropic\/claude-haiku-4\.5/).length).toBeGreaterThan(0)
   })
