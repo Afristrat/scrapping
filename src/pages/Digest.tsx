@@ -11,9 +11,12 @@ import {
   FileText,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { ConfidenceBadge } from '@/components/features/ConfidenceBadge'
+import { detectConfidenceLevel } from '@/lib/confidence-levels'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -44,6 +47,31 @@ const WINDOW_OPTIONS: Array<{ value: number; label: string }> = [
 ]
 
 const RETRY_FALLBACK_SCORE = 30
+
+/**
+ * Wave 10.0 — Custom strong renderer support.
+ *
+ * Le LLM digest émet des insights sous le format :
+ *   **[Quasi-certain] Insight en 1 phrase** [^1][^2]
+ *
+ * Cette fonction détecte le tag de confiance au début du contenu d'un `<strong>`
+ * et retourne le niveau normalisé + le reste du contenu pour rendu côté React.
+ */
+function extractConfidenceTag(children: React.ReactNode): {
+  level: ReturnType<typeof detectConfidenceLevel>
+  rest: React.ReactNode
+} {
+  const arr = Array.isArray(children) ? children : [children]
+  if (arr.length === 0 || typeof arr[0] !== 'string') {
+    return { level: null, rest: children }
+  }
+  const match = (arr[0] as string).match(/^\s*\[([^\]]+)\]\s*(.*)$/s)
+  if (!match) return { level: null, rest: children }
+  const [, rawTag, remaining] = match
+  const level = detectConfidenceLevel(`[${rawTag}]`)
+  if (!level) return { level: null, rest: children }
+  return { level, rest: [remaining, ...arr.slice(1)] }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -424,6 +452,7 @@ export default function Digest(): React.ReactElement {
 
               <div className="prose prose-sm prose-slate max-w-none p-6">
                 <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
                   components={{
                     a: ({ href, children, ...rest }) => (
                       <a
@@ -440,7 +469,7 @@ export default function Digest(): React.ReactElement {
                       <h2 className="text-on-surface mt-4 mb-3 text-lg font-bold">{children}</h2>
                     ),
                     h2: ({ children }) => (
-                      <h3 className="text-on-surface mt-6 mb-2 text-base font-semibold">
+                      <h3 className="text-on-surface mt-6 mb-3 text-base font-semibold tracking-tight">
                         {children}
                       </h3>
                     ),
@@ -462,10 +491,38 @@ export default function Digest(): React.ReactElement {
                     p: ({ children }) => (
                       <p className="text-on-surface my-2 text-sm leading-relaxed">{children}</p>
                     ),
+                    em: ({ children }) => (
+                      <em className="text-on-surface-variant mt-1 block text-sm leading-relaxed not-italic">
+                        {children}
+                      </em>
+                    ),
+                    strong: ({ children }) => {
+                      const { level, rest } = extractConfidenceTag(children)
+                      if (level) {
+                        return (
+                          <strong className="text-on-surface inline-flex flex-wrap items-baseline gap-2 font-semibold">
+                            <ConfidenceBadge
+                              level={level}
+                              language={selected.language as 'fr' | 'en' | 'es'}
+                            />
+                            <span>{rest}</span>
+                          </strong>
+                        )
+                      }
+                      return <strong className="text-on-surface font-semibold">{children}</strong>
+                    },
                     code: ({ children }) => (
                       <code className="bg-surface-container-low rounded px-1 py-0.5 font-mono text-xs">
                         {children}
                       </code>
+                    ),
+                    sup: ({ children, ...rest }) => (
+                      <sup
+                        className="text-secondary hover:text-secondary-container ml-0.5 cursor-pointer text-[10px] font-semibold"
+                        {...rest}
+                      >
+                        {children}
+                      </sup>
                     ),
                   }}
                 >
