@@ -1,8 +1,18 @@
 import { createElement, type ReactNode } from 'react'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { useBacktestRubric } from './useBacktestRubric'
+
+// Mock sonner pour éviter les erreurs de rendu dans les tests
+vi.mock('sonner', () => ({
+  toast: {
+    warning: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+    info: vi.fn(),
+  },
+}))
 
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
@@ -33,6 +43,15 @@ describe('useBacktestRubric', () => {
     mockGetSession.mockResolvedValue({
       data: { session: { access_token: 'test-token' } },
     })
+    vi.clearAllMocks()
+    // Restaurer les mocks de session après clearAllMocks
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'test-token' } },
+    })
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
   })
 
   it('happy path: retourne les résultats avec delta', async () => {
@@ -138,5 +157,86 @@ describe('useBacktestRubric', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(caughtError?.message).toBe('not_authenticated')
+  })
+
+  // ─── US-9.2.5 : Cap simultané + cancel ────────────────────────────────────
+
+  it('409 → toast warning affiché', async () => {
+    const { toast } = await import('sonner')
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: () => Promise.resolve({ ok: false, error: 'backtest_in_progress' }),
+    })
+
+    const { result } = renderHook(() => useBacktestRubric(), { wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ rubric_prompt: 'Test prompt' }).catch(() => {})
+    })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(toast.warning).toHaveBeenCalledWith(
+      'Un backtest est déjà en cours pour ce compte.',
+    )
+  })
+
+  it('cancel: reset mutation → isIdle', async () => {
+    // Simuler un fetch qui ne se résout jamais (requête en cours)
+    let resolvePromise: (() => void) | null = null
+    mockFetch.mockReturnValueOnce(
+      new Promise((_resolve) => {
+        resolvePromise = () =>
+          _resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ ok: true, results: [] }),
+          })
+      }),
+    )
+
+    const { result } = renderHook(() => useBacktestRubric(), { wrapper })
+
+    // Lance la mutation sans attendre
+    act(() => {
+      result.current.mutate({ rubric_prompt: 'Test prompt' })
+    })
+
+    await waitFor(() => expect(result.current.isPending).toBe(true))
+
+    // Annule via cancel
+    act(() => {
+      result.current.cancel()
+    })
+
+    await waitFor(() => expect(result.current.isIdle).toBe(true))
+
+    // Nettoyage : on résout quand même la promesse
+    resolvePromise?.()
+  })
+
+  it('AbortSignal: fetch receive signal dans les options', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: true, results: [] }),
+    })
+
+    const { result } = renderHook(() => useBacktestRubric(), { wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ rubric_prompt: 'Test prompt' })
+    })
+
+    // Vérifier que fetch a été appelé avec un signal AbortController
+    expect(mockFetch).toHaveBeenCalledOnce()
+    const callArgs = mockFetch.mock.calls[0][1] as RequestInit
+    expect(callArgs.signal).toBeDefined()
+    expect(callArgs.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('hook expose cancel function', () => {
+    const { result } = renderHook(() => useBacktestRubric(), { wrapper })
+    expect(typeof result.current.cancel).toBe('function')
   })
 })
