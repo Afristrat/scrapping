@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { SettingsSuggestions } from '@/components/features/SettingsSuggestions'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { Save } from 'lucide-react'
@@ -17,10 +18,15 @@ import { RubricsManager } from '@/components/features/RubricsManager'
 import { SourcePrioritySliders } from '@/components/features/SourcePrioritySliders'
 import { TagInput } from '@/components/features/TagInput'
 import { TopicsTaxonomyEditor } from '@/components/features/TopicsTaxonomyEditor'
+import { SourceHealthBadge } from '@/components/features/SourceHealthBadge'
+import { useSubredditHealth } from '@/hooks/useSourceHealth'
 import { useSettings } from '@/hooks/useSettings'
 import { useUpdateSettings } from '@/hooks/useUpdateSettings'
 import { useUpdateConsensusModels } from '@/hooks/useUpdateConsensusModels'
 import { useProviderModels } from '@/hooks/useProviderModels'
+import { SettingsProfileBar } from '@/components/features/SettingsProfileBar'
+import { SettingsDiffDialog } from '@/components/features/SettingsDiffDialog'
+import { computeSettingsDiff, type SettingsDiff } from '@/lib/settings-diff'
 import {
   DEFAULT_APIFY_CONFIG,
   DEFAULT_SOURCE_PRIORITY,
@@ -148,9 +154,70 @@ export default function Settings() {
   const watchedXQueries = useWatch({ control, name: 'x_queries' })
   const watchedTopicSeeds = useWatch({ control, name: 'topic_seeds' })
 
-  const onSubmit = (values: SettingsFormValues) => {
-    updateMutation.mutate(values)
+  // Snapshot complet du formulaire pour SettingsProfileBar
+  const watchedPromptScoring = useWatch({ control, name: 'prompt_scoring' })
+  const watchedBranding = useWatch({ control, name: 'branding' })
+  const watchedDailyBudget = useWatch({ control, name: 'daily_budget_usd' })
+  const watchedActiveRubricId = useWatch({ control, name: 'active_rubric_id' })
+  const watchedLanguage = useWatch({ control, name: 'language' })
+  const watchedScoreConcurrency = useWatch({ control, name: 'score_concurrency' })
+
+  const currentSnapshot: SettingsFormValues = {
+    prompt_scoring: watchedPromptScoring ?? '',
+    reddit_subs: watchedRedditSubs ?? [],
+    arxiv_categories: watchedArxivCategories ?? [],
+    x_queries: watchedXQueries ?? [],
+    topic_seeds: watchedTopicSeeds ?? [],
+    model_config: watchedModelConfig ?? {},
+    branding: watchedBranding ?? { name: 'Kairos', primary: '#6750A4', logo_url: null },
+    source_priority: sourcePriority ?? DEFAULT_SOURCE_PRIORITY,
+    apify_config: apifyConfig ?? DEFAULT_APIFY_CONFIG,
+    daily_budget_usd: watchedDailyBudget ?? 5,
+    active_rubric_id: watchedActiveRubricId ?? null,
+    language: watchedLanguage ?? 'fr',
+    score_concurrency: watchedScoreConcurrency ?? 20,
   }
+
+  // État de l'onglet actif — contrôlé pour permettre la navigation programmatique
+  const [activeTab, setActiveTab] = useState('models')
+
+  // État du dialog de diff avant sauvegarde
+  const [diffState, setDiffState] = useState<{
+    open: boolean
+    diff: SettingsDiff[]
+    pendingData: SettingsFormValues | null
+  }>({ open: false, diff: [], pendingData: null })
+
+  const handleApplyProfile = (values: SettingsFormValues) => {
+    reset(values)
+  }
+
+  const onSubmit = (values: SettingsFormValues) => {
+    if (!settings) {
+      // Pas de données DB — sauvegarder directement
+      updateMutation.mutate(values)
+      return
+    }
+    const diff = computeSettingsDiff(settings, values)
+    if (diff.length === 0) {
+      // Aucun changement détecté — sauvegarder directement sans dialog
+      updateMutation.mutate(values)
+      return
+    }
+    // Afficher le dialog récapitulatif
+    setDiffState({ open: true, diff, pendingData: values })
+  }
+
+  const handleDiffConfirm = useCallback(() => {
+    if (diffState.pendingData) {
+      updateMutation.mutate(diffState.pendingData)
+    }
+    setDiffState({ open: false, diff: [], pendingData: null })
+  }, [diffState.pendingData, updateMutation])
+
+  const handleDiffCancel = useCallback(() => {
+    setDiffState({ open: false, diff: [], pendingData: null })
+  }, [])
 
   return (
     <div className="bg-surface min-h-full">
@@ -164,8 +231,17 @@ export default function Settings() {
           </p>
         </header>
 
+        <SettingsProfileBar currentSnapshot={currentSnapshot} onApply={handleApplyProfile} />
+
+        <SettingsDiffDialog
+          open={diffState.open}
+          diff={diffState.diff}
+          onConfirm={handleDiffConfirm}
+          onCancel={handleDiffCancel}
+        />
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          <Tabs defaultValue="models" className="gap-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-0">
             {/* Onglets — style underline Stitch (border-b primary sur active) */}
             <TabsList className="border-outline-variant flex h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0">
               {[
@@ -339,6 +415,13 @@ export default function Settings() {
                       onChange={(next) => setValue('reddit_subs', next, { shouldDirty: true })}
                       placeholder="ex : MachineLearning"
                     />
+                    {(watchedRedditSubs ?? []).length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {(watchedRedditSubs ?? []).map((sub) => (
+                          <SubredditHealthRow key={sub} sub={sub} />
+                        ))}
+                      </ul>
+                    )}
                   </FieldGroup>
 
                   <FieldGroup
@@ -485,6 +568,8 @@ export default function Settings() {
                   </FieldGroup>
                 </SectionCard>
               </div>
+
+              <SettingsSuggestions onNavigate={setActiveTab} />
             </TabsContent>
             {/* Onglet 7 : Taxonomie Topics */}
             <TabsContent value="topics" className="space-y-6 pt-8">
@@ -528,6 +613,22 @@ export default function Settings() {
         </form>
       </div>
     </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Sous-composants santé sources                                               */
+/* -------------------------------------------------------------------------- */
+
+function SubredditHealthRow({ sub }: { sub: string }) {
+  const health = useSubredditHealth(sub)
+  return (
+    <li className="flex items-center gap-2 text-xs">
+      <span className="text-on-surface-variant">
+        r/<span className="text-on-surface font-medium">{sub}</span>
+      </span>
+      <SourceHealthBadge health={health} />
+    </li>
   )
 }
 
