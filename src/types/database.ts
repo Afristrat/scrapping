@@ -294,6 +294,7 @@ export type Database = {
           min_score: number
           model_used: string | null
           org_id: string
+          scope_params: Json | null
           signal_count: number
           user_id: string
           window_hours: number
@@ -307,6 +308,7 @@ export type Database = {
           min_score?: number
           model_used?: string | null
           org_id?: string
+          scope_params?: Json | null
           signal_count?: number
           user_id: string
           window_hours?: number
@@ -320,6 +322,7 @@ export type Database = {
           min_score?: number
           model_used?: string | null
           org_id?: string
+          scope_params?: Json | null
           signal_count?: number
           user_id?: string
           window_hours?: number
@@ -846,6 +849,53 @@ export type Database = {
           },
         ]
       }
+      rss_feeds: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          error_count: number | null
+          id: string
+          last_error: string | null
+          last_fetched_at: string | null
+          name: string
+          org_id: string
+          signal_count: number | null
+          url: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          error_count?: number | null
+          id?: string
+          last_error?: string | null
+          last_fetched_at?: string | null
+          name: string
+          org_id: string
+          signal_count?: number | null
+          url: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          error_count?: number | null
+          id?: string
+          last_error?: string | null
+          last_fetched_at?: string | null
+          name?: string
+          org_id?: string
+          signal_count?: number | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rss_feeds_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       score_runs: {
         Row: {
           completion_tokens: number | null
@@ -1103,6 +1153,7 @@ export type Database = {
         Row: {
           confidence: number
           context_snippet: string | null
+          created_at: string | null
           entity_id: string
           mention_text: string | null
           org_id: string
@@ -1111,6 +1162,7 @@ export type Database = {
         Insert: {
           confidence: number
           context_snippet?: string | null
+          created_at?: string | null
           entity_id: string
           mention_text?: string | null
           org_id: string
@@ -1119,6 +1171,7 @@ export type Database = {
         Update: {
           confidence?: number
           context_snippet?: string | null
+          created_at?: string | null
           entity_id?: string
           mention_text?: string | null
           org_id?: string
@@ -1150,6 +1203,7 @@ export type Database = {
       }
       signal_personas: {
         Row: {
+          created_at: string | null
           org_id: string
           persona_id: string
           reasoning: string | null
@@ -1157,6 +1211,7 @@ export type Database = {
           signal_id: string
         }
         Insert: {
+          created_at?: string | null
           org_id: string
           persona_id: string
           reasoning?: string | null
@@ -1164,6 +1219,7 @@ export type Database = {
           signal_id: string
         }
         Update: {
+          created_at?: string | null
           org_id?: string
           persona_id?: string
           reasoning?: string | null
@@ -1197,6 +1253,7 @@ export type Database = {
       signal_topics: {
         Row: {
           confidence: number
+          created_at: string | null
           org_id: string
           signal_id: string
           source: string
@@ -1204,6 +1261,7 @@ export type Database = {
         }
         Insert: {
           confidence: number
+          created_at?: string | null
           org_id: string
           signal_id: string
           source?: string
@@ -1211,6 +1269,7 @@ export type Database = {
         }
         Update: {
           confidence?: number
+          created_at?: string | null
           org_id?: string
           signal_id?: string
           source?: string
@@ -1794,6 +1853,38 @@ export type Database = {
           total_cost: number
         }[]
       }
+      enriched_signals: {
+        Args: {
+          p_cursor?: string
+          p_limit?: number
+          p_min_score?: number
+          p_org_id: string
+          p_persona_keys?: string[]
+          p_sources?: string[]
+          p_topic_slugs?: string[]
+          p_window_hours?: number
+        }
+        Returns: {
+          editorial_kind: string
+          enriched_at: string
+          external_id: string
+          id: string
+          model_used: string
+          org_id: string
+          raw_payload: Json
+          reasoning: string
+          score: number
+          scraped_at: string
+          source: string
+          title: string
+          top_entities: string[]
+          top_personas: string[]
+          topic_slugs: string[]
+          url: string
+          user_id: string
+          weight: number
+        }[]
+      }
       is_app_admin: { Args: never; Returns: boolean }
       list_app_admins: {
         Args: never
@@ -1897,7 +1988,7 @@ export type Database = {
         | "cto_sme"
         | "solo"
       persona_kind: "project" | "hat" | "resource" | "inbox"
-      signal_source: "reddit" | "arxiv" | "x"
+      signal_source: "reddit" | "arxiv" | "x" | "rss"
       subscription_status:
         | "active"
         | "past_due"
@@ -2066,7 +2157,7 @@ export const Constants = {
       org_role: ["owner", "admin", "member", "viewer"],
       org_segment: ["vc_pe", "legal", "newsletter", "brand", "cto_sme", "solo"],
       persona_kind: ["project", "hat", "resource", "inbox"],
-      signal_source: ["reddit", "arxiv", "x"],
+      signal_source: ["reddit", "arxiv", "x", "rss"],
       subscription_status: [
         "active",
         "past_due",

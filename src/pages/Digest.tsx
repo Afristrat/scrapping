@@ -17,19 +17,12 @@ import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { ConfidenceBadge } from '@/components/features/ConfidenceBadge'
+import { DigestScopePanel, type DigestScope } from '@/components/features/DigestScopePanel'
 import { detectConfidenceLevel } from '@/lib/confidence-levels'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Slider } from '@/components/ui/slider'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
   useDigests,
@@ -42,13 +35,6 @@ import {
 import { useSettings } from '@/hooks/useSettings'
 import { useFormatCost } from '@/hooks/useFormatCost'
 import { copyToClipboard, downloadAsMarkdown, formatDateForFilename } from '@/lib/download-utils'
-
-const WINDOW_OPTIONS: Array<{ value: number; label: string }> = [
-  { value: 24, label: '24 h' },
-  { value: 72, label: '72 h' },
-  { value: 24 * 7, label: '7 j' },
-  { value: 24 * 30, label: '30 j' },
-]
 
 const RETRY_FALLBACK_SCORE = 30
 
@@ -124,22 +110,17 @@ export default function Digest(): React.ReactElement {
   const [searchParams] = useSearchParams()
   const urlId = searchParams.get('id')
 
-  const [windowHours, setWindowHours] = useState<number>(24)
-  const [minScoreRange, setMinScoreRange] = useState<number[]>([60])
   const [selectedId, setSelectedId] = useState<string | null>(urlId)
+  // Garder le dernier scope pour le retry avec seuil bas
+  const [lastScope, setLastScope] = useState<DigestScope | null>(null)
 
   const digestsQuery = useDigests()
   const generate = useGenerateDigest()
   const remove = useDeleteDigest()
   const formatCost = useFormatCost()
   const { data: settings } = useSettings()
-  // Langue de génération : override par-brief depuis cette page, fallback settings global
+  // Langue par défaut depuis les settings utilisateur
   const settingsLanguage = (settings?.language as DigestLanguage | undefined) ?? 'fr'
-  const [briefLanguage, setBriefLanguage] = useState<DigestLanguage>(settingsLanguage)
-  // Re-sync si settings.language change après le mount initial
-  if (briefLanguage !== settingsLanguage && !generate.isPending) {
-    // no-op, on garde le choix utilisateur per-brief
-  }
 
   const digests = useMemo<DigestRow[]>(() => digestsQuery.data ?? [], [digestsQuery.data])
   const selected = useMemo<DigestRow | null>(() => {
@@ -151,47 +132,44 @@ export default function Digest(): React.ReactElement {
     return digests[0] ?? null
   }, [digests, selectedId])
 
-  const minScore = minScoreRange[0] ?? 60
-
-  const submitGeneration = (params: {
-    window_hours: number
-    min_score: number
-    language: DigestLanguage
-  }): void => {
-    generate.mutate(params, {
-      onSuccess: (resp) => {
-        setSelectedId(resp.digest_id)
+  const handleScopeGenerate = (scope: DigestScope): void => {
+    setLastScope(scope)
+    generate.mutate(
+      {
+        window_hours: scope.windowHours,
+        min_score: scope.minScore ?? undefined,
+        language: scope.language,
+        topic_ids: scope.topicIds.length > 0 ? scope.topicIds : undefined,
+        persona_ids: scope.personaIds.length > 0 ? scope.personaIds : undefined,
+        sources: scope.sources.length > 0 ? scope.sources : undefined,
+        custom_angle: scope.customAngle || undefined,
+        prioritize: scope.prioritize,
       },
-    })
-  }
-
-  const handleGenerate = (): void => {
-    submitGeneration({
-      window_hours: windowHours,
-      min_score: minScore,
-      language: briefLanguage,
-    })
+      {
+        onSuccess: (resp) => {
+          setSelectedId(resp.digest_id)
+        },
+      },
+    )
   }
 
   const digestError = generate.error instanceof DigestError ? generate.error : null
+  const currentMinScore = lastScope?.minScore ?? 60
   const canRetryWithLowerScore =
     digestError !== null &&
     digestError.code === 'no_signals' &&
     typeof digestError.maxScoreInWindow === 'number' &&
     digestError.maxScoreInWindow >= 0 &&
-    minScore > RETRY_FALLBACK_SCORE
+    currentMinScore > RETRY_FALLBACK_SCORE
   const retryScore =
     digestError !== null && typeof digestError.maxScoreInWindow === 'number'
       ? Math.max(0, Math.min(RETRY_FALLBACK_SCORE, digestError.maxScoreInWindow))
       : RETRY_FALLBACK_SCORE
 
   const handleRetryWithLowerScore = (): void => {
-    setMinScoreRange([retryScore])
-    submitGeneration({
-      window_hours: windowHours,
-      min_score: retryScore,
-      language: briefLanguage,
-    })
+    if (!lastScope) return
+    const scopeWithLowerScore: DigestScope = { ...lastScope, minScore: retryScore }
+    handleScopeGenerate(scopeWithLowerScore)
   }
 
   const handleDelete = (id: string): void => {
@@ -339,82 +317,11 @@ export default function Digest(): React.ReactElement {
         </p>
       </header>
 
-      <Card className="border-outline-variant bg-surface-container-lowest rounded-xl shadow-sm">
-        <CardContent className="flex flex-wrap items-end gap-6 py-5">
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="window-hours"
-              className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
-            >
-              Fenêtre
-            </label>
-            <Select value={String(windowHours)} onValueChange={(v) => setWindowHours(Number(v))}>
-              <SelectTrigger id="window-hours" className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {WINDOW_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={String(opt.value)}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="brief-language"
-              className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
-            >
-              Langue
-            </label>
-            <Select
-              value={briefLanguage}
-              onValueChange={(v) => setBriefLanguage(v as DigestLanguage)}
-            >
-              <SelectTrigger id="brief-language" className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fr">🇫🇷 Français</SelectItem>
-                <SelectItem value="en">🇬🇧 English</SelectItem>
-                <SelectItem value="es">🇪🇸 Español</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
-            <label
-              htmlFor="min-score"
-              className="text-on-surface-variant flex items-center justify-between text-xs font-semibold tracking-[0.05em] uppercase"
-            >
-              <span>Score minimum</span>
-              <span className="text-primary font-mono text-sm normal-case">{minScore}</span>
-            </label>
-            <Slider
-              id="min-score"
-              min={0}
-              max={100}
-              step={5}
-              value={minScoreRange}
-              onValueChange={setMinScoreRange}
-            />
-          </div>
-
-          <Button
-            onClick={handleGenerate}
-            disabled={generate.isPending}
-            className="bg-primary text-on-primary hover:bg-primary-container gap-2 shadow-sm"
-          >
-            <Sparkles
-              className={`h-4 w-4 ${generate.isPending ? 'animate-spin' : ''}`}
-              aria-hidden="true"
-            />
-            {generate.isPending ? 'Génération…' : 'Générer le brief'}
-          </Button>
-        </CardContent>
-      </Card>
+      <DigestScopePanel
+        onGenerate={handleScopeGenerate}
+        isGenerating={generate.isPending}
+        defaultLanguage={settingsLanguage}
+      />
 
       {digestError ? (
         <div
