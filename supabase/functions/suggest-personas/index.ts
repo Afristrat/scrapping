@@ -199,7 +199,7 @@ Réponds avec ce JSON exact :
       method: 'POST',
       headers: { Authorization: auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        task: 'scoring',
+        task: 'digest',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
