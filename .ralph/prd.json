@@ -1417,7 +1417,7 @@
       "id": "S-10B.5",
       "wave": "10.B",
       "title": "digest edge fn scope params",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 5,
       "effort": "L",
@@ -1431,13 +1431,17 @@
         "custom_angle dans system",
         "Persists scope_params jsonb",
         "Tests"
-      ]
+      ],
+      "completedAt": "2026-05-04T18:40:45.651916Z",
+      "metadata": {
+        "completedBy": "claude-sonnet-4-6"
+      }
     },
     {
       "id": "S-10B.6",
       "wave": "10.B",
       "title": "Strategie selection score-first vs freshness",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 6,
       "effort": "M",
@@ -1452,7 +1456,11 @@
         "Mode freshness : strict window",
         "Toggle UI",
         "Tests"
-      ]
+      ],
+      "completedAt": "2026-05-04T18:40:45.651916Z",
+      "metadata": {
+        "completedBy": "claude-sonnet-4-6"
+      }
     },
     {
       "id": "S-10C.1",
