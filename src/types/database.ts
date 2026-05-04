@@ -1213,6 +1213,30 @@ export type Database = {
           },
         ]
       }
+      settings_profiles: {
+        Row: {
+          config_snapshot: Json
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          config_snapshot: Json
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          config_snapshot?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       signal_cluster_members: {
         Row: {
           cluster_id: string

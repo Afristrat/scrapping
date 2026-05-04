@@ -21,6 +21,7 @@ import { useSettings } from '@/hooks/useSettings'
 import { useUpdateSettings } from '@/hooks/useUpdateSettings'
 import { useUpdateConsensusModels } from '@/hooks/useUpdateConsensusModels'
 import { useProviderModels } from '@/hooks/useProviderModels'
+import { SettingsProfileBar } from '@/components/features/SettingsProfileBar'
 import {
   DEFAULT_APIFY_CONFIG,
   DEFAULT_SOURCE_PRIORITY,
@@ -148,6 +149,34 @@ export default function Settings() {
   const watchedXQueries = useWatch({ control, name: 'x_queries' })
   const watchedTopicSeeds = useWatch({ control, name: 'topic_seeds' })
 
+  // Snapshot complet du formulaire pour SettingsProfileBar
+  const watchedPromptScoring = useWatch({ control, name: 'prompt_scoring' })
+  const watchedBranding = useWatch({ control, name: 'branding' })
+  const watchedDailyBudget = useWatch({ control, name: 'daily_budget_usd' })
+  const watchedActiveRubricId = useWatch({ control, name: 'active_rubric_id' })
+  const watchedLanguage = useWatch({ control, name: 'language' })
+  const watchedScoreConcurrency = useWatch({ control, name: 'score_concurrency' })
+
+  const currentSnapshot: SettingsFormValues = {
+    prompt_scoring: watchedPromptScoring ?? '',
+    reddit_subs: watchedRedditSubs ?? [],
+    arxiv_categories: watchedArxivCategories ?? [],
+    x_queries: watchedXQueries ?? [],
+    topic_seeds: watchedTopicSeeds ?? [],
+    model_config: watchedModelConfig ?? {},
+    branding: watchedBranding ?? { name: 'Kairos', primary: '#6750A4', logo_url: null },
+    source_priority: sourcePriority ?? DEFAULT_SOURCE_PRIORITY,
+    apify_config: apifyConfig ?? DEFAULT_APIFY_CONFIG,
+    daily_budget_usd: watchedDailyBudget ?? 5,
+    active_rubric_id: watchedActiveRubricId ?? null,
+    language: watchedLanguage ?? 'fr',
+    score_concurrency: watchedScoreConcurrency ?? 20,
+  }
+
+  const handleApplyProfile = (values: SettingsFormValues) => {
+    reset(values)
+  }
+
   const onSubmit = (values: SettingsFormValues) => {
     updateMutation.mutate(values)
   }
@@ -163,6 +192,8 @@ export default function Settings() {
             Configurez Kairos selon vos besoins.
           </p>
         </header>
+
+        <SettingsProfileBar currentSnapshot={currentSnapshot} onApply={handleApplyProfile} />
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
           <Tabs defaultValue="models" className="gap-0">
