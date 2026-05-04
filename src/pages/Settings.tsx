@@ -146,7 +146,7 @@ export default function Settings() {
             <TabsList className="border-outline-variant flex h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0">
               {[
                 { value: 'models', label: 'Modèles' },
-                { value: 'rubrics', label: 'Rubriques' },
+                { value: 'rubrics', label: 'Grilles' },
                 { value: 'sources', label: 'Sources' },
                 { value: 'api-keys', label: 'Clés API' },
                 { value: 'admin', label: 'Prompts Admin' },
@@ -288,7 +288,7 @@ export default function Settings() {
             {/* Onglet 2 : Rubriques de scoring */}
             <TabsContent value="rubrics" className="space-y-6 pt-8">
               <SectionHeader
-                title="Rubriques de scoring"
+                title="Grilles de scoring"
                 description="Crée et active les grilles de critères utilisées par le LLM pour évaluer chaque signal."
               />
               <SectionCard>
