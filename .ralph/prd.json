@@ -1593,19 +1593,27 @@
       "id": "S-10C.5",
       "wave": "10.C",
       "title": "Compute weight composite signal",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-04",
       "agentModel": "sonnet",
       "priority": 5,
       "effort": "M",
       "dependencies": ["S-10A.4", "S-10C.3"],
-      "filesCreate": ["supabase/migrations/20260504000024_compute_weight.sql"],
-      "filesModify": [],
+      "filesCreate": ["supabase/migrations/20260504155000_compute_signal_weight.sql"],
+      "filesModify": ["src/types/database.ts"],
       "acceptanceCriteria": [
         "Function compute_signal_weight()",
         "weight = importance*0.4 + frequency*0.2 + utility*0.3 + reputation*0.1",
         "Trigger update on enrichment",
         "Tests SQL"
-      ]
+      ],
+      "metadata": {
+        "migration": "20260504155000_compute_signal_weight.sql",
+        "dbPush": "applied — remote 2026-05-04 15:50:00",
+        "tsc": "0 erreurs",
+        "triggers": ["trg_weight_on_score (scores)", "trg_weight_on_entity (signal_entities)"],
+        "notes": "signals.weight migré de NUMERIC(4,3) vers NUMERIC(5,4) DEFAULT 0 ; vue signals_enriched recrée avec CASCADE"
+      }
     },
     {
       "id": "S-10C.6",
