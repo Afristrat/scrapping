@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom'
+import { CommandPalette } from '@/components/features/CommandPalette'
 import { Sidebar } from './Sidebar'
 import { BrandedHeader } from './BrandedHeader'
 import { useOrganizations } from '@/hooks/useOrganizations'
@@ -20,6 +21,7 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+      <CommandPalette />
     </div>
   )
 }
