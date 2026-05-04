@@ -650,6 +650,70 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_enrichments: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          org_id: string
+          pass_kind: string
+          scheduled_at: string
+          signal_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          org_id: string
+          pass_kind: string
+          scheduled_at?: string
+          signal_id: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          org_id?: string
+          pass_kind?: string
+          scheduled_at?: string
+          signal_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_enrichments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_enrichments_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_enrichments_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_minio_writes: {
         Row: {
           attempts: number
@@ -1142,6 +1206,90 @@ export type Database = {
           },
           {
             foreignKeyName: "settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_cluster_members: {
+        Row: {
+          cluster_id: string
+          org_id: string
+          signal_id: string
+          similarity: number | null
+        }
+        Insert: {
+          cluster_id: string
+          org_id: string
+          signal_id: string
+          similarity?: number | null
+        }
+        Update: {
+          cluster_id?: string
+          org_id?: string
+          signal_id?: string
+          similarity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_cluster_members_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "signal_clusters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_cluster_members_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_cluster_members_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_clusters: {
+        Row: {
+          centroid_title: string | null
+          created_at: string | null
+          first_seen_at: string | null
+          id: string
+          last_seen_at: string | null
+          org_id: string
+          signal_count: number | null
+          sources: string[] | null
+        }
+        Insert: {
+          centroid_title?: string | null
+          created_at?: string | null
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          org_id: string
+          signal_count?: number | null
+          sources?: string[] | null
+        }
+        Update: {
+          centroid_title?: string | null
+          created_at?: string | null
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          org_id?: string
+          signal_count?: number | null
+          sources?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_clusters_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"

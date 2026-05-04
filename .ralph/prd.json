@@ -1466,7 +1466,7 @@
       "id": "S-10C.1",
       "wave": "10.C",
       "title": "DB schema pending_enrichments + queue",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 1,
       "effort": "M",
@@ -1478,13 +1478,22 @@
         "Index partiel WHERE pending OR failed",
         "RLS",
         "Trigger insert signal append 4 rows queue"
-      ]
+      ],
+      "completedAt": "2026-05-04T22:30:00Z",
+      "metadata": {
+        "commit": "f83c2e9",
+        "migrationApplied": "20260504150000_pending_enrichments.sql",
+        "typesRegenerated": true,
+        "tsc": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "206 passed (7 pre-existing failures unrelated to this story)"
+      }
     },
     {
       "id": "S-10C.2",
       "wave": "10.C",
       "title": "Edge fn enrich-entities (NER async)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 2,
       "effort": "L",
@@ -1502,21 +1511,32 @@
         "Update queue status",
         "pg_cron 30min",
         "Tests"
-      ]
+      ],
+      "completedAt": "2026-05-04T22:45:00Z",
+      "metadata": {
+        "commit": "aa9f501",
+        "deploy": "enrich-entities deployed on crplceoptyeslqyfcqvj",
+        "denoTests": "11/11 passed",
+        "tsc": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "208 passed (8 pre-existing failures unrelated to this story)"
+      }
     },
     {
       "id": "S-10C.3",
       "wave": "10.C",
       "title": "Edge fn compute-reputation hebdo",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-04T15:20:00Z",
       "agentModel": "sonnet",
       "priority": 3,
       "effort": "L",
       "dependencies": ["S-10C.1", "S-10A.5"],
       "filesCreate": [
         "supabase/functions/compute-reputation/index.ts",
-        "supabase/functions/compute-reputation/index.test.ts",
-        "supabase/migrations/20260504000022_reputation_cron.sql"
+        "supabase/functions/compute-reputation/reputation.ts",
+        "supabase/functions/compute-reputation/reputation.test.ts",
+        "supabase/migrations/20260504152000_cron_compute_reputation.sql"
       ],
       "filesModify": [],
       "acceptanceCriteria": [
@@ -1524,13 +1544,20 @@
         "Update entity.metadata.reputation_score",
         "pg_cron daily 3am UTC",
         "Tests"
-      ]
+      ],
+      "metadata": {
+        "commit": "2572a3a",
+        "denoTests": "8/8 passed",
+        "tsc": "0 errors",
+        "lint": "0 warnings (supabase/functions ignoré par ESLint, Deno scope)",
+        "vitest": "83 passed (pre-existing failures inchangées : 112 fail / 28 errors)"
+      }
     },
     {
       "id": "S-10C.4",
       "wave": "10.C",
       "title": "Edge fn cluster-signals (embeddings cross-source)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 4,
       "effort": "L",
@@ -1547,37 +1574,67 @@
         "Cosine > 0.80 fenetre 48h cross-source",
         "signal_clusters",
         "pg_cron hourly"
-      ]
+      ],
+      "completedAt": "2026-05-03T22:45:00Z",
+      "metadata": {
+        "tsc": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "209 passed (7 pre-existing failures unrelated to this story)",
+        "migrationApplied": [
+          "20260504153000_signal_clusters.sql",
+          "20260504154000_cron_cluster_signals.sql"
+        ],
+        "edgeFnDeployed": "cluster-signals",
+        "typesRegenerated": true,
+        "sideFixedBug": "20260504151000_cron_enrich_entities.sql nested-dollar-quote syntax error"
+      }
     },
     {
       "id": "S-10C.5",
       "wave": "10.C",
       "title": "Compute weight composite signal",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-04",
       "agentModel": "sonnet",
       "priority": 5,
       "effort": "M",
       "dependencies": ["S-10A.4", "S-10C.3"],
-      "filesCreate": ["supabase/migrations/20260504000024_compute_weight.sql"],
-      "filesModify": [],
+      "filesCreate": ["supabase/migrations/20260504155000_compute_signal_weight.sql"],
+      "filesModify": ["src/types/database.ts"],
       "acceptanceCriteria": [
         "Function compute_signal_weight()",
         "weight = importance*0.4 + frequency*0.2 + utility*0.3 + reputation*0.1",
         "Trigger update on enrichment",
         "Tests SQL"
-      ]
+      ],
+      "metadata": {
+        "migration": "20260504155000_compute_signal_weight.sql",
+        "dbPush": "applied — remote 2026-05-04 15:50:00",
+        "tsc": "0 erreurs",
+        "triggers": ["trg_weight_on_score (scores)", "trg_weight_on_entity (signal_entities)"],
+        "notes": "signals.weight migré de NUMERIC(4,3) vers NUMERIC(5,4) DEFAULT 0 ; vue signals_enriched recrée avec CASCADE"
+      }
     },
     {
       "id": "S-10C.6",
       "wave": "10.C",
       "title": "Page /admin/queue monitoring",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-03",
       "agentModel": "sonnet",
       "priority": 6,
       "effort": "M",
       "dependencies": ["S-10C.1"],
-      "filesCreate": ["src/pages/AdminQueue.tsx", "src/pages/AdminQueue.test.tsx"],
-      "filesModify": ["src/App.tsx"],
+      "filesCreate": [
+        "src/hooks/usePendingEnrichments.ts",
+        "src/pages/admin/QueueMonitor.tsx",
+        "src/pages/admin/QueueMonitor.test.tsx"
+      ],
+      "filesModify": [
+        "src/routes.tsx",
+        "src/components/layout/Sidebar.tsx",
+        "src/pages/AdminCockpit.tsx"
+      ],
       "acceptanceCriteria": [
         "Route /admin/queue gated app_admin",
         "Tableau status counts par pass_kind",
@@ -1589,22 +1646,33 @@
       "id": "S-10C.7",
       "wave": "10.C",
       "title": "Edge fn process-pending-enrichments orchestrateur",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-04",
       "agentModel": "sonnet",
       "priority": 7,
       "effort": "M",
       "dependencies": ["S-10C.2", "S-10C.3", "S-10C.4"],
       "filesCreate": [
         "supabase/functions/process-pending-enrichments/index.ts",
-        "supabase/functions/process-pending-enrichments/index.test.ts",
-        "supabase/migrations/20260504000025_process_pending_cron.sql"
+        "supabase/functions/process-pending-enrichments/orchestrator.ts",
+        "supabase/functions/process-pending-enrichments/orchestrator.test.ts",
+        "supabase/migrations/20260504160000_cron_process_pending.sql"
       ],
       "filesModify": [],
       "acceptanceCriteria": [
         "Consume queue retries max 5 backoff",
         "Dispatch sub-workers selon pass_kind",
         "pg_cron 30min"
-      ]
+      ],
+      "metadata": {
+        "commit": "36ee41e",
+        "deployedAt": "2026-05-04",
+        "testsPassed": "11/11 Deno tests",
+        "typecheckErrors": 0,
+        "lintWarnings": 0,
+        "migrationApplied": "20260504160000_cron_process_pending.sql",
+        "edgeFnDeployed": "process-pending-enrichments"
+      }
     },
     {
       "id": "S-10D.1",

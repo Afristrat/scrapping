@@ -4,6 +4,7 @@ import {
   ScrollText,
   DollarSign,
   FlaskConical,
+  ListChecks,
   LogOut,
   Sparkles,
   Table2,
@@ -106,6 +107,20 @@ export function Sidebar() {
             >
               <UserPlus className="h-3.5 w-3.5" />
               Onboarding CSM
+            </Link>
+            <Link
+              to="/admin/queue"
+              className={cn(
+                'ml-9 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                pathname === '/admin/queue'
+                  ? 'bg-primary-fixed text-on-primary-fixed border-primary border-r-2'
+                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/30',
+              )}
+              aria-current={pathname === '/admin/queue' ? 'page' : undefined}
+              title="Monitoring de la queue d'enrichissement"
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+              Queue enrichissement
             </Link>
           </>
         )}

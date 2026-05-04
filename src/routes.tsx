@@ -7,6 +7,7 @@ import AcceptInvitation from '@/pages/AcceptInvitation'
 import AdminCockpit from '@/pages/AdminCockpit'
 import AppSettings from '@/pages/admin/AppSettings'
 import CSMOnboarding from '@/pages/admin/CSMOnboarding'
+import QueueMonitor from '@/pages/admin/QueueMonitor'
 import AuditLog from '@/pages/AuditLog'
 import Blog from '@/pages/Blog'
 import BlogPost from '@/pages/BlogPost'
@@ -88,6 +89,7 @@ export const router = createBrowserRouter([
           { path: '/admin', element: <AdminCockpit /> },
           { path: '/admin/csm', element: <CSMOnboarding /> },
           { path: '/admin/settings', element: <AppSettings /> },
+          { path: '/admin/queue', element: <QueueMonitor /> },
           { path: '/monitoring', element: <Navigate to="/costs" replace /> },
         ],
       },
