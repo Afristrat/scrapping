@@ -1493,7 +1493,7 @@
       "id": "S-10C.2",
       "wave": "10.C",
       "title": "Edge fn enrich-entities (NER async)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 2,
       "effort": "L",
@@ -1511,7 +1511,16 @@
         "Update queue status",
         "pg_cron 30min",
         "Tests"
-      ]
+      ],
+      "completedAt": "2026-05-04T22:45:00Z",
+      "metadata": {
+        "commit": "aa9f501",
+        "deploy": "enrich-entities deployed on crplceoptyeslqyfcqvj",
+        "denoTests": "11/11 passed",
+        "tsc": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "208 passed (8 pre-existing failures unrelated to this story)"
+      }
     },
     {
       "id": "S-10C.3",
