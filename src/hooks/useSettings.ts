@@ -23,6 +23,7 @@ export interface Settings {
     scraping?: { provider: string; model: string } | null
     monitoring?: { provider: string; model: string } | null
     digest?: { provider: string; model: string } | null
+    enrichment?: { provider: string; model: string } | null
   }
   branding: Branding
   daily_budget_usd: number

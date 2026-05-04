@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useCurrentOrgId } from '@/hooks/useCurrentOrgId'
 import type { Database } from '@/types/database'
 
 // =============================================================================
@@ -37,21 +38,26 @@ const QUEUE_KEYS = {
 // ---------------------------------------------------------------------------
 
 export function useQueueStats() {
+  const orgId = useCurrentOrgId()
   return useQuery<QueueStats, Error>({
-    queryKey: QUEUE_KEYS.stats,
-    refetchInterval: 30_000,
+    queryKey: [...QUEUE_KEYS.stats, orgId],
+    enabled: !!orgId,
+    refetchInterval: 120_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('pending_enrichments').select('pass_kind, status')
+      const { data, error } = await supabase
+        .from('pending_enrichments')
+        .select('pass_kind, status')
+        .eq('org_id', orgId ?? '')
+        .neq('status', 'completed')
+        .limit(2000)
 
       if (error) throw new Error(error.message)
 
-      // Initialiser toutes les pass_kinds à zéro
       const stats: QueueStats = {} as QueueStats
       for (const kind of ALL_PASS_KINDS) {
         stats[kind] = { pending: 0, in_progress: 0, completed: 0, failed: 0 }
       }
 
-      // Agréger les compteurs
       for (const row of data ?? []) {
         const kind = row.pass_kind as PassKind
         if (!stats[kind]) {
@@ -73,13 +79,16 @@ export function useQueueStats() {
 // ---------------------------------------------------------------------------
 
 export function useFailedJobs() {
+  const orgId = useCurrentOrgId()
   return useQuery<PendingEnrichment[], Error>({
-    queryKey: QUEUE_KEYS.failed,
-    refetchInterval: 30_000,
+    queryKey: [...QUEUE_KEYS.failed, orgId],
+    enabled: !!orgId,
+    refetchInterval: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pending_enrichments')
         .select('*')
+        .eq('org_id', orgId ?? '')
         .eq('status', 'failed')
         .order('scheduled_at', { ascending: false })
         .limit(50)
