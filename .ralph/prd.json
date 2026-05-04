@@ -1526,15 +1526,17 @@
       "id": "S-10C.3",
       "wave": "10.C",
       "title": "Edge fn compute-reputation hebdo",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-04T15:20:00Z",
       "agentModel": "sonnet",
       "priority": 3,
       "effort": "L",
       "dependencies": ["S-10C.1", "S-10A.5"],
       "filesCreate": [
         "supabase/functions/compute-reputation/index.ts",
-        "supabase/functions/compute-reputation/index.test.ts",
-        "supabase/migrations/20260504000022_reputation_cron.sql"
+        "supabase/functions/compute-reputation/reputation.ts",
+        "supabase/functions/compute-reputation/reputation.test.ts",
+        "supabase/migrations/20260504152000_cron_compute_reputation.sql"
       ],
       "filesModify": [],
       "acceptanceCriteria": [
@@ -1542,7 +1544,14 @@
         "Update entity.metadata.reputation_score",
         "pg_cron daily 3am UTC",
         "Tests"
-      ]
+      ],
+      "metadata": {
+        "commit": "2572a3a",
+        "denoTests": "8/8 passed",
+        "tsc": "0 errors",
+        "lint": "0 warnings (supabase/functions ignoré par ESLint, Deno scope)",
+        "vitest": "83 passed (pre-existing failures inchangées : 112 fail / 28 errors)"
+      }
     },
     {
       "id": "S-10C.4",
