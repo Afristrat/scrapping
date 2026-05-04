@@ -144,6 +144,7 @@ export default function Digest(): React.ReactElement {
         sources: scope.sources.length > 0 ? scope.sources : undefined,
         custom_angle: scope.customAngle || undefined,
         prioritize: scope.prioritize,
+        instructions: scope.instructions || undefined,
       },
       {
         onSuccess: (resp) => {
