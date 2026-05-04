@@ -17,6 +17,8 @@ import { RubricsManager } from '@/components/features/RubricsManager'
 import { SourcePrioritySliders } from '@/components/features/SourcePrioritySliders'
 import { TagInput } from '@/components/features/TagInput'
 import { TopicsTaxonomyEditor } from '@/components/features/TopicsTaxonomyEditor'
+import { SourceHealthBadge } from '@/components/features/SourceHealthBadge'
+import { useSubredditHealth } from '@/hooks/useSourceHealth'
 import { useSettings } from '@/hooks/useSettings'
 import { useUpdateSettings } from '@/hooks/useUpdateSettings'
 import { useUpdateConsensusModels } from '@/hooks/useUpdateConsensusModels'
@@ -370,6 +372,13 @@ export default function Settings() {
                       onChange={(next) => setValue('reddit_subs', next, { shouldDirty: true })}
                       placeholder="ex : MachineLearning"
                     />
+                    {(watchedRedditSubs ?? []).length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {(watchedRedditSubs ?? []).map((sub) => (
+                          <SubredditHealthRow key={sub} sub={sub} />
+                        ))}
+                      </ul>
+                    )}
                   </FieldGroup>
 
                   <FieldGroup
@@ -559,6 +568,22 @@ export default function Settings() {
         </form>
       </div>
     </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Sous-composants santé sources                                               */
+/* -------------------------------------------------------------------------- */
+
+function SubredditHealthRow({ sub }: { sub: string }) {
+  const health = useSubredditHealth(sub)
+  return (
+    <li className="flex items-center gap-2 text-xs">
+      <span className="text-on-surface-variant">
+        r/<span className="text-on-surface font-medium">{sub}</span>
+      </span>
+      <SourceHealthBadge health={health} />
+    </li>
   )
 }
 
