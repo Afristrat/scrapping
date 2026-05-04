@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { SettingsSuggestions } from '@/components/features/SettingsSuggestions'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { Save } from 'lucide-react'
@@ -177,6 +178,9 @@ export default function Settings() {
     score_concurrency: watchedScoreConcurrency ?? 20,
   }
 
+  // État de l'onglet actif — contrôlé pour permettre la navigation programmatique
+  const [activeTab, setActiveTab] = useState('models')
+
   // État du dialog de diff avant sauvegarde
   const [diffState, setDiffState] = useState<{
     open: boolean
@@ -237,7 +241,7 @@ export default function Settings() {
         />
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          <Tabs defaultValue="models" className="gap-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-0">
             {/* Onglets — style underline Stitch (border-b primary sur active) */}
             <TabsList className="border-outline-variant flex h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0">
               {[
@@ -564,6 +568,8 @@ export default function Settings() {
                   </FieldGroup>
                 </SectionCard>
               </div>
+
+              <SettingsSuggestions onNavigate={setActiveTab} />
             </TabsContent>
             {/* Onglet 7 : Taxonomie Topics */}
             <TabsContent value="topics" className="space-y-6 pt-8">
