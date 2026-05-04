@@ -106,3 +106,22 @@ PRD ouverte 2026-05-01T18:00 par brief utilisateur ambitieux : delete inline/bul
 - Validation : typecheck 0 err · lint 0 new warning · vitest 44/44 (✨ `bun install` réparé les 19 jest-dom matchers cassés cette session) · deno test 24/24 · build 1.72 s
 - **Pattern cascade réutilisable** : pour ajouter d'autres types de prompts dépendants, étendre `compose.ts:resolveComposedRuns` plutôt que dupliquer la logique dans `index.ts`
 - **Piège résolu** : `node_modules/.deno/` créé par `deno test` casse temporairement `tsc -b` (conflit `@types/react`). Workaround durant validation : `bun install` réintègre proprement
+
+### 2026-05-03T19:38:00Z — S-10B.5 + S-10B.6 ✓ (commits à venir)
+
+**Fichiers modifiés** :
+
+- `supabase/migrations/20260504140000_digests_scope_params.sql` — ajout `scope_params JSONB` sur `digests`
+- `supabase/functions/digest/index.ts` — scope params complets + stratégie score/freshness + contexte persona + angle custom
+- `supabase/functions/digest/scope.test.ts` — 13 tests Deno unitaires (buildUserPrompt, stratégies, déduplication)
+- `src/types/database.ts` — régénéré (scope_params: Json | null dans Row/Insert/Update)
+
+**Architecture S-10B.5** : `RequestBody` étendu avec `topic_ids[]`, `persona_ids[]`, `sources[]`, `custom_angle`, `prioritize`. Fonction `buildSignalQuery(sinceTs)` pour requêtes filtrées réutilisables. Jointure `signal_topics`/`signal_personas` pour filtrage topic/persona. Persistance `scope_params` dans `digests`.
+
+**Architecture S-10B.6** : Extension fenêtre auto 7j si `prioritize='score'` et résultats < 30. Déduplication par Set d'IDs. Stratégie `freshness` → tri `scraped_at DESC` strict sans extension. Toggle UI déjà présent dans `DigestScopePanel.tsx` (S-10B.4), `useDigest.ts` transmet déjà `prioritize`.
+
+**Déploiement** : `supabase db push` OK (20260504130000 + 20260504140000) · `supabase functions deploy digest` OK.
+
+**Validation** : typecheck 0 err · lint 0 warning · vitest 205/213 (8 échecs pré-existants identiques avant/après).
+
+**Pattern réutilisable** : `buildSignalQuery(sinceTs)` en closure capture les filtres scope et `candidateIds` — permet réutilisation propre pour l'extension de fenêtre sans duplication du code de jointure.

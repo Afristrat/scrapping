@@ -1305,25 +1305,36 @@
       "id": "S-10B.1",
       "wave": "10.B",
       "title": "Hook useSignalsEnriched + filtres multi-axes",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-04T19:01:00Z",
+      "commit": "2a54941",
       "agentModel": "haiku",
       "priority": 1,
       "effort": "S",
       "dependencies": ["S-10A.4"],
       "filesCreate": ["src/hooks/useSignalsEnriched.ts", "src/hooks/useSignalsEnriched.test.ts"],
-      "filesModify": [],
+      "filesModify": [
+        "supabase/migrations/20260504130000_rpc_signals_enriched.sql",
+        "src/types/database.ts"
+      ],
       "acceptanceCriteria": [
         "Hook avec filtres dynamiques",
         "Pagination cursor",
         "staleTime 60s",
         "Tests"
-      ]
+      ],
+      "metadata": {
+        "tsc": "0 erreurs",
+        "lint": "0 warnings",
+        "vitest": "5/5 pass (useSignalsEnriched.test.ts)",
+        "supabase": "migration 20260504130000 appliquée + types régénérés"
+      }
     },
     {
       "id": "S-10B.2",
       "wave": "10.B",
       "title": "Dashboard filtres topic + persona + source",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 2,
       "effort": "L",
@@ -1337,45 +1348,76 @@
         "Window slider",
         "URL params sync",
         "Reset"
-      ]
+      ],
+      "completedAt": "2026-05-03T19:25:00Z",
+      "metadata": {
+        "tsc": "0 erreurs",
+        "lint": "0 warnings",
+        "vitest": "5/5 pass (DashboardFilters.test.tsx)",
+        "files": [
+          "src/lib/signal-filters.ts",
+          "src/components/features/DashboardFilters.tsx",
+          "src/components/features/DashboardFilters.test.tsx",
+          "src/pages/Dashboard.tsx"
+        ]
+      }
     },
     {
       "id": "S-10B.3",
       "wave": "10.B",
       "title": "Page /explorer (vue tableau croise)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 3,
       "effort": "L",
       "dependencies": ["S-10B.1"],
-      "filesCreate": ["src/pages/Explorer.tsx", "src/pages/Explorer.test.tsx"],
-      "filesModify": ["src/App.tsx"],
-      "acceptanceCriteria": ["Pivot table axes choisis", "Drill-down click", "Export CSV"]
+      "filesCreate": [
+        "src/pages/Explorer.tsx",
+        "src/pages/Explorer.test.tsx",
+        "src/lib/signal-filters.ts"
+      ],
+      "filesModify": [
+        "src/routes.tsx",
+        "src/components/layout/Sidebar.tsx",
+        "src/components/features/DashboardFilters.tsx",
+        "src/components/features/DashboardFilters.test.tsx"
+      ],
+      "acceptanceCriteria": ["Pivot table axes choisis", "Drill-down click", "Export CSV"],
+      "completedAt": "2026-05-03"
     },
     {
       "id": "S-10B.4",
       "wave": "10.B",
       "title": "/digest pre-ecran scope",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-03",
       "agentModel": "sonnet",
       "priority": 4,
       "effort": "M",
       "dependencies": ["S-10A.7", "S-10A.8"],
-      "filesCreate": ["src/components/features/DigestScopePanel.tsx"],
-      "filesModify": ["src/pages/Digest.tsx"],
+      "filesCreate": [
+        "src/components/features/DigestScopePanel.tsx",
+        "src/components/features/DigestScopePanel.test.tsx"
+      ],
+      "filesModify": ["src/pages/Digest.tsx", "src/hooks/useDigest.ts"],
       "acceptanceCriteria": [
         "Modal pre-generation",
         "Champs topics/personas/sources/langue/window/score",
         "Champ Angle libre",
         "Cost estimate",
         "Bouton desactive si scope vide"
-      ]
+      ],
+      "metadata": {
+        "commit": "31c3b1f",
+        "tests": "5/5",
+        "notes": "DigestScopePanel Card compacte avec topics/persona/sources/fenetre/langue/score/priorite/angle. GenerateDigestArgs etendu avec topic_ids, persona_ids, sources, custom_angle, prioritize. Fix pré-existant Dashboard imports signal-filters."
+      }
     },
     {
       "id": "S-10B.5",
       "wave": "10.B",
       "title": "digest edge fn scope params",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 5,
       "effort": "L",
@@ -1389,13 +1431,17 @@
         "custom_angle dans system",
         "Persists scope_params jsonb",
         "Tests"
-      ]
+      ],
+      "completedAt": "2026-05-04T18:40:45.651916Z",
+      "metadata": {
+        "completedBy": "claude-sonnet-4-6"
+      }
     },
     {
       "id": "S-10B.6",
       "wave": "10.B",
       "title": "Strategie selection score-first vs freshness",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 6,
       "effort": "M",
@@ -1410,7 +1456,11 @@
         "Mode freshness : strict window",
         "Toggle UI",
         "Tests"
-      ]
+      ],
+      "completedAt": "2026-05-04T18:40:45.651916Z",
+      "metadata": {
+        "completedBy": "claude-sonnet-4-6"
+      }
     },
     {
       "id": "S-10C.1",
