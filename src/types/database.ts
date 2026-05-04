@@ -294,6 +294,7 @@ export type Database = {
           min_score: number
           model_used: string | null
           org_id: string
+          scope_params: Json | null
           signal_count: number
           user_id: string
           window_hours: number
@@ -307,6 +308,7 @@ export type Database = {
           min_score?: number
           model_used?: string | null
           org_id?: string
+          scope_params?: Json | null
           signal_count?: number
           user_id: string
           window_hours?: number
@@ -320,6 +322,7 @@ export type Database = {
           min_score?: number
           model_used?: string | null
           org_id?: string
+          scope_params?: Json | null
           signal_count?: number
           user_id?: string
           window_hours?: number
