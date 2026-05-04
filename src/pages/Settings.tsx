@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { Save } from 'lucide-react'
@@ -87,32 +87,55 @@ export default function Settings() {
     handleSubmit,
     register,
     setValue,
+    reset,
     formState: { isDirty, errors },
   } = useForm<SettingsFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(settingsSchema) as any,
-    values: settings
-      ? {
-          prompt_scoring: settings.prompt_scoring,
-          reddit_subs: settings.reddit_subs,
-          arxiv_categories: settings.arxiv_categories,
-          x_queries: settings.x_queries,
-          topic_seeds: settings.topic_seeds ?? [],
-          model_config: settings.model_config ?? {},
-          branding: {
-            name: settings.branding.name,
-            primary: settings.branding.primary,
-            logo_url: settings.branding.logo_url,
-          },
-          source_priority: settings.source_priority ?? DEFAULT_SOURCE_PRIORITY,
-          apify_config: settings.apify_config ?? DEFAULT_APIFY_CONFIG,
-          daily_budget_usd: settings.daily_budget_usd ?? 5,
-          active_rubric_id: settings.active_rubric_id ?? null,
-          language: settings.language ?? 'fr',
-          score_concurrency: settings.score_concurrency ?? 20,
-        }
-      : undefined,
+    defaultValues: {
+      prompt_scoring: '',
+      reddit_subs: [],
+      arxiv_categories: [],
+      x_queries: [],
+      topic_seeds: [],
+      model_config: {},
+      branding: { name: 'Kairos', primary: '#6750A4', logo_url: null },
+      source_priority: DEFAULT_SOURCE_PRIORITY,
+      apify_config: DEFAULT_APIFY_CONFIG,
+      daily_budget_usd: 5,
+      active_rubric_id: null,
+      language: 'fr',
+      score_concurrency: 20,
+    },
   })
+
+  // Initialise le formulaire une seule fois quand settings arrive.
+  // On évite `values` prop qui reset le form à chaque refetch TanStack Query,
+  // ce qui effaçait les modifications en cours.
+  const initializedRef = useRef(false)
+  useEffect(() => {
+    if (!settings || initializedRef.current) return
+    initializedRef.current = true
+    reset({
+      prompt_scoring: settings.prompt_scoring,
+      reddit_subs: settings.reddit_subs,
+      arxiv_categories: settings.arxiv_categories,
+      x_queries: settings.x_queries,
+      topic_seeds: settings.topic_seeds ?? [],
+      model_config: settings.model_config ?? {},
+      branding: {
+        name: settings.branding.name,
+        primary: settings.branding.primary,
+        logo_url: settings.branding.logo_url,
+      },
+      source_priority: settings.source_priority ?? DEFAULT_SOURCE_PRIORITY,
+      apify_config: settings.apify_config ?? DEFAULT_APIFY_CONFIG,
+      daily_budget_usd: settings.daily_budget_usd ?? 5,
+      active_rubric_id: settings.active_rubric_id ?? null,
+      language: settings.language ?? 'fr',
+      score_concurrency: settings.score_concurrency ?? 20,
+    })
+  }, [settings, reset])
 
   // useWatch est stable côté React Compiler (vs watch() qui force des
   // re-renders non mémorisables — règle react-hooks/incompatible-library).
