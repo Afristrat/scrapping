@@ -1638,22 +1638,33 @@
       "id": "S-10C.7",
       "wave": "10.C",
       "title": "Edge fn process-pending-enrichments orchestrateur",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-04",
       "agentModel": "sonnet",
       "priority": 7,
       "effort": "M",
       "dependencies": ["S-10C.2", "S-10C.3", "S-10C.4"],
       "filesCreate": [
         "supabase/functions/process-pending-enrichments/index.ts",
-        "supabase/functions/process-pending-enrichments/index.test.ts",
-        "supabase/migrations/20260504000025_process_pending_cron.sql"
+        "supabase/functions/process-pending-enrichments/orchestrator.ts",
+        "supabase/functions/process-pending-enrichments/orchestrator.test.ts",
+        "supabase/migrations/20260504160000_cron_process_pending.sql"
       ],
       "filesModify": [],
       "acceptanceCriteria": [
         "Consume queue retries max 5 backoff",
         "Dispatch sub-workers selon pass_kind",
         "pg_cron 30min"
-      ]
+      ],
+      "metadata": {
+        "commit": "36ee41e",
+        "deployedAt": "2026-05-04",
+        "testsPassed": "11/11 Deno tests",
+        "typecheckErrors": 0,
+        "lintWarnings": 0,
+        "migrationApplied": "20260504160000_cron_process_pending.sql",
+        "edgeFnDeployed": "process-pending-enrichments"
+      }
     },
     {
       "id": "S-10D.1",
