@@ -56,6 +56,11 @@ interface RequestBody {
    * 'freshness' : ORDER BY scraped_at DESC strict, pas d'extension.
    */
   prioritize?: Prioritize
+  /**
+   * S-10E.2 : instructions libres saisies via le champ slash commands.
+   * Injectées dans le user prompt comme directives supplémentaires.
+   */
+  instructions?: string
 }
 
 interface DispatchResponse {
@@ -146,6 +151,8 @@ Deno.serve(async (req: Request) => {
     : []
   const customAngle: string =
     typeof body.custom_angle === 'string' ? body.custom_angle.trim().slice(0, 500) : ''
+  const instructions: string =
+    typeof body.instructions === 'string' ? body.instructions.trim().slice(0, 1000) : ''
 
   // ---- 1. Resolve language : body override (per-brief) ou fallback settings
   const settingsRes = await supabase
@@ -410,7 +417,14 @@ Deno.serve(async (req: Request) => {
 
   // ---- 3. Build prompts (multi-langue)
   const systemPrompt = buildSystemPrompt(language, personaContextMd, personaNames)
-  const userPrompt = buildUserPrompt(top, windowHours, minScore, language, customAngle)
+  const userPrompt = buildUserPrompt(
+    top,
+    windowHours,
+    minScore,
+    language,
+    customAngle,
+    instructions,
+  )
 
   // ---- 4. Call dispatch-llm
   let dispatchResult: DispatchResponse
@@ -763,6 +777,7 @@ function buildUserPrompt(
   minScore: number,
   language: Language,
   customAngle = '',
+  instructions = '',
 ): string {
   const header =
     language === 'en'
@@ -780,6 +795,15 @@ function buildUserPrompt(
           : `\n\nAngle de lecture demandé : ${customAngle}`
       : ''
 
+  const instructionsBlock =
+    instructions.length > 0
+      ? language === 'en'
+        ? `\n\nAdditional instructions: ${instructions}`
+        : language === 'es'
+          ? `\n\nInstrucciones adicionales: ${instructions}`
+          : `\n\nInstructions supplémentaires : ${instructions}`
+      : ''
+
   const payload = signals.map((s) => ({
     n: s.n,
     source: s.source,
@@ -791,7 +815,7 @@ function buildUserPrompt(
     why: s.reasoning,
   }))
 
-  return `${header}${angleBlock}\n\n${JSON.stringify(payload, null, 2)}`
+  return `${header}${angleBlock}${instructionsBlock}\n\n${JSON.stringify(payload, null, 2)}`
 }
 
 /**

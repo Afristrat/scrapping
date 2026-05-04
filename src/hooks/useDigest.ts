@@ -33,6 +33,8 @@ export interface GenerateDigestArgs {
   sources?: string[]
   custom_angle?: string
   prioritize?: 'score' | 'freshness'
+  /** S-10E.2 : instructions libres via slash commands. */
+  instructions?: string
 }
 
 export interface GenerateDigestResponse {
@@ -160,6 +162,7 @@ export function useGenerateDigest(): ReturnType<
       if (args.sources && args.sources.length > 0) body.sources = args.sources
       if (args.custom_angle) body.custom_angle = args.custom_angle
       if (args.prioritize) body.prioritize = args.prioritize
+      if (args.instructions) body.instructions = args.instructions
 
       const resp = await fetch(url, {
         method: 'POST',
