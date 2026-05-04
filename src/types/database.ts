@@ -1213,6 +1213,90 @@ export type Database = {
           },
         ]
       }
+      signal_cluster_members: {
+        Row: {
+          cluster_id: string
+          org_id: string
+          signal_id: string
+          similarity: number | null
+        }
+        Insert: {
+          cluster_id: string
+          org_id: string
+          signal_id: string
+          similarity?: number | null
+        }
+        Update: {
+          cluster_id?: string
+          org_id?: string
+          signal_id?: string
+          similarity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_cluster_members_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "signal_clusters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_cluster_members_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_cluster_members_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_clusters: {
+        Row: {
+          centroid_title: string | null
+          created_at: string | null
+          first_seen_at: string | null
+          id: string
+          last_seen_at: string | null
+          org_id: string
+          signal_count: number | null
+          sources: string[] | null
+        }
+        Insert: {
+          centroid_title?: string | null
+          created_at?: string | null
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          org_id: string
+          signal_count?: number | null
+          sources?: string[] | null
+        }
+        Update: {
+          centroid_title?: string | null
+          created_at?: string | null
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          org_id?: string
+          signal_count?: number | null
+          sources?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_clusters_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signal_entities: {
         Row: {
           confidence: number

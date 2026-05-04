@@ -125,3 +125,23 @@ PRD ouverte 2026-05-01T18:00 par brief utilisateur ambitieux : delete inline/bul
 **Validation** : typecheck 0 err · lint 0 warning · vitest 205/213 (8 échecs pré-existants identiques avant/après).
 
 **Pattern réutilisable** : `buildSignalQuery(sinceTs)` en closure capture les filtres scope et `candidateIds` — permet réutilisation propre pour l'extension de fenêtre sans duplication du code de jointure.
+
+### 2026-05-03T22:45:00Z — S-10C.4 ✓ — cluster-signals (embeddings cross-source)
+
+**Fichiers créés** :
+
+- `supabase/migrations/20260504153000_signal_clusters.sql` — tables `signal_clusters` + `signal_cluster_members`, RLS, index.
+- `supabase/migrations/20260504154000_cron_cluster_signals.sql` — pg_cron horaire (toutes les heures, min 0).
+- `supabase/functions/cluster-signals/cluster.ts` — fonctions pures `cosineSimilarity` + `isSimilar` (TypeScript pur, 0 dépendances).
+- `supabase/functions/cluster-signals/cluster.test.ts` — 12 tests Deno (vecteurs identiques → 1.0, orthogonaux → 0.0, opposés → -1.0, nul → 0, vides → 0, dimensions différentes → 0, isSimilar strict > 0.80).
+- `supabase/functions/cluster-signals/index.ts` — edge fn principale : batch 30, embedding text-embedding-3-small 256 dims via OpenAI/OpenRouter, cosine > 0.80 fenêtre 48h, skip graceful si pas de clé.
+
+**Bug fixé en collatéral** : `20260504151000_cron_enrich_entities.sql` avait une erreur de syntaxe SQL (délimiteurs `$$` imbriqués). Corrigé en `$outer$...$outer$` + `$cron$...$cron$` pour éviter la collision.
+
+**Architecture** : embeddings calculés côté Deno en mémoire (pas de pg_vector requis). Pré-calcul batch des centroids existants pour O(1) lookup. Cache en mémoire des nouveaux clusters créés pendant le run pour éviter doublons intra-batch.
+
+**Validation** : tsc 0 err · lint 0 warning · vitest 209/216 (7 échecs pré-existants, -1 par rapport au baseline grâce aux nouveaux types générés).
+
+**Déploiement** : `supabase db push` OK (4 migrations) · `supabase functions deploy cluster-signals` OK.
+
+**Pattern réutilisable** : pour les fonctions pures critiques (calculs mathématiques, parseurs), les extraire dans un module `.ts` séparé et les couvrir avec Deno tests — garantit testabilité sans mock Supabase.

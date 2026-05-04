@@ -1557,7 +1557,7 @@
       "id": "S-10C.4",
       "wave": "10.C",
       "title": "Edge fn cluster-signals (embeddings cross-source)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 4,
       "effort": "L",
@@ -1574,7 +1574,20 @@
         "Cosine > 0.80 fenetre 48h cross-source",
         "signal_clusters",
         "pg_cron hourly"
-      ]
+      ],
+      "completedAt": "2026-05-03T22:45:00Z",
+      "metadata": {
+        "tsc": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "209 passed (7 pre-existing failures unrelated to this story)",
+        "migrationApplied": [
+          "20260504153000_signal_clusters.sql",
+          "20260504154000_cron_cluster_signals.sql"
+        ],
+        "edgeFnDeployed": "cluster-signals",
+        "typesRegenerated": true,
+        "sideFixedBug": "20260504151000_cron_enrich_entities.sql nested-dollar-quote syntax error"
+      }
     },
     {
       "id": "S-10C.5",
