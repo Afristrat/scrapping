@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
     .from('personas')
     .select('id, name, key, kind')
     .eq('org_id', org_id)
-    .is('archived_at', null)
+    .eq('is_archived', false)
 
   if (personasErr) {
     const f = formatError(personasErr)
