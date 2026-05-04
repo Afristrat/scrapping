@@ -1466,7 +1466,7 @@
       "id": "S-10C.1",
       "wave": "10.C",
       "title": "DB schema pending_enrichments + queue",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 1,
       "effort": "M",
@@ -1478,7 +1478,16 @@
         "Index partiel WHERE pending OR failed",
         "RLS",
         "Trigger insert signal append 4 rows queue"
-      ]
+      ],
+      "completedAt": "2026-05-04T22:30:00Z",
+      "metadata": {
+        "commit": "f83c2e9",
+        "migrationApplied": "20260504150000_pending_enrichments.sql",
+        "typesRegenerated": true,
+        "tsc": "0 errors",
+        "lint": "0 warnings",
+        "vitest": "206 passed (7 pre-existing failures unrelated to this story)"
+      }
     },
     {
       "id": "S-10C.2",
