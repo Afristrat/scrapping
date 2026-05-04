@@ -1589,13 +1589,22 @@
       "id": "S-10C.6",
       "wave": "10.C",
       "title": "Page /admin/queue monitoring",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-03",
       "agentModel": "sonnet",
       "priority": 6,
       "effort": "M",
       "dependencies": ["S-10C.1"],
-      "filesCreate": ["src/pages/AdminQueue.tsx", "src/pages/AdminQueue.test.tsx"],
-      "filesModify": ["src/App.tsx"],
+      "filesCreate": [
+        "src/hooks/usePendingEnrichments.ts",
+        "src/pages/admin/QueueMonitor.tsx",
+        "src/pages/admin/QueueMonitor.test.tsx"
+      ],
+      "filesModify": [
+        "src/routes.tsx",
+        "src/components/layout/Sidebar.tsx",
+        "src/pages/AdminCockpit.tsx"
+      ],
       "acceptanceCriteria": [
         "Route /admin/queue gated app_admin",
         "Tableau status counts par pass_kind",
