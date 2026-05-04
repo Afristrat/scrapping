@@ -14,6 +14,7 @@ import {
 import { useTopicsTaxonomy } from '@/hooks/useTopicsTaxonomy'
 import { usePersonas } from '@/hooks/usePersonas'
 import type { DigestLanguage } from '@/hooks/useDigest'
+import { InstructionsTextarea } from '@/components/features/InstructionsTextarea'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,6 +29,7 @@ export interface DigestScope {
   windowHours: number
   minScore: number | null
   prioritize: 'score' | 'freshness'
+  instructions?: string
 }
 
 export interface DigestScopeProps {
@@ -77,6 +79,7 @@ export function DigestScopePanel({
   const [minScoreRaw, setMinScoreRaw] = useState<string>('')
   const [prioritize, setPrioritize] = useState<'score' | 'freshness'>('score')
   const [customAngle, setCustomAngle] = useState<string>('')
+  const [instructions, setInstructions] = useState<string>('')
   // defaultLanguage utilisé comme valeur initiale uniquement.
   // L'utilisateur peut ensuite changer la langue librement dans le panneau.
   const [language, setLanguage] = useState<DigestLanguage>(defaultLanguage)
@@ -113,6 +116,7 @@ export function DigestScopePanel({
       windowHours,
       minScore: parsedMinScore,
       prioritize,
+      instructions: instructions.trim() || undefined,
     }
     onGenerate(scope)
   }
@@ -331,6 +335,21 @@ export function DigestScopePanel({
             placeholder="Ex : Focus sur les applications enterprise…"
             data-testid="custom-angle-textarea"
             className="border-input bg-background text-on-surface placeholder:text-on-surface-variant focus-visible:ring-primary w-full resize-none rounded-md border px-3 py-2 text-sm focus:outline-none focus-visible:ring-2"
+          />
+        </div>
+
+        {/* ---- Instructions supplémentaires ---- */}
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor="scope-instructions"
+            className="text-on-surface-variant text-xs font-semibold tracking-[0.05em] uppercase"
+          >
+            Instructions supplémentaires (optionnel)
+          </label>
+          <InstructionsTextarea
+            value={instructions}
+            onChange={setInstructions}
+            placeholder="Ex : /focus ou /style formel… Tape / pour voir les commandes"
           />
         </div>
 
