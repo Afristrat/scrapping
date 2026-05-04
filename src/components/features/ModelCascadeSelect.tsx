@@ -1,5 +1,11 @@
 import { useMemo } from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useProviderModels } from '@/hooks/useProviderModels'
 import { useApiKeys } from '@/hooks/useApiKeys'
 import { useLLMProviders } from '@/hooks/useLLMProviders'
@@ -25,14 +31,21 @@ export function ModelCascadeSelect({ value, onChange, allowClear = false }: Prop
   const availableProviders = useMemo(() => {
     const withKey = new Set<string>((keys ?? []).map((k) => k.provider))
     const withModels = new Set<string>((models ?? []).map((m) => m.provider))
-    return providers.filter(
-      (p) => withKey.has(p.id) || withModels.has(p.id) || p.id === 'ollama',
-    )
+    return providers.filter((p) => withKey.has(p.id) || withModels.has(p.id) || p.id === 'ollama')
   }, [keys, models, providers])
 
   const modelsForProvider = useMemo(() => {
     if (!value) return []
-    return (models ?? []).filter((m) => m.provider === value.provider)
+    const list = (models ?? []).filter((m) => m.provider === value.provider)
+    // Si le modèle sauvegardé n'est pas dans la liste (ex: provider_models pas encore refresh),
+    // l'ajouter comme item de secours pour éviter l'affichage du placeholder
+    if (value.model && !list.some((m) => m.model_id === value.model)) {
+      return [
+        { model_id: value.model, display_name: value.model, provider: value.provider },
+        ...list,
+      ]
+    }
+    return list
   }, [models, value])
 
   return (
@@ -76,7 +89,7 @@ export function ModelCascadeSelect({ value, onChange, allowClear = false }: Prop
           <SelectValue
             placeholder={
               !value
-                ? 'Choisir provider d\'abord'
+                ? "Choisir provider d'abord"
                 : modelsForProvider.length === 0
                   ? 'Refresh models requis'
                   : 'Modèle…'
