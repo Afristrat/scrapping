@@ -27,7 +27,7 @@ const CORS = {
 const DEFAULT_PROVIDER = 'openrouter'
 const DEFAULT_MODEL = 'openrouter/auto'
 
-type Task = 'scoring' | 'scraping' | 'monitoring' | 'digest'
+type Task = 'scoring' | 'scraping' | 'monitoring' | 'digest' | 'enrichment'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -60,6 +60,7 @@ const VALID_TASKS: ReadonlySet<Task> = new Set([
   'scraping',
   'monitoring',
   'digest',
+  'enrichment',
 ])
 
 Deno.serve(async (req) => {
@@ -128,11 +129,7 @@ Deno.serve(async (req) => {
   // The BYOK migration extended user_api_keys.provider to arbitrary strings, but
   // we deliberately don't modify _shared/api-keys.ts as part of this refactor —
   // so we cast to the historic literal union to keep the call typed.
-  const apiKey = await getUserApiKey(
-    supabase,
-    user.id,
-    providerId as 'openrouter' | 'apify',
-  )
+  const apiKey = await getUserApiKey(supabase, user.id, providerId as 'openrouter' | 'apify')
   if (!apiKey && providerCfg.modelsRequiresAuth) {
     return json({ ok: false, error: 'missing_api_key', provider: providerId }, 500)
   }

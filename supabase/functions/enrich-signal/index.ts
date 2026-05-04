@@ -484,7 +484,7 @@ async function callDispatch(
     method: 'POST',
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      task: 'scoring',
+      task: 'enrichment',
       messages: [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user },

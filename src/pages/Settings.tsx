@@ -27,18 +27,24 @@ import {
   type SettingsFormValues,
 } from '@/lib/schemas/settings-schema'
 
-const TASK_LABELS: Record<'scoring' | 'scraping' | 'monitoring' | 'digest', string> = {
-  scoring: 'Scoring',
-  scraping: 'Scraping',
-  monitoring: 'Monitoring',
-  digest: 'Digest',
-}
+const TASK_LABELS: Record<'scoring' | 'scraping' | 'monitoring' | 'digest' | 'enrichment', string> =
+  {
+    scoring: 'Scoring',
+    scraping: 'Scraping',
+    monitoring: 'Monitoring',
+    digest: 'Digest',
+    enrichment: 'Enrichissement',
+  }
 
-const TASK_DESCRIPTIONS: Record<'scoring' | 'scraping' | 'monitoring' | 'digest', string> = {
+const TASK_DESCRIPTIONS: Record<
+  'scoring' | 'scraping' | 'monitoring' | 'digest' | 'enrichment',
+  string
+> = {
   scoring: 'Évaluation pertinence des signaux',
   scraping: 'Filtre intelligent sur les flux',
   monitoring: 'Détection de tendances émergentes',
   digest: 'Synthèse stratégique 80/20',
+  enrichment: 'Classification topics, personas PARA, suggestions IA',
 }
 
 export default function Settings() {
@@ -161,47 +167,49 @@ export default function Settings() {
                 description="Définissez les modèles d'intelligence artificielle utilisés pour chaque étape du traitement Kairos. Les modèles sont chargés depuis l'onglet « Clés API » via « Modèles » pour chaque provider configuré."
               />
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {(['scoring', 'scraping', 'monitoring', 'digest'] as const).map((task) => {
-                  const cur = (watchedModelConfig ?? {})[task] ?? null
-                  const isActive = !!cur?.provider && !!cur?.model
-                  return (
-                    <div
-                      key={task}
-                      className="bg-surface-container-lowest border-outline-variant rounded-xl border p-6 shadow-sm"
-                    >
-                      <div className="mb-4 flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="text-on-surface text-lg font-semibold">
-                            {TASK_LABELS[task]}
-                          </h3>
-                          <p className="text-on-surface-variant mt-0.5 text-xs">
-                            {TASK_DESCRIPTIONS[task]}
-                          </p>
+                {(['scoring', 'scraping', 'monitoring', 'digest', 'enrichment'] as const).map(
+                  (task) => {
+                    const cur = (watchedModelConfig ?? {})[task] ?? null
+                    const isActive = !!cur?.provider && !!cur?.model
+                    return (
+                      <div
+                        key={task}
+                        className="bg-surface-container-lowest border-outline-variant rounded-xl border p-6 shadow-sm"
+                      >
+                        <div className="mb-4 flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className="text-on-surface text-lg font-semibold">
+                              {TASK_LABELS[task]}
+                            </h3>
+                            <p className="text-on-surface-variant mt-0.5 text-xs">
+                              {TASK_DESCRIPTIONS[task]}
+                            </p>
+                          </div>
+                          <span
+                            className={
+                              isActive
+                                ? 'bg-primary-fixed text-on-primary-fixed inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium'
+                                : 'bg-surface-container-high text-on-surface-variant inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium'
+                            }
+                          >
+                            {isActive ? 'Actif' : 'Non configuré'}
+                          </span>
                         </div>
-                        <span
-                          className={
-                            isActive
-                              ? 'bg-primary-fixed text-on-primary-fixed inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium'
-                              : 'bg-surface-container-high text-on-surface-variant inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium'
-                          }
-                        >
-                          {isActive ? 'Actif' : 'Non configuré'}
-                        </span>
+                        <ModelCascadeSelect
+                          value={(cur as ModelChoice | null) ?? null}
+                          onChange={(next) => {
+                            const current = watchedModelConfig ?? {}
+                            setValue(
+                              'model_config',
+                              { ...current, [task]: next ?? undefined },
+                              { shouldDirty: true },
+                            )
+                          }}
+                        />
                       </div>
-                      <ModelCascadeSelect
-                        value={(cur as ModelChoice | null) ?? null}
-                        onChange={(next) => {
-                          const current = watchedModelConfig ?? {}
-                          setValue(
-                            'model_config',
-                            { ...current, [task]: next ?? undefined },
-                            { shouldDirty: true },
-                          )
-                        }}
-                      />
-                    </div>
-                  )
-                })}
+                    )
+                  },
+                )}
               </div>
 
               {/* Section consensus scoring */}

@@ -46,6 +46,7 @@ export const settingsSchema = z.object({
       scraping: z.object({ provider: z.string(), model: z.string() }).nullable().optional(),
       monitoring: z.object({ provider: z.string(), model: z.string() }).nullable().optional(),
       digest: z.object({ provider: z.string(), model: z.string() }).nullable().optional(),
+      enrichment: z.object({ provider: z.string(), model: z.string() }).nullable().optional(),
     })
     .default({}),
   branding: z.object({
