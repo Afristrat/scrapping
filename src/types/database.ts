@@ -650,6 +650,70 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_enrichments: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          org_id: string
+          pass_kind: string
+          scheduled_at: string
+          signal_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          org_id: string
+          pass_kind: string
+          scheduled_at?: string
+          signal_id: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          org_id?: string
+          pass_kind?: string
+          scheduled_at?: string
+          signal_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_enrichments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_enrichments_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_enrichments_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals_enriched"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_minio_writes: {
         Row: {
           attempts: number
