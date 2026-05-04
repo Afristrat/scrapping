@@ -27,6 +27,12 @@ export interface GenerateDigestArgs {
    * avoir à modifier ses Settings.
    */
   language?: DigestLanguage
+  /** S-10B.4 : paramètres de scope optionnels transmis à l'edge fn. */
+  topic_ids?: string[]
+  persona_ids?: string[]
+  sources?: string[]
+  custom_angle?: string
+  prioritize?: 'score' | 'freshness'
 }
 
 export interface GenerateDigestResponse {
@@ -144,10 +150,16 @@ export function useGenerateDigest(): ReturnType<
       const token = sessionData.session?.access_token
       if (!token) throw new Error('not_authenticated')
 
-      const body: Record<string, number | string> = {}
+      const body: Record<string, unknown> = {}
       if (typeof args.window_hours === 'number') body.window_hours = args.window_hours
       if (typeof args.min_score === 'number') body.min_score = args.min_score
       if (args.language) body.language = args.language
+      // S-10B.4 : champs scope optionnels
+      if (args.topic_ids && args.topic_ids.length > 0) body.topic_ids = args.topic_ids
+      if (args.persona_ids && args.persona_ids.length > 0) body.persona_ids = args.persona_ids
+      if (args.sources && args.sources.length > 0) body.sources = args.sources
+      if (args.custom_angle) body.custom_angle = args.custom_angle
+      if (args.prioritize) body.prioritize = args.prioritize
 
       const resp = await fetch(url, {
         method: 'POST',
