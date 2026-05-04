@@ -294,6 +294,7 @@ export type Database = {
           min_score: number
           model_used: string | null
           org_id: string
+          scope_params: Json | null
           signal_count: number
           user_id: string
           window_hours: number
@@ -307,6 +308,7 @@ export type Database = {
           min_score?: number
           model_used?: string | null
           org_id?: string
+          scope_params?: Json | null
           signal_count?: number
           user_id: string
           window_hours?: number
@@ -320,6 +322,7 @@ export type Database = {
           min_score?: number
           model_used?: string | null
           org_id?: string
+          scope_params?: Json | null
           signal_count?: number
           user_id?: string
           window_hours?: number
@@ -1985,7 +1988,7 @@ export type Database = {
         | "cto_sme"
         | "solo"
       persona_kind: "project" | "hat" | "resource" | "inbox"
-      signal_source: "reddit" | "arxiv" | "x"
+      signal_source: "reddit" | "arxiv" | "x" | "rss"
       subscription_status:
         | "active"
         | "past_due"
@@ -2154,7 +2157,7 @@ export const Constants = {
       org_role: ["owner", "admin", "member", "viewer"],
       org_segment: ["vc_pe", "legal", "newsletter", "brand", "cto_sme", "solo"],
       persona_kind: ["project", "hat", "resource", "inbox"],
-      signal_source: ["reddit", "arxiv", "x"],
+      signal_source: ["reddit", "arxiv", "x", "rss"],
       subscription_status: [
         "active",
         "past_due",
