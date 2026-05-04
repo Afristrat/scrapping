@@ -1334,7 +1334,7 @@
       "id": "S-10B.2",
       "wave": "10.B",
       "title": "Dashboard filtres topic + persona + source",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 2,
       "effort": "L",
@@ -1348,39 +1348,70 @@
         "Window slider",
         "URL params sync",
         "Reset"
-      ]
+      ],
+      "completedAt": "2026-05-03T19:25:00Z",
+      "metadata": {
+        "tsc": "0 erreurs",
+        "lint": "0 warnings",
+        "vitest": "5/5 pass (DashboardFilters.test.tsx)",
+        "files": [
+          "src/lib/signal-filters.ts",
+          "src/components/features/DashboardFilters.tsx",
+          "src/components/features/DashboardFilters.test.tsx",
+          "src/pages/Dashboard.tsx"
+        ]
+      }
     },
     {
       "id": "S-10B.3",
       "wave": "10.B",
       "title": "Page /explorer (vue tableau croise)",
-      "passes": false,
+      "passes": true,
       "agentModel": "sonnet",
       "priority": 3,
       "effort": "L",
       "dependencies": ["S-10B.1"],
-      "filesCreate": ["src/pages/Explorer.tsx", "src/pages/Explorer.test.tsx"],
-      "filesModify": ["src/App.tsx"],
-      "acceptanceCriteria": ["Pivot table axes choisis", "Drill-down click", "Export CSV"]
+      "filesCreate": [
+        "src/pages/Explorer.tsx",
+        "src/pages/Explorer.test.tsx",
+        "src/lib/signal-filters.ts"
+      ],
+      "filesModify": [
+        "src/routes.tsx",
+        "src/components/layout/Sidebar.tsx",
+        "src/components/features/DashboardFilters.tsx",
+        "src/components/features/DashboardFilters.test.tsx"
+      ],
+      "acceptanceCriteria": ["Pivot table axes choisis", "Drill-down click", "Export CSV"],
+      "completedAt": "2026-05-03"
     },
     {
       "id": "S-10B.4",
       "wave": "10.B",
       "title": "/digest pre-ecran scope",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-03",
       "agentModel": "sonnet",
       "priority": 4,
       "effort": "M",
       "dependencies": ["S-10A.7", "S-10A.8"],
-      "filesCreate": ["src/components/features/DigestScopePanel.tsx"],
-      "filesModify": ["src/pages/Digest.tsx"],
+      "filesCreate": [
+        "src/components/features/DigestScopePanel.tsx",
+        "src/components/features/DigestScopePanel.test.tsx"
+      ],
+      "filesModify": ["src/pages/Digest.tsx", "src/hooks/useDigest.ts"],
       "acceptanceCriteria": [
         "Modal pre-generation",
         "Champs topics/personas/sources/langue/window/score",
         "Champ Angle libre",
         "Cost estimate",
         "Bouton desactive si scope vide"
-      ]
+      ],
+      "metadata": {
+        "commit": "31c3b1f",
+        "tests": "5/5",
+        "notes": "DigestScopePanel Card compacte avec topics/persona/sources/fenetre/langue/score/priorite/angle. GenerateDigestArgs etendu avec topic_ids, persona_ids, sources, custom_angle, prioritize. Fix pré-existant Dashboard imports signal-filters."
+      }
     },
     {
       "id": "S-10B.5",
