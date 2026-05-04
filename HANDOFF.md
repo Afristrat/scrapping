@@ -1,7 +1,7 @@
 # HANDOFF — Kairos (anciennement theresa-scrap / zlatan-scrap)
 
-> **Date** : 2026-05-03 (MAJ session 2)
-> **État global** : production stable sur `https://scrap.ai-mpower.com`. Wave 1-9.2 + Sprint 0 + Wave 11 (4 stories) + **Wave 10A (10 stories)** livrées. Wave 10A sur branche `feat/wave-10A-foundation` — prête pour PR + merge. Wave 10B-E à venir (27 stories restantes).
+> **Date** : 2026-05-04 (MAJ session 3)
+> **État global** : production stable sur `https://scrap.ai-mpower.com`. Wave 1-9.2 + Sprint 0 + Wave 11 + **Wave 10A** + **Wave 10B** + **RSS feeds** livrées et mergées sur `main`. Wave 10C-E à venir (21 stories restantes).
 
 ---
 
@@ -90,29 +90,30 @@ bun x vitest run                   # 181/181 tests
 
 ## 3. User Stories — état complet (90 total trackées)
 
-| Wave                | Stories | Statut             | Détail                                                                                                                                                                                                        |
-| ------------------- | ------: | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Wave 1**          |       6 | ✅ Livré           | Refactor BYOK, dispatch-llm, llm_providers, lint/CI, code-splitting                                                                                                                                           |
-| **Wave 1.5**        |       1 | ✅ Livré           | Fix bug rescoring + extract body 5xx                                                                                                                                                                          |
-| **Wave 2**          |       3 | ✅ Livré           | Topic tracking 90j (Welford z-score + MinIO)                                                                                                                                                                  |
-| **Wave 4**          |       2 | ✅ Livré           | Tests cascade Deno + `{{run:<kind>}}` engine                                                                                                                                                                  |
-| **Wave 5**          |       5 | ✅ Livré           | DashDelete + ScoreZero + Landing + LandingContent v2 + MoatHunter                                                                                                                                             |
-| **Wave 6**          |      22 | ✅ Livré           | Multi-tenant complet (orgs, members, RLS rewrite, Stripe billing 12 SKUs, configurateur, BYOK validation, audit log, AdminCockpit, CSM, self-host)                                                            |
-| **Wave 7**          |       — | ✅ Livré           | Re-skin Material You complet (5 sous-vagues design tokens)                                                                                                                                                    |
-| **Wave 8**          |       — | ✅ Livré           | Currency picker + domain admin + GitHub removal                                                                                                                                                               |
-| **Wave 9.1**        |       5 | ✅ Livré           | Multi-LLM consensus scoring (`score_runs` + `consensus_models` + `ConsensusBadge`) — commit `bceeb73` merge                                                                                                   |
-| **Wave 9.2**        |       5 | ✅ Livré           | Backtest des grilles de scoring (edge fn dry-run + page `/settings/rubrics/backtest` + `BacktestComparator`) — commit `de10d23` merge                                                                         |
-| **Sprint 0**        |       6 | ✅ Livré           | 6 boutons distribution sur footer Digest (Copier md / Email mailto / Tweet / LinkedIn / Télécharger md / PDF basique) — commit `f7aaef6`                                                                      |
-| **Wave 9.3**        |       6 | ❄️ **Freeze**      | Negative signal propagation → migré dans Phase C Wave 10 (clustering + signal_flags)                                                                                                                          |
-| **Wave 9.4**        |       5 | ❄️ **Freeze**      | Cross-source corroboration → migré dans Phase C Wave 10 (cluster-signals embeddings)                                                                                                                          |
-| **Wave 9.5**        |       5 | ❄️ **Freeze**      | Author Reputation Layer → migré dans Phase C Wave 10 (compute-reputation entities)                                                                                                                            |
-| **Wave 10.A**       |      10 | ✅ Livré (branche) | Foundation Postgres + Taxonomie PARA — 5 migrations + seed 40 topics + UI CRUD + edge fn enrich-signal + suggest-personas + trigger llm-score-batch. Branche `feat/wave-10A-foundation`, 195 tests, 0 erreur. |
-| **Wave 10.B**       |       6 | 📋 Planifié        | Vues filtrables + /digest contextualisé (Dashboard filtres + /explorer + scope params)                                                                                                                        |
-| **Wave 10.C**       |       7 | 📋 Planifié        | Async enrichment + queue résiliente (NER + reputation + clustering + weight composite + /admin/queue)                                                                                                         |
-| **Wave 10.D**       |       6 | 📋 Planifié        | Neo4j shadow mode (provisioning + push async + backfill + health + backup)                                                                                                                                    |
-| **Wave 10.E**       |       8 | 📋 Planifié        | Neo4j active + commandes /slash (queryWithFallback + /brief @persona + /presentation + /recap + /explorer graph + annotations + GraphQL + lien public OG)                                                     |
-| **Wave 11 (livré)** |       4 | ✅ Livré partiel   | PDF brandé sélectionnable + lien public `/share/:slug` + sélecteur langue + header brief enrichi                                                                                                              |
-| **Wave 11 TODO**    |       — | 📋 Planifié        | OG meta tags dynamiques + Email HTML Resend + Slack webhook + Branding org PDF                                                                                                                                |
+| Wave                | Stories | Statut           | Détail                                                                                                                                                    |
+| ------------------- | ------: | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wave 1**          |       6 | ✅ Livré         | Refactor BYOK, dispatch-llm, llm_providers, lint/CI, code-splitting                                                                                       |
+| **Wave 1.5**        |       1 | ✅ Livré         | Fix bug rescoring + extract body 5xx                                                                                                                      |
+| **Wave 2**          |       3 | ✅ Livré         | Topic tracking 90j (Welford z-score + MinIO)                                                                                                              |
+| **Wave 4**          |       2 | ✅ Livré         | Tests cascade Deno + `{{run:<kind>}}` engine                                                                                                              |
+| **Wave 5**          |       5 | ✅ Livré         | DashDelete + ScoreZero + Landing + LandingContent v2 + MoatHunter                                                                                         |
+| **Wave 6**          |      22 | ✅ Livré         | Multi-tenant complet (orgs, members, RLS rewrite, Stripe billing 12 SKUs, configurateur, BYOK validation, audit log, AdminCockpit, CSM, self-host)        |
+| **Wave 7**          |       — | ✅ Livré         | Re-skin Material You complet (5 sous-vagues design tokens)                                                                                                |
+| **Wave 8**          |       — | ✅ Livré         | Currency picker + domain admin + GitHub removal                                                                                                           |
+| **Wave 9.1**        |       5 | ✅ Livré         | Multi-LLM consensus scoring (`score_runs` + `consensus_models` + `ConsensusBadge`) — commit `bceeb73` merge                                               |
+| **Wave 9.2**        |       5 | ✅ Livré         | Backtest des grilles de scoring (edge fn dry-run + page `/settings/rubrics/backtest` + `BacktestComparator`) — commit `de10d23` merge                     |
+| **Sprint 0**        |       6 | ✅ Livré         | 6 boutons distribution sur footer Digest (Copier md / Email mailto / Tweet / LinkedIn / Télécharger md / PDF basique) — commit `f7aaef6`                  |
+| **Wave 9.3**        |       6 | ❄️ **Freeze**    | Negative signal propagation → migré dans Phase C Wave 10 (clustering + signal_flags)                                                                      |
+| **Wave 9.4**        |       5 | ❄️ **Freeze**    | Cross-source corroboration → migré dans Phase C Wave 10 (cluster-signals embeddings)                                                                      |
+| **Wave 9.5**        |       5 | ❄️ **Freeze**    | Author Reputation Layer → migré dans Phase C Wave 10 (compute-reputation entities)                                                                        |
+| **Wave 10.A**       |      10 | ✅ Livré         | Foundation Postgres + Taxonomie PARA — 5 migrations + seed 40 topics + UI CRUD + enrich-signal + suggest-personas + trigger llm-score-batch.              |
+| **Wave 10.B**       |       6 | ✅ Livré         | Dashboard filtres multi-axes + /explorer pivot + /digest pré-écran scope + RPC enriched_signals + digest edge fn étendue + stratégie score-first.         |
+| **RSS Feeds**       |       5 | ✅ Livré         | Table rss_feeds + scraper-rss (RSS 2.0 + Atom 1.0) + run-pipeline + hook useRssFeeds + UI Settings Sources. Google Alerts supporté.                       |
+| **Wave 10.C**       |       7 | 📋 Planifié      | Async enrichment + queue résiliente (NER + reputation + clustering + weight composite + /admin/queue)                                                     |
+| **Wave 10.D**       |       6 | 📋 Planifié      | Neo4j shadow mode (provisioning + push async + backfill + health + backup)                                                                                |
+| **Wave 10.E**       |       8 | 📋 Planifié      | Neo4j active + commandes /slash (queryWithFallback + /brief @persona + /presentation + /recap + /explorer graph + annotations + GraphQL + lien public OG) |
+| **Wave 11 (livré)** |       4 | ✅ Livré partiel | PDF brandé sélectionnable + lien public `/share/:slug` + sélecteur langue + header brief enrichi                                                          |
+| **Wave 11 TODO**    |       — | 📋 Planifié      | OG meta tags dynamiques + Email HTML Resend + Slack webhook + Branding org PDF                                                                            |
 
 **Total** : 90 stories trackées dans `.ralph/prd.json` (réf authoritative).
 

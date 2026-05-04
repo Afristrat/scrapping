@@ -6,6 +6,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Clock,
+  ListChecks,
   Mail,
   Plus,
   ShieldAlert,
@@ -207,6 +208,16 @@ export default function AdminCockpit(): React.ReactElement {
           <p className="text-on-surface-variant text-xs">
             Mis à jour : {new Date(generated_at).toLocaleTimeString('fr-FR')}
           </p>
+          <Link to="/admin/queue">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-outline-variant text-on-surface gap-1.5 rounded-lg"
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+              Queue enrichissement
+            </Button>
+          </Link>
           <Link to="/admin/csm">
             <Button
               size="sm"
