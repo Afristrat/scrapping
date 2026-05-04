@@ -12,6 +12,7 @@ import { ApifyConfigForm } from '@/components/features/ApifyConfigForm'
 import { BrandingForm } from '@/components/features/BrandingForm'
 import { ModelCascadeSelect, type ModelChoice } from '@/components/features/ModelCascadeSelect'
 import { PersonasEditor } from '@/components/features/PersonasEditor'
+import { RssFeedsManager } from '@/components/features/RssFeedsManager'
 import { RubricsManager } from '@/components/features/RubricsManager'
 import { SourcePrioritySliders } from '@/components/features/SourcePrioritySliders'
 import { TagInput } from '@/components/features/TagInput'
@@ -376,6 +377,10 @@ export default function Settings() {
                     />
                   </FieldGroup>
                 </div>
+              </SectionCard>
+
+              <SectionCard>
+                <RssFeedsManager />
               </SectionCard>
 
               <ApifyConfigForm

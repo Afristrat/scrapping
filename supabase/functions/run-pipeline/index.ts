@@ -44,15 +44,21 @@ Deno.serve(async (req) => {
     payload: {},
   })
 
-  // Phase 1 - scrape parallele (X et Reddit via Apify, ArXiv inchange)
+  // Phase 1 - scrape parallele (X et Reddit via Apify, ArXiv inchange, RSS natif)
   const scrapePromises = [
     callScraper('scraper-reddit', { subs: settings.reddit_subs ?? [] }, base, headers),
     callScraper('scraper-arxiv', { categories: settings.arxiv_categories ?? [] }, base, headers),
     callScraper('scraper-x', { listIds: settings.apify_config?.x_list_ids ?? [] }, base, headers),
+    callScraper(
+      'scraper-rss',
+      { org_id: (settings as unknown as { org_id?: string }).org_id ?? user.id },
+      base,
+      headers,
+    ),
   ]
   const scrapeResults = await Promise.allSettled(scrapePromises)
   const scrapeSummary = scrapeResults.map((r, i) => ({
-    name: ['reddit', 'arxiv', 'x'][i],
+    name: ['reddit', 'arxiv', 'x', 'rss'][i],
     status: r.status,
     value: r.status === 'fulfilled' ? r.value : null,
     reason: r.status === 'rejected' ? String(r.reason) : null,

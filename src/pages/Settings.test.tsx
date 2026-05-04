@@ -208,7 +208,7 @@ describe('Settings', () => {
     renderSettings()
 
     expect(screen.getByRole('tab', { name: /modèles/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /rubriques/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /grilles/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /sources/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /clés api/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /branding/i })).toBeInTheDocument()

@@ -1,9 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
-import { AtSign, FileText, MessageSquare } from 'lucide-react'
+import { AtSign, FileText, MessageSquare, Rss } from 'lucide-react'
 
-export type SignalSource = 'reddit' | 'arxiv' | 'x'
+export type SignalSource = 'reddit' | 'arxiv' | 'x' | 'rss'
 
-export const SOURCES: SignalSource[] = ['reddit', 'arxiv', 'x']
+export const SOURCES: SignalSource[] = ['reddit', 'arxiv', 'x', 'rss']
 
 export const SOURCE_META: Record<
   SignalSource,
@@ -23,5 +23,10 @@ export const SOURCE_META: Record<
     label: 'X',
     badgeClass: 'bg-secondary-fixed text-on-secondary-fixed hover:bg-secondary-fixed-dim',
     Icon: AtSign,
+  },
+  rss: {
+    label: 'RSS',
+    badgeClass: 'bg-error-container text-on-error-container hover:bg-error/20',
+    Icon: Rss,
   },
 }
