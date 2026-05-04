@@ -1305,19 +1305,30 @@
       "id": "S-10B.1",
       "wave": "10.B",
       "title": "Hook useSignalsEnriched + filtres multi-axes",
-      "passes": false,
+      "passes": true,
+      "completedAt": "2026-05-04T19:01:00Z",
+      "commit": "2a54941",
       "agentModel": "haiku",
       "priority": 1,
       "effort": "S",
       "dependencies": ["S-10A.4"],
       "filesCreate": ["src/hooks/useSignalsEnriched.ts", "src/hooks/useSignalsEnriched.test.ts"],
-      "filesModify": [],
+      "filesModify": [
+        "supabase/migrations/20260504130000_rpc_signals_enriched.sql",
+        "src/types/database.ts"
+      ],
       "acceptanceCriteria": [
         "Hook avec filtres dynamiques",
         "Pagination cursor",
         "staleTime 60s",
         "Tests"
-      ]
+      ],
+      "metadata": {
+        "tsc": "0 erreurs",
+        "lint": "0 warnings",
+        "vitest": "5/5 pass (useSignalsEnriched.test.ts)",
+        "supabase": "migration 20260504130000 appliquée + types régénérés"
+      }
     },
     {
       "id": "S-10B.2",
