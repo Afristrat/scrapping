@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
     )
     .eq('org_id', org_id)
     .gte('created_at', thirtyDaysAgo)
+    .limit(500)
 
   if (topicsErr) {
     const f = formatError(topicsErr)
