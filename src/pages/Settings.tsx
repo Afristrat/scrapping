@@ -119,6 +119,10 @@ export default function Settings() {
   const sourcePriority = useWatch({ control, name: 'source_priority' })
   const apifyConfig = useWatch({ control, name: 'apify_config' })
   const watchedModelConfig = useWatch({ control, name: 'model_config' })
+  const watchedRedditSubs = useWatch({ control, name: 'reddit_subs' })
+  const watchedArxivCategories = useWatch({ control, name: 'arxiv_categories' })
+  const watchedXQueries = useWatch({ control, name: 'x_queries' })
+  const watchedTopicSeeds = useWatch({ control, name: 'topic_seeds' })
 
   const onSubmit = (values: SettingsFormValues) => {
     updateMutation.mutate(values)
@@ -307,7 +311,7 @@ export default function Settings() {
                     help="Liste de subreddits scrapés via Apify."
                   >
                     <TagInput
-                      value={settings?.reddit_subs ?? []}
+                      value={watchedRedditSubs ?? []}
                       onChange={(next) => setValue('reddit_subs', next, { shouldDirty: true })}
                       placeholder="ex : MachineLearning"
                     />
@@ -319,7 +323,7 @@ export default function Settings() {
                     help="Catégories arXiv (ex : cs.AI, cs.CL) interrogées via l'API officielle."
                   >
                     <TagInput
-                      value={settings?.arxiv_categories ?? []}
+                      value={watchedArxivCategories ?? []}
                       onChange={(next) => setValue('arxiv_categories', next, { shouldDirty: true })}
                       placeholder="ex : cs.AI"
                     />
@@ -331,7 +335,7 @@ export default function Settings() {
                     help="Hashtags ou requêtes injectées dans le scraper Apify."
                   >
                     <TagInput
-                      value={settings?.x_queries ?? []}
+                      value={watchedXQueries ?? []}
                       onChange={(next) => setValue('x_queries', next, { shouldDirty: true })}
                       placeholder="ex : #LLM"
                     />
@@ -343,7 +347,7 @@ export default function Settings() {
                     help="Liste de topics de référence utilisée par le classifier. Le LLM peut aussi proposer des topics émergents en plus."
                   >
                     <TagInput
-                      value={settings?.topic_seeds ?? []}
+                      value={watchedTopicSeeds ?? []}
                       onChange={(next) => setValue('topic_seeds', next, { shouldDirty: true })}
                       placeholder="ex : Embeddings & Vector DB"
                     />
