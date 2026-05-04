@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { Save } from 'lucide-react'
@@ -24,6 +24,8 @@ import { useUpdateSettings } from '@/hooks/useUpdateSettings'
 import { useUpdateConsensusModels } from '@/hooks/useUpdateConsensusModels'
 import { useProviderModels } from '@/hooks/useProviderModels'
 import { SettingsProfileBar } from '@/components/features/SettingsProfileBar'
+import { SettingsDiffDialog } from '@/components/features/SettingsDiffDialog'
+import { computeSettingsDiff, type SettingsDiff } from '@/lib/settings-diff'
 import {
   DEFAULT_APIFY_CONFIG,
   DEFAULT_SOURCE_PRIORITY,
@@ -175,13 +177,43 @@ export default function Settings() {
     score_concurrency: watchedScoreConcurrency ?? 20,
   }
 
+  // État du dialog de diff avant sauvegarde
+  const [diffState, setDiffState] = useState<{
+    open: boolean
+    diff: SettingsDiff[]
+    pendingData: SettingsFormValues | null
+  }>({ open: false, diff: [], pendingData: null })
+
   const handleApplyProfile = (values: SettingsFormValues) => {
     reset(values)
   }
 
   const onSubmit = (values: SettingsFormValues) => {
-    updateMutation.mutate(values)
+    if (!settings) {
+      // Pas de données DB — sauvegarder directement
+      updateMutation.mutate(values)
+      return
+    }
+    const diff = computeSettingsDiff(settings, values)
+    if (diff.length === 0) {
+      // Aucun changement détecté — sauvegarder directement sans dialog
+      updateMutation.mutate(values)
+      return
+    }
+    // Afficher le dialog récapitulatif
+    setDiffState({ open: true, diff, pendingData: values })
   }
+
+  const handleDiffConfirm = useCallback(() => {
+    if (diffState.pendingData) {
+      updateMutation.mutate(diffState.pendingData)
+    }
+    setDiffState({ open: false, diff: [], pendingData: null })
+  }, [diffState.pendingData, updateMutation])
+
+  const handleDiffCancel = useCallback(() => {
+    setDiffState({ open: false, diff: [], pendingData: null })
+  }, [])
 
   return (
     <div className="bg-surface min-h-full">
@@ -196,6 +228,13 @@ export default function Settings() {
         </header>
 
         <SettingsProfileBar currentSnapshot={currentSnapshot} onApply={handleApplyProfile} />
+
+        <SettingsDiffDialog
+          open={diffState.open}
+          diff={diffState.diff}
+          onConfirm={handleDiffConfirm}
+          onCancel={handleDiffCancel}
+        />
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
           <Tabs defaultValue="models" className="gap-0">
