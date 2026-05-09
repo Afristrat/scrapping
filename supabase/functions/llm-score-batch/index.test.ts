@@ -330,3 +330,539 @@ Deno.test('2 modèles dont 1 fail → fallback car < 2 succès', async () => {
     globalThis.fetch = originalFetch
   }
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STORY RALPH K04 — Tests rubric_override (3-couches : criteria + disqualifiers + soft_boosts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { validateBody } from './index.ts'
+import {
+  applyBoosts,
+  parseGateResponse,
+  parseLLMScoreResponse,
+  shouldCombineGates,
+  validateRubricOverride,
+  type RubricOverride,
+  type SoftBoostRule,
+} from './rubric-override.ts'
+import {
+  type DispatchCaller,
+  type DispatchResponse,
+  scoreSignalWithRubric,
+} from './scoring-engine.ts'
+
+// ─── Helpers tests K04 ───────────────────────────────────────────────────────
+
+function makeRubric(overrides: Partial<RubricOverride> = {}): RubricOverride {
+  return {
+    scoring_prompt:
+      "Tu évalues la pertinence d'un signal d'actualité pour la graine donnée. Renvoie un score 0-100.",
+    criteria: [
+      ['pertinence_geographique', 30],
+      ['source_primaire', 25],
+      ['fraicheur', 20],
+      ['densite_factuelle', 25],
+    ],
+    disqualifiers: [
+      { id: 'dq_001', rule: 'Signal purement promotionnel sans fait', rationale: 'spam' },
+      { id: 'dq_002', rule: 'Off-topic géographique total', rationale: 'pas pertinent' },
+      { id: 'dq_003', rule: 'Horoscope ou contenu buzz', rationale: 'pas valeur' },
+    ],
+    soft_boosts: [
+      {
+        id: 'sb_001',
+        rule: 'Signal contredit la lecture dominante',
+        boost: 15,
+        rationale: 'counter-narrative',
+      },
+      {
+        id: 'sb_002',
+        rule: 'Source primaire (acteur lui-même)',
+        boost: 10,
+        rationale: 'primaire',
+      },
+    ],
+    calibration_examples: [
+      { expected_score: 85, signal_archetype: 'Article fouillé sur acteur primaire récent' },
+      { expected_score: 45, signal_archetype: 'Reprise généraliste avec quelques faits' },
+      { expected_score: 10, signal_archetype: 'Tweet promo sans contenu' },
+    ],
+    ...overrides,
+  }
+}
+
+function makeMockDispatch(handlers: {
+  criteria?: (prompt: string) => DispatchResponse
+  gate?: (prompt: string) => DispatchResponse
+}): { caller: DispatchCaller; calls: { task: string; prompt: string }[] } {
+  const calls: { task: string; prompt: string }[] = []
+  const caller: DispatchCaller = ({ task, prompt }) => {
+    calls.push({ task, prompt })
+    if (task === 'scoring') {
+      return Promise.resolve(
+        handlers.criteria?.(prompt) ?? {
+          ok: true,
+          content: '{"score": 50, "reasoning": "default"}',
+          model_used: 'mock-scoring-model',
+          usage: { prompt_tokens: 10, completion_tokens: 5, cost: 0.0001 },
+        },
+      )
+    }
+    return Promise.resolve(
+      handlers.gate?.(prompt) ?? {
+        ok: true,
+        content: '{"disqualified_id": null, "applied": []}',
+        model_used: 'mock-gate-model',
+        usage: { prompt_tokens: 5, completion_tokens: 2, cost: 0.00005 },
+      },
+    )
+  }
+  return { caller, calls }
+}
+
+// ─── Test K04-1 : body validation — signals_input sans rubric_override → 400 ─
+
+Deno.test('K04: validateBody → signals_input sans rubric_override → RUBRIC_REQUIRED_FOR_AD_HOC', () => {
+  const result = validateBody({
+    signals_input: [{ id: 'sig-1', source: 'arxiv' }],
+  })
+  assertEquals(result.ok, false)
+  assertEquals(result.error, 'RUBRIC_REQUIRED_FOR_AD_HOC')
+})
+
+// ─── Test K04-2 : disqualifier match → score=0 ──────────────────────────────
+
+Deno.test('K04: disqualifier match → score=0, disqualified=true, applied_disqualifier', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      content: '{"disqualified_id": "dq_001", "applied": []}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: true,
+      content: '{"score": 75, "reasoning": "Should be ignored"}',
+      model_used: 'crit-model',
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-x', source: 'reddit', title: 'Promo article' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(result.score, 0)
+  assertEquals(result.raw_score, 0)
+  assertEquals(result.disqualified, true)
+  assertEquals(result.applied_disqualifier, 'dq_001')
+  assertEquals(result.applied_boosts, [])
+})
+
+// ─── Test K04-3 : criteria scoring nominal ──────────────────────────────────
+
+Deno.test('K04: criteria scoring nominal (no disqualifier, no boost match) → raw_score', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      content: '{"disqualified_id": null, "applied": []}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: true,
+      content: '{"score": 67, "reasoning": "Bon signal"}',
+      model_used: 'crit-model',
+      usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 },
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-y', source: 'rss', title: 'Article' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(result.score, 67)
+  assertEquals(result.raw_score, 67)
+  assertEquals(result.disqualified, false)
+  assertEquals(result.applied_disqualifier, null)
+  assertEquals(result.applied_boosts, [])
+  assertEquals(result.reasoning, 'Bon signal')
+})
+
+// ─── Test K04-4 : soft_boost application ────────────────────────────────────
+
+Deno.test('K04: soft_boost match → score = raw + boost (capped à 100)', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      content: '{"disqualified_id": null, "applied": ["sb_001"]}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: true,
+      content: '{"score": 70, "reasoning": "ok"}',
+      model_used: 'crit-model',
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-z', source: 'arxiv' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(result.raw_score, 70)
+  assertEquals(result.score, 85) // 70 + 15 (sb_001) = 85
+  assertEquals(result.applied_boosts, ['sb_001'])
+})
+
+Deno.test('K04: soft_boost qui pousserait > 100 est cappé à 100', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      content: '{"disqualified_id": null, "applied": ["sb_001", "sb_002"]}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: true,
+      content: '{"score": 95, "reasoning": "haut signal"}',
+      model_used: 'crit-model',
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-cap', source: 'arxiv' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(result.raw_score, 95)
+  // 95 + 15 (sb_001) → cap 100 ; +10 (sb_002) → reste 100
+  assertEquals(result.score, 100)
+  assertEquals(result.applied_boosts, ['sb_001', 'sb_002'])
+})
+
+// ─── Test K04-5 : cumulative cap multiple boosts ────────────────────────────
+
+Deno.test('K04: applyBoosts cumulatif ne peut PAS dépasser 100', () => {
+  const rules: SoftBoostRule[] = [
+    { id: 'a', rule: 'a', boost: 20, rationale: '' },
+    { id: 'b', rule: 'b', boost: 20, rationale: '' },
+    { id: 'c', rule: 'c', boost: 20, rationale: '' },
+  ]
+  // 50 + 20 + 20 + 20 = 110 → cappé à 100
+  assertEquals(applyBoosts(50, ['a', 'b', 'c'], rules), 100)
+  // 100 + autres boosts → reste 100
+  assertEquals(applyBoosts(100, ['a', 'b'], rules), 100)
+  // Boost id inconnu → ignoré silencieusement
+  assertEquals(applyBoosts(50, ['unknown'], rules), 50)
+})
+
+// ─── Test K04-6 : mode legacy validateBody ──────────────────────────────────
+
+Deno.test('K04: validateBody → mode=legacy si signal_ids only, pas de rubric_override', () => {
+  const result = validateBody({ signal_ids: ['sig-1', 'sig-2'] })
+  assertEquals(result.ok, true)
+  assertEquals(result.mode, 'legacy')
+})
+
+// ─── Test K04-7 : mode hybride ──────────────────────────────────────────────
+
+Deno.test('K04: validateBody → mode=hybrid si signal_ids + rubric_override + source_table', () => {
+  const result = validateBody({
+    signal_ids: ['sig-1'],
+    rubric_override: makeRubric(),
+    source_table: 'signals_session',
+  })
+  assertEquals(result.ok, true)
+  assertEquals(result.mode, 'hybrid')
+})
+
+Deno.test('K04: validateBody → source_table invalide → 400', () => {
+  const result = validateBody({
+    signal_ids: ['sig-1'],
+    rubric_override: makeRubric(),
+    source_table: 'random_table',
+  })
+  assertEquals(result.ok, false)
+  assertEquals(result.error, 'invalid_source_table')
+})
+
+// ─── Test K04-8 : mode ad-hoc pur ───────────────────────────────────────────
+
+Deno.test('K04: validateBody → mode=ad_hoc si signals_input + rubric_override', () => {
+  const result = validateBody({
+    signals_input: [{ id: 'sig-1', source: 'arxiv' }],
+    rubric_override: makeRubric(),
+  })
+  assertEquals(result.ok, true)
+  assertEquals(result.mode, 'ad_hoc')
+})
+
+Deno.test('K04: validateBody → signal_ids ET signals_input ensemble → mutually_exclusive', () => {
+  const result = validateBody({
+    signal_ids: ['sig-1'],
+    signals_input: [{ id: 'sig-2', source: 'arxiv' }],
+    rubric_override: makeRubric(),
+  })
+  assertEquals(result.ok, false)
+  assertEquals(result.error, 'mutually_exclusive_inputs')
+})
+
+// ─── Test K04-9 : validation rubric_override ────────────────────────────────
+
+Deno.test('K04: validateRubricOverride → criteria sum != 100 → invalid', () => {
+  const r = validateRubricOverride({
+    scoring_prompt: 'foo',
+    criteria: [
+      ['a', 30],
+      ['b', 30],
+    ], // sum = 60
+    disqualifiers: [],
+    soft_boosts: [],
+  })
+  assertEquals(r.valid, false)
+  const codes = r.errors.map((e) => e.code)
+  assertEquals(codes.includes('weight_sum'), true)
+})
+
+Deno.test('K04: validateRubricOverride → soft_boost > 20 → cap_individual error', () => {
+  const r = validateRubricOverride({
+    scoring_prompt: 'foo',
+    criteria: [
+      ['a', 50],
+      ['b', 50],
+    ],
+    disqualifiers: [],
+    soft_boosts: [{ id: 'sb_x', rule: 'rule', boost: 25, rationale: 'r' }],
+  })
+  assertEquals(r.valid, false)
+  const codes = r.errors.map((e) => e.code)
+  assertEquals(codes.includes('soft_boost_cap_individual'), true)
+})
+
+Deno.test('K04: validateRubricOverride → rubric K02 valide → ok', () => {
+  const r = validateRubricOverride(makeRubric())
+  assertEquals(r.valid, true)
+  assertEquals(r.errors.length, 0)
+})
+
+// ─── Test K04-10 : optimisation combined ≤12 rules → 1 appel LLM ────────────
+
+Deno.test('K04: shouldCombineGates → ≤12 règles total → true (1 appel combiné)', () => {
+  const rubric = makeRubric() // 3 dq + 2 sb = 5 → combined
+  assertEquals(shouldCombineGates(rubric.disqualifiers, rubric.soft_boosts), true)
+})
+
+Deno.test('K04: shouldCombineGates → > 12 règles total → false (split)', () => {
+  const dq = Array.from({ length: 7 }, (_, i) => ({
+    id: `dq_${i}`,
+    rule: `rule ${i}`,
+    rationale: 'r',
+  }))
+  const sb = Array.from({ length: 7 }, (_, i) => ({
+    id: `sb_${i}`,
+    rule: `rule ${i}`,
+    boost: 5,
+    rationale: 'r',
+  }))
+  assertEquals(shouldCombineGates(dq, sb), false)
+})
+
+Deno.test('K04: scoring 1 signal en mode combined → 2 appels dispatch (criteria + gate combiné)', async () => {
+  const rubric = makeRubric() // 5 règles → combined
+  const { caller, calls } = makeMockDispatch({})
+
+  await scoreSignalWithRubric({
+    signal: { id: 'sig-comb', source: 'rss' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(calls.length, 2, 'Mode combiné = 2 appels (criteria + gate combiné)')
+  const tasks = calls.map((c) => c.task).sort()
+  assertEquals(tasks, ['enrichment', 'scoring'])
+})
+
+Deno.test('K04: scoring 1 signal en mode split (>12 règles) → 3 appels dispatch', async () => {
+  const dq = Array.from({ length: 7 }, (_, i) => ({
+    id: `dq_${i}`,
+    rule: `rule ${i}`,
+    rationale: 'r',
+  }))
+  const sb = Array.from({ length: 7 }, (_, i) => ({
+    id: `sb_${i}`,
+    rule: `rule ${i}`,
+    boost: 5,
+    rationale: 'r',
+  }))
+  const rubric: RubricOverride = {
+    scoring_prompt: 'prompt',
+    criteria: [
+      ['a', 50],
+      ['b', 50],
+    ],
+    disqualifiers: dq,
+    soft_boosts: sb,
+  }
+  const { caller, calls } = makeMockDispatch({})
+
+  await scoreSignalWithRubric({
+    signal: { id: 'sig-split', source: 'rss' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(calls.length, 3, 'Mode split = 3 appels (criteria + dq + sb)')
+})
+
+// ─── Test K04-11 : helpers purs (parseLLMScoreResponse, parseGateResponse) ──
+
+Deno.test('K04: parseLLMScoreResponse → JSON propre → score + reasoning', () => {
+  const r = parseLLMScoreResponse('{"score": 88, "reasoning": "tres pertinent"}')
+  assertEquals(r?.score, 88)
+  assertEquals(r?.reasoning, 'tres pertinent')
+})
+
+Deno.test('K04: parseLLMScoreResponse → score string → coerced int', () => {
+  const r = parseLLMScoreResponse('{"score": "73.4", "reasoning": "ok"}')
+  assertEquals(r?.score, 73)
+})
+
+Deno.test('K04: parseLLMScoreResponse → score > 100 → cappé à 100', () => {
+  const r = parseLLMScoreResponse('{"score": 150, "reasoning": "ok"}')
+  assertEquals(r?.score, 100)
+})
+
+Deno.test('K04: parseLLMScoreResponse → JSON invalide → null', () => {
+  assertEquals(parseLLMScoreResponse('not json'), null)
+  assertEquals(parseLLMScoreResponse('{"foo": "bar"}'), null) // pas de score
+})
+
+Deno.test('K04: parseLLMScoreResponse → markdown fence → extracted', () => {
+  const r = parseLLMScoreResponse('```json\n{"score": 60, "reasoning": "ok"}\n```')
+  assertEquals(r?.score, 60)
+})
+
+Deno.test('K04: parseGateResponse → disqualified + boosts → extracted', () => {
+  const r = parseGateResponse('{"disqualified_id": "dq_001", "applied": ["sb_001", "sb_003"]}')
+  assertEquals(r.disqualified_id, 'dq_001')
+  assertEquals(r.applied_boosts, ['sb_001', 'sb_003'])
+})
+
+Deno.test('K04: parseGateResponse → "null" string → null disqualified', () => {
+  const r = parseGateResponse('{"disqualified_id": null, "applied": []}')
+  assertEquals(r.disqualified_id, null)
+  assertEquals(r.applied_boosts, [])
+})
+
+Deno.test('K04: parseGateResponse → JSON invalide → défaut conservateur', () => {
+  const r = parseGateResponse('{ broken json')
+  assertEquals(r.disqualified_id, null)
+  assertEquals(r.applied_boosts, [])
+})
+
+// ─── Test K04-12 : disqualifier unknown id → ignoré (bruit LLM) ─────────────
+
+Deno.test('K04: disqualifier_id retourné par LLM mais inconnu dans rubric → ignoré', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      // dq_999 n'existe pas dans rubric.disqualifiers
+      content: '{"disqualified_id": "dq_999", "applied": []}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: true,
+      content: '{"score": 60, "reasoning": "ok"}',
+      model_used: 'crit-model',
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-unk-dq', source: 'rss' },
+    rubric,
+    dispatch: caller,
+  })
+
+  // dq_999 ignoré → on tombe sur le scoring criteria normal
+  assertEquals(result.disqualified, false)
+  assertEquals(result.score, 60)
+  assertEquals(result.applied_disqualifier, null)
+})
+
+Deno.test('K04: applied_boost id inconnu → filtré (pas appliqué)', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      content: '{"disqualified_id": null, "applied": ["sb_001", "sb_unknown"]}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: true,
+      content: '{"score": 50, "reasoning": "ok"}',
+      model_used: 'crit-model',
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-unk-b', source: 'rss' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(result.applied_boosts, ['sb_001'])
+  assertEquals(result.score, 65) // 50 + 15 seulement
+})
+
+// ─── Test K04-13 : calculateFinalScore (helper pur) ─────────────────────────
+
+import { calculateFinalScore } from './rubric-override.ts'
+
+Deno.test('K04: calculateFinalScore → disqualified=true → 0 quel que soit raw', () => {
+  const rules: SoftBoostRule[] = [{ id: 'a', rule: 'r', boost: 20, rationale: '' }]
+  assertEquals(
+    calculateFinalScore({ rawScore: 95, disqualified: true, appliedBoosts: ['a'], rules }),
+    0,
+  )
+})
+
+Deno.test('K04: calculateFinalScore → not disqualified → applique boosts cappés', () => {
+  const rules: SoftBoostRule[] = [
+    { id: 'a', rule: 'r', boost: 15, rationale: '' },
+    { id: 'b', rule: 'r', boost: 10, rationale: '' },
+  ]
+  assertEquals(
+    calculateFinalScore({ rawScore: 60, disqualified: false, appliedBoosts: ['a', 'b'], rules }),
+    85,
+  )
+  // 95 + 15 = 110 → 100
+  assertEquals(
+    calculateFinalScore({ rawScore: 95, disqualified: false, appliedBoosts: ['a'], rules }),
+    100,
+  )
+})
+
+// ─── Test K04-14 : signals_input validation par item ────────────────────────
+
+Deno.test('K04: validateBody → signals_input avec id manquant → invalid_signals_input', () => {
+  const result = validateBody({
+    signals_input: [{ source: 'arxiv' }], // pas de id
+    rubric_override: makeRubric(),
+  })
+  assertEquals(result.ok, false)
+  assertEquals(result.error, 'invalid_signals_input')
+})
+
+Deno.test('K04: validateBody → no inputs → signal_ids_or_signals_input_required', () => {
+  const result = validateBody({})
+  assertEquals(result.ok, false)
+  assertEquals(result.error, 'signal_ids_or_signals_input_required')
+})

@@ -1,7 +1,43 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+/**
+ * llm-score-batch — Edge function Kairos.
+ *
+ * BYOK strict — aucun modèle hardcodé. Tous les appels LLM passent par
+ * dispatch-llm (task='scoring' pour criteria, task='enrichment' pour
+ * disqualifier/soft_boost gates qui sont des classifications binaires).
+ *
+ * 3 modes d'invocation (Story Ralph K04) :
+ *
+ * 1. LEGACY USER (rétrocompat total — comportement historique inchangé)
+ *    Body : { signal_ids: string[] }
+ *    → Lit signaux depuis 'signals' (filtrés par user_id JWT)
+ *    → Lit rubric depuis settings.active_rubric_id
+ *    → Mode consensus si settings.consensus_models.length ≥ 2
+ *    → Upsert dans 'scores' + 'score_runs' + déclenche enrich-signal
+ *
+ * 2. HYBRIDE (signal_ids + rubric_override + source_table)
+ *    Body : { signal_ids, rubric_override, source_table?: 'signals' | 'signals_session' }
+ *    → Lit signaux depuis source_table
+ *    → Applique rubric ad-hoc 3-couches (skip DB read settings)
+ *    → Retourne résultats par signal SANS persistance scores (caller décide)
+ *
+ * 3. AD-HOC PUR (signals_input + rubric_override)
+ *    Body : { signals_input: ScoredSignalInput[], rubric_override }
+ *    → Pas de DB read signaux. rubric_override OBLIGATOIRE (sinon 400).
+ *    → Applique rubric 3-couches sur l'array fourni.
+ *    → Retourne résultats SANS persistance.
+ */
+
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError, summarizeError } from '../_shared/errors.ts'
 import { parseScoringResponse, ScoreParseError } from '../_shared/parse-score.ts'
 import { buildEnrichPayload, triggerEnrichSignal } from './enrich-trigger.ts'
+import {
+  type RubricOverride,
+  type ScoredSignalInput,
+  validateRubricOverride,
+  validateScoredSignalInput,
+} from './rubric-override.ts'
+import { makeFetchDispatchCaller, scoreSignalWithRubric } from './scoring-engine.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,9 +45,21 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-interface RequestBody {
-  signal_ids: string[]
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface LlmScoreBatchBody {
+  /** Mode legacy : ids à lire depuis 'signals' (ou source_table). */
+  signal_ids?: string[]
+  /** Mode ad-hoc pur : signaux fournis directement. */
+  signals_input?: ScoredSignalInput[]
+  /** Rubric ad-hoc K02. Skip DB read settings.active_rubric_id si présent. */
+  rubric_override?: RubricOverride
+  /** Table d'où lire les signaux (default 'signals'). */
+  source_table?: 'signals' | 'signals_session'
 }
+
 interface ScoringCriterion {
   label: string
   weight: number
@@ -36,6 +84,94 @@ interface ConsensusScoreResult {
   cost: number
 }
 
+const VALID_SOURCE_TABLES: ReadonlySet<string> = new Set(['signals', 'signals_session'])
+
+// =============================================================================
+// Validation purs (testables)
+// =============================================================================
+
+export type BodyMode = 'legacy' | 'hybrid' | 'ad_hoc'
+
+export interface BodyValidationResult {
+  ok: boolean
+  mode?: BodyMode
+  error?: string
+  detail?: string
+}
+
+/**
+ * Détermine le mode et valide la cohérence du body.
+ * Pure — pas d'I/O.
+ */
+export function validateBody(body: unknown): BodyValidationResult {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'invalid_body' }
+  }
+  const b = body as LlmScoreBatchBody
+
+  const hasSignalIds = Array.isArray(b.signal_ids) && b.signal_ids.length > 0
+  const hasSignalsInput = Array.isArray(b.signals_input) && b.signals_input.length > 0
+  const hasRubricOverride = b.rubric_override !== undefined && b.rubric_override !== null
+
+  if (!hasSignalIds && !hasSignalsInput) {
+    return { ok: false, error: 'signal_ids_or_signals_input_required' }
+  }
+  if (hasSignalIds && hasSignalsInput) {
+    return {
+      ok: false,
+      error: 'mutually_exclusive_inputs',
+      detail: 'Provide signal_ids OR signals_input, not both',
+    }
+  }
+
+  // Mode ad-hoc pur : rubric_override OBLIGATOIRE.
+  if (hasSignalsInput) {
+    if (!hasRubricOverride) {
+      return { ok: false, error: 'RUBRIC_REQUIRED_FOR_AD_HOC' }
+    }
+    // Valider chaque signal
+    for (let i = 0; i < (b.signals_input ?? []).length; i++) {
+      const v = validateScoredSignalInput(b.signals_input![i])
+      if (!v.valid) {
+        return {
+          ok: false,
+          error: 'invalid_signals_input',
+          detail: `signals_input[${i}]: ${v.errors[0]?.message ?? 'invalid'}`,
+        }
+      }
+    }
+  }
+
+  if (hasRubricOverride) {
+    const v = validateRubricOverride(b.rubric_override)
+    if (!v.valid) {
+      return {
+        ok: false,
+        error: 'invalid_rubric_override',
+        detail: v.errors.map((e) => `${e.code}: ${e.message}`).join('; '),
+      }
+    }
+  }
+
+  if (b.source_table !== undefined && !VALID_SOURCE_TABLES.has(b.source_table)) {
+    return {
+      ok: false,
+      error: 'invalid_source_table',
+      detail: `source_table must be 'signals' or 'signals_session'`,
+    }
+  }
+
+  if (hasSignalIds) {
+    if (hasRubricOverride) return { ok: true, mode: 'hybrid' }
+    return { ok: true, mode: 'legacy' }
+  }
+  return { ok: true, mode: 'ad_hoc' }
+}
+
+// =============================================================================
+// Consensus mode helper (legacy/hybrid uniquement)
+// =============================================================================
+
 /**
  * Appelle dispatch-llm pour un modèle donné (format "provider:model_id").
  * Retourne null si l'appel échoue (pour Promise.allSettled).
@@ -58,7 +194,6 @@ async function callDispatchForModel(
       headers: { Authorization: auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         task: 'scoring',
-        // Pass provider+model override so dispatch-llm uses the right model
         provider_override: provider,
         model_override: modelId,
         messages: [{ role: 'user', content: prompt }],
@@ -98,10 +233,11 @@ async function callDispatchForModel(
   }
 }
 
-Deno.serve(async (req) => {
-  // HTTP 204 « No Content » INTERDIT un body — `json({...}, 204)` crashait
-  // Cloudflare/Deno avec un 500 silencieux au preflight, le navigateur recevait
-  // « Failed to fetch ». Retour Response sans body avec headers CORS uniquement.
+// =============================================================================
+// Edge handler
+// =============================================================================
+
+export const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
@@ -114,7 +250,7 @@ Deno.serve(async (req) => {
     return json({ error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
   })
 
@@ -123,22 +259,91 @@ Deno.serve(async (req) => {
   } = await supabase.auth.getUser()
   if (!user) return json({ error: 'invalid_token' }, 401)
 
-  let body: RequestBody
+  let rawBody: unknown
   try {
-    body = await req.json()
+    rawBody = await req.json()
   } catch {
     return json({ error: 'invalid_json' }, 400)
   }
-  if (!Array.isArray(body.signal_ids) || body.signal_ids.length === 0)
-    return json({ error: 'signal_ids_required' }, 400)
 
-  const ids = body.signal_ids.slice(0, 30)
+  const validation = validateBody(rawBody)
+  if (!validation.ok) {
+    return json({ error: validation.error, detail: validation.detail }, 400)
+  }
+  const body = rawBody as LlmScoreBatchBody
+  const mode: BodyMode = validation.mode!
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // MODE AD-HOC PUR — pas de DB read signaux, scoring direct via rubric_override
+  // ─────────────────────────────────────────────────────────────────────────
+  if (mode === 'ad_hoc') {
+    return await handleAdHocOrHybridScoring({
+      supabase,
+      supabaseUrl,
+      auth,
+      userId: user.id,
+      signals: body.signals_input!,
+      rubric: body.rubric_override!,
+    })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MODES LEGACY + HYBRID — partagent la lecture signaux depuis DB
+  // ─────────────────────────────────────────────────────────────────────────
+  const ids = (body.signal_ids ?? []).slice(0, 30)
+  const sourceTable = body.source_table ?? 'signals'
+
+  // Pour signals_session, le filtre user_id n'est pas pertinent — RLS gère l'accès
+  // côté table. On filtre par id uniquement et laissons RLS rejeter les non-autorisés.
+  const signalsQuery = supabase
+    .from(sourceTable)
+    .select('id, source, title, raw_payload, signal_date, org_id, url, lang')
+    .in('id', ids)
+
+  if (mode === 'hybrid') {
+    // Hybrid : on a déjà rubric_override, pas besoin de settings.
+    const signalsRes = await signalsQuery
+    if (signalsRes.error || !signalsRes.data) {
+      const f = formatError(signalsRes.error)
+      await supabase.from('logs').insert({
+        user_id: user.id,
+        action: 'llm:score-batch',
+        status: 'error',
+        payload: {
+          stage: 'fetch_signals',
+          mode,
+          source_table: sourceTable,
+          ids_count: ids.length,
+          ...f,
+        },
+      })
+      return json({ error: 'signals_not_found', detail: f.message }, 404)
+    }
+
+    const signalsInput: ScoredSignalInput[] = signalsRes.data.map((s) => ({
+      id: s.id as string,
+      source: s.source as string,
+      url: (s.url as string | null) ?? undefined,
+      title: (s.title as string | null) ?? undefined,
+      raw_payload: (s.raw_payload as Record<string, unknown> | null) ?? undefined,
+      lang: (s.lang as string | null) ?? undefined,
+    }))
+
+    return await handleAdHocOrHybridScoring({
+      supabase,
+      supabaseUrl,
+      auth,
+      userId: user.id,
+      signals: signalsInput,
+      rubric: body.rubric_override!,
+    })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MODE LEGACY — comportement historique inchangé
+  // ─────────────────────────────────────────────────────────────────────────
   const [signalsRes, settingsRes] = await Promise.all([
-    supabase
-      .from('signals')
-      .select('id, source, title, raw_payload, signal_date, org_id')
-      .in('id', ids),
+    signalsQuery,
     supabase.from('settings').select('*').eq('user_id', user.id).single(),
   ])
   if (signalsRes.error || !signalsRes.data) {
@@ -201,12 +406,11 @@ Deno.serve(async (req) => {
 
   if (isConsensusMode) {
     // ─────────────────────────────────────────────────────────────────────
-    // CONSENSUS MODE : score chaque signal avec N modèles en parallèle
+    // CONSENSUS MODE
     // ─────────────────────────────────────────────────────────────────────
     const knownIds = new Set(signals.map((s) => s.id))
     const orgId = signals[0]?.org_id as string | undefined
 
-    // Lancer tous les appels dispatch en parallèle
     const settled = await Promise.allSettled(
       consensusModels.map((modelSpec) =>
         callDispatchForModel(supabaseUrl, auth, prompt, signals.length, modelSpec, knownIds),
@@ -222,9 +426,7 @@ Deno.serve(async (req) => {
 
     const failedCount = consensusModels.length - successResults.length
 
-    // Fallback si moins de 2 modèles ont réussi
     if (successResults.length < 2) {
-      // On utilise le comportement original (dispatch-llm standard)
       let dispatchResult: DispatchResponse
       try {
         const dispatchRes = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
@@ -263,7 +465,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Insérer les score_runs individuels pour chaque modèle ayant réussi
     const scoreRunsRows: Array<{
       signal_id: string
       org_id: string
@@ -313,7 +514,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Calculer consensus + variance par signal
     const scoreRows: Array<{
       signal_id: string
       user_id: string
@@ -343,7 +543,6 @@ Deno.serve(async (req) => {
         (acc, r) => acc + (r.scores.has(sig.id) ? r.cost / signals.length : 0),
         0,
       )
-      // Reasoning from the first model that scored this signal
       const primaryReasoning = perModelScores[0].reasoning
 
       scoreRows.push({
@@ -381,7 +580,6 @@ Deno.serve(async (req) => {
 
     const totalCost = successResults.reduce((acc, r) => acc + r.cost, 0)
 
-    // Déclencher enrich-signal best-effort après scoring consensus
     const consensusScoredIds = scoreRows.map((r) => r.signal_id)
     const enrichPayloadConsensus = buildEnrichPayload(consensusScoredIds, orgId)
     let enrichTriggeredConsensus = false
@@ -472,13 +670,80 @@ Deno.serve(async (req) => {
     prompt,
     standardOrgId,
   )
-})
+}
 
-/**
- * Gère le flow standard (1 seul modèle) depuis la réponse dispatch-llm.
- */
+// Guard so test runner can `import` this module without booting the listener.
+if (import.meta.main) {
+  Deno.serve(handler)
+}
+
+// =============================================================================
+// Mode rubric_override — 3-couches scoring (hybrid + ad_hoc)
+// =============================================================================
+
+async function handleAdHocOrHybridScoring(args: {
+  supabase: SupabaseClient
+  supabaseUrl: string
+  auth: string
+  userId: string
+  signals: ScoredSignalInput[]
+  rubric: RubricOverride
+}): Promise<Response> {
+  const { supabase, supabaseUrl, auth, userId, signals, rubric } = args
+  const dispatch = makeFetchDispatchCaller({ supabaseUrl, auth })
+
+  // Limite par batch — éviter l'explosion de coût/latence
+  const limited = signals.slice(0, 30)
+
+  const startedAt = Date.now()
+  const settled = await Promise.allSettled(
+    limited.map((sig) => scoreSignalWithRubric({ signal: sig, rubric, dispatch })),
+  )
+
+  const results = settled
+    .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof scoreSignalWithRubric>>> =>
+      r.status === 'fulfilled',
+    )
+    .map((r) => r.value)
+
+  const failedCount = settled.length - results.length
+  const totalCost = results.reduce((acc, r) => acc + (r.cost ?? 0), 0)
+  const disqualifiedCount = results.filter((r) => r.disqualified).length
+
+  await supabase.from('logs').insert({
+    user_id: userId,
+    action: 'llm:score-rubric-override',
+    status: 'ok',
+    payload: {
+      mode: signals.length === limited.length ? 'no_truncation' : 'truncated_to_30',
+      count: limited.length,
+      scored: results.length,
+      failed: failedCount,
+      disqualified: disqualifiedCount,
+      cost: totalCost,
+      duration_ms: Date.now() - startedAt,
+    },
+  })
+
+  return json(
+    {
+      batch_size: limited.length,
+      scored: results.length,
+      failed: failedCount,
+      disqualified: disqualifiedCount,
+      cost: totalCost,
+      results,
+    },
+    200,
+  )
+}
+
+// =============================================================================
+// Legacy single-dispatch handler (inchangé)
+// =============================================================================
+
 async function handleSingleDispatch(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   dispatchResult: DispatchResponse,
   signals: Array<{
     id: string
@@ -611,7 +876,6 @@ async function handleSingleDispatch(
     cost: totalCost,
   })
 
-  // Déclencher enrich-signal best-effort après scoring standard
   const scoredIds = scoreRows.map((r) => r.signal_id)
   const enrichPayload = buildEnrichPayload(scoredIds, orgId)
   let enrichTriggered = false
