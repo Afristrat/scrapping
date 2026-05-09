@@ -103,7 +103,7 @@ function makeMockSupabase(cfg: MockSupabaseConfig = {}) {
       },
       single: () => Promise.resolve({ data: null, error: null }),
       // .update().eq() chaining returns a thenable that resolves to {error: null}
-      then: <T,>(resolve: (v: MockOpResult) => T) => {
+      then: <T>(resolve: (v: MockOpResult) => T) => {
         if (table === 'public_api_rate_hits' && _isCountQuery) {
           return Promise.resolve(
             resolve({
@@ -131,8 +131,7 @@ function makeMockSupabase(cfg: MockSupabaseConfig = {}) {
 // ============================================================================
 
 const BODY_OK = {
-  seed:
-    'Réforme du Code du travail au Maroc en 2026 : flexibilité CDD, droit de grève, conventions collectives, tension CGEM CDT UMT.',
+  seed: 'Réforme du Code du travail au Maroc en 2026 : flexibilité CDD, droit de grève, conventions collectives, tension CGEM CDT UMT.',
   lang: 'fr',
 }
 
@@ -277,7 +276,7 @@ Deno.test('validateApiKey: scope research-only manquant → scope_missing', asyn
   }
 })
 
-Deno.test('validateApiKey: clé valide active scope OK → ok', async () => {
+Deno.test('validateApiKey: clé valide active scope OK + proxy_user_id → ok', async () => {
   const hash = await hashApiKey(VALID_KEY)
   const supa = makeMockSupabase({
     apiKeyRow: {
@@ -289,6 +288,7 @@ Deno.test('validateApiKey: clé valide active scope OK → ok', async () => {
       rate_limit_per_min: 60,
       daily_budget_usd: null,
       active: true,
+      proxy_user_id: '11111111-1111-1111-1111-111111111111',
     },
   })
   const r = await validateApiKey(supa as never, VALID_KEY)
@@ -296,8 +296,35 @@ Deno.test('validateApiKey: clé valide active scope OK → ok', async () => {
   if (r.ok) {
     assertEquals(r.key.id, 'k1')
     assertEquals(r.key.rate_limit_per_min, 60)
+    assertEquals(r.key.proxy_user_id, '11111111-1111-1111-1111-111111111111')
   }
 })
+
+Deno.test(
+  'validateApiKey: clé valide MAIS proxy_user_id null → proxy_user_not_configured',
+  async () => {
+    const hash = await hashApiKey(VALID_KEY)
+    const supa = makeMockSupabase({
+      apiKeyRow: {
+        id: 'k2',
+        name: 'orphan-key',
+        key_hash: hash,
+        key_prefix: 'bsr_test',
+        scopes: ['research-only'],
+        rate_limit_per_min: 60,
+        daily_budget_usd: null,
+        active: true,
+        proxy_user_id: null,
+      },
+    })
+    const r = await validateApiKey(supa as never, VALID_KEY)
+    assertEquals(r.ok, false)
+    if (!r.ok) {
+      assertEquals(r.error, 'proxy_user_not_configured')
+      assertEquals(r.status, 500)
+    }
+  },
+)
 
 // ============================================================================
 // checkRateLimit
@@ -388,8 +415,7 @@ Deno.test('callInternal: timeout → status 504 error=timeout', async () => {
 })
 
 Deno.test('callInternal: réseau-down → status 502 error=fetch_failed', async () => {
-  const fakeFetch: typeof fetch = (() =>
-    Promise.reject(new Error('ECONNREFUSED'))) as typeof fetch
+  const fakeFetch: typeof fetch = (() => Promise.reject(new Error('ECONNREFUSED'))) as typeof fetch
   const r = await callInternal('https://example.test/down', {}, 'jwt', 1000, fakeFetch)
   assertEquals(r.ok, false)
   if (!r.ok) {
@@ -483,7 +509,10 @@ Deno.test('selectTopSignals: filtre disqualified=true', () => {
     { id: 'c', score: 70, disqualified: false },
   ]
   const top = selectTopSignals(signals, 10)
-  assertEquals(top.map((s) => s.id), ['a', 'c'])
+  assertEquals(
+    top.map((s) => s.id),
+    ['a', 'c'],
+  )
 })
 
 Deno.test('selectTopSignals: tri score desc', () => {
@@ -493,7 +522,10 @@ Deno.test('selectTopSignals: tri score desc', () => {
     { id: 'c', score: 60, disqualified: false },
   ]
   const top = selectTopSignals(signals, 10)
-  assertEquals(top.map((s) => s.id), ['b', 'c', 'a'])
+  assertEquals(
+    top.map((s) => s.id),
+    ['b', 'c', 'a'],
+  )
 })
 
 Deno.test('selectTopSignals: limit tronque', () => {
@@ -530,10 +562,7 @@ Deno.test('resolveCorsOrigin: prospectives.ai-mpower.com OK', () => {
 })
 
 Deno.test('resolveCorsOrigin: sous-domaine *.ai-mpower.com OK', () => {
-  assertEquals(
-    resolveCorsOrigin('https://staging.ai-mpower.com'),
-    'https://staging.ai-mpower.com',
-  )
+  assertEquals(resolveCorsOrigin('https://staging.ai-mpower.com'), 'https://staging.ai-mpower.com')
 })
 
 Deno.test('resolveCorsOrigin: localhost:port OK', () => {

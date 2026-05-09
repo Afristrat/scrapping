@@ -50,6 +50,7 @@ import {
   validateApiKey,
   validateRequestBody,
 } from './lib.ts'
+import { signUserJwt } from '../_shared/sign-user-jwt.ts'
 
 // ---------------------------------------------------------------------------
 // Telemetry helpers
@@ -218,6 +219,36 @@ export const handler = async (req: Request): Promise<Response> => {
 
   const fnUrl = (name: string) => `${supabaseUrl}/functions/v1/${name}`
 
+  // ─── Proxy user JWT (Option A — BYOK delegation) ──────────────────────
+  // Pour les appels aux fns Phase 1 (research-strategist, rubric-architect,
+  // signal-synthesizer, quality-auditor, llm-score-batch), on signe un JWT
+  // user HS256 pour le proxy_user_id désigné côté public_api_keys. Ce user
+  // Kairos détient les credentials BYOK (settings.model_config + user_api_keys)
+  // utilisés par dispatch-llm. Coûts trackés sur ce user.
+  // Pour les scrapers en mode signals_session (table service_role-only),
+  // on garde le serviceKey direct.
+  const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET')
+  if (!jwtSecret) {
+    return jsonResp({ ok: false, error: 'jwt_secret_env_missing' }, 500, cors)
+  }
+
+  const proxyUserId = apiKeyRow.proxy_user_id!
+  const { data: proxyUserData, error: proxyUserErr } =
+    await supabase.auth.admin.getUserById(proxyUserId)
+  if (proxyUserErr || !proxyUserData?.user) {
+    return jsonResp(
+      { ok: false, error: 'proxy_user_lookup_failed', detail: proxyUserErr?.message },
+      500,
+      cors,
+    )
+  }
+  const proxyJwt = await signUserJwt({
+    userId: proxyUserId,
+    email: proxyUserData.user.email ?? `${proxyUserId}@proxy.kairos`,
+    jwtSecret,
+    ttlSeconds: 180, // pipeline budget ~75s + marge
+  })
+
   // ─── Stage 1+2 PARALLEL : research-strategist + rubric-architect ──────
   // research-strategist d'abord (rubric a besoin de research_strategy en
   // input). On lance les deux en parallèle quand-même : le rubric-architect
@@ -230,7 +261,7 @@ export const handler = async (req: Request): Promise<Response> => {
   const stratRes = await callInternal<ResearchStrategistResp>(
     fnUrl('research-strategist'),
     { seed: body.seed, lang: body.lang, sector_hint: body.sector_hint },
-    serviceKey,
+    proxyJwt,
     STAGE_TIMEOUTS_MS.research_strategist,
   )
   pushStage(telemetry, 'research-strategist', stratStart, {
@@ -256,7 +287,7 @@ export const handler = async (req: Request): Promise<Response> => {
   const rubricRes = await callInternal<RubricArchitectResp>(
     fnUrl('rubric-architect'),
     { seed: body.seed, lang: body.lang, research_strategy: researchStrategy },
-    serviceKey,
+    proxyJwt,
     STAGE_TIMEOUTS_MS.rubric_architect,
   )
   pushStage(telemetry, 'rubric-architect', rubricStart, {
@@ -304,9 +335,7 @@ export const handler = async (req: Request): Promise<Response> => {
       ),
     )
 
-    const successCount = scrapeSettled.filter(
-      (r) => r.status === 'fulfilled' && r.value.ok,
-    ).length
+    const successCount = scrapeSettled.filter((r) => r.status === 'fulfilled' && r.value.ok).length
 
     pushStage(telemetry, 'scrape', scrapeStart, {
       ok: successCount > 0,
@@ -385,7 +414,7 @@ export const handler = async (req: Request): Promise<Response> => {
   const scoreRes = await callInternal<LlmScoreBatchResp>(
     fnUrl('llm-score-batch'),
     { signals_input: scoringInput, rubric_override: rubric },
-    serviceKey,
+    proxyJwt,
     STAGE_TIMEOUTS_MS.score,
   )
   pushStage(telemetry, 'llm-score-batch', scoreStart, {
@@ -444,7 +473,7 @@ export const handler = async (req: Request): Promise<Response> => {
       research_strategy: researchStrategy,
       lang: body.lang,
     },
-    serviceKey,
+    proxyJwt,
     STAGE_TIMEOUTS_MS.synthesize,
   )
   pushStage(telemetry, 'signal-synthesizer', synthStart, {
@@ -484,7 +513,7 @@ export const handler = async (req: Request): Promise<Response> => {
       lang: body.lang,
       signals_input: topSignals.map((s) => ({ id: s.id, source: s.source, lang: s.lang })),
     },
-    serviceKey,
+    proxyJwt,
     STAGE_TIMEOUTS_MS.audit,
   )
   pushStage(telemetry, 'quality-auditor', auditStart, {
@@ -568,12 +597,7 @@ interface StageRecord {
   error?: string
 }
 
-function pushStage(
-  tel: PipelineTelemetry,
-  stage: string,
-  startMs: number,
-  res: StageRecord,
-): void {
+function pushStage(tel: PipelineTelemetry, stage: string, startMs: number, res: StageRecord): void {
   tel.stages.push({
     stage,
     duration_ms: res.durationMs ?? Date.now() - startMs,
