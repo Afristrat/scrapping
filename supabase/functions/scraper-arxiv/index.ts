@@ -1,5 +1,6 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { DOMParser, type Element } from 'jsr:@b-fuze/deno-dom'
+import { buildSessionRow, isSessionMode, parseSessionRouting } from '../_shared/session-routing.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,6 +23,11 @@ interface ArxivEntry {
 
 interface RequestBody {
   categories: string[]
+  // K03 — routage session (optionnel, rétrocompat préservée)
+  target_table?: 'signals' | 'signals_session'
+  session_id?: string
+  created_by_api_key?: string
+  ttl_hours?: number
 }
 
 Deno.serve(async (req) => {
@@ -32,24 +38,10 @@ Deno.serve(async (req) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  // Auth
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) return json({ error: 'missing_authorization' }, 401)
-
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  })
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser()
-  if (userErr || !user) return json({ error: 'invalid_token' }, 401)
-
   // Body
   let body: RequestBody
   try {
-    body = await req.json()
+    body = (await req.json()) as RequestBody
   } catch {
     return json({ error: 'invalid_json' }, 400)
   }
@@ -60,19 +52,58 @@ Deno.serve(async (req) => {
     )
   }
 
+  // Routage signals vs signals_session (K03)
+  const routing = parseSessionRouting(body)
+  if (!routing.ok) return json({ error: routing.error, detail: routing.detail }, routing.status)
+  const sessionMode = isSessionMode(routing.config)
+
+  // Selon le mode, on utilise soit le client user-scoped (legacy) soit le
+  // client service_role (session — bypass RLS, pas de user_id à attacher).
+  // SupabaseClient sans generic Database évite les conflits de types entre
+  // les deux modes et matche le pattern utilisé dans `_shared/api-keys.ts`.
+  let supabase: SupabaseClient
+  let userId: string | null = null
+
+  if (sessionMode) {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !serviceKey) {
+      return json({ error: 'service_role_env_missing' }, 500)
+    }
+    supabase = createClient(supabaseUrl, serviceKey)
+  } else {
+    // Mode legacy : auth user JWT obligatoire
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) return json({ error: 'missing_authorization' }, 401)
+
+    supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    })
+
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser()
+    if (userErr || !user) return json({ error: 'invalid_token' }, 401)
+    userId = user.id
+  }
+
   const categories = body.categories.slice(0, 5)
 
   let fetched = 0
   let inserted = 0
   const errors: Array<{ category: string; reason: string }> = []
 
-  // Log start
-  await supabase.from('logs').insert({
-    user_id: user.id,
-    action: 'scrape:arxiv',
-    status: 'start',
-    payload: { categories },
-  })
+  // Log start (uniquement mode legacy : signals_session ne doit pas polluer
+  // les logs user-scoped).
+  if (!sessionMode && userId) {
+    await supabase.from('logs').insert({
+      user_id: userId,
+      action: 'scrape:arxiv',
+      status: 'start',
+      payload: { categories },
+    })
+  }
 
   for (let i = 0; i < categories.length; i++) {
     const cat = categories[i]
@@ -81,62 +112,107 @@ Deno.serve(async (req) => {
       const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT } })
       if (!resp.ok) {
         errors.push({ category: cat, reason: `http_${resp.status}` })
-        await supabase.from('logs').insert({
-          user_id: user.id,
-          action: 'scrape:arxiv',
-          status: 'error',
-          payload: { category: cat, http_status: resp.status },
-        })
+        if (!sessionMode && userId) {
+          await supabase.from('logs').insert({
+            user_id: userId,
+            action: 'scrape:arxiv',
+            status: 'error',
+            payload: { category: cat, http_status: resp.status },
+          })
+        }
         continue
       }
       const xml = await resp.text()
       const entries = parseAtomEntries(xml)
-      const rows = entries.map((e) => {
-        const d = e.published ? new Date(e.published) : null
-        const signalDate = d && !Number.isNaN(d.getTime()) ? d.toISOString() : null
-        return {
-          user_id: user.id,
-          source: 'arxiv' as const,
-          external_id: e.id,
-          url: e.id,
-          title: e.title,
-          raw_payload: {
-            summary: e.summary,
-            published: e.published,
-            authors: e.authors,
-            categories: e.categories,
-          },
-          signal_date: signalDate,
-        }
-      })
-      fetched += rows.length
 
-      if (rows.length > 0) {
-        // Dedup defensif par external_id (cf. scraper-x meme bug 21000 ON CONFLICT)
-        const seenExt = new Set<string>()
-        const dedupedRows: typeof rows = []
-        for (const r of rows) {
-          if (seenExt.has(r.external_id)) continue
-          seenExt.add(r.external_id)
-          dedupedRows.push(r)
-        }
-        const { data: upserted, error: upErr } = await supabase
-          .from('signals')
-          .upsert(dedupedRows, {
-            onConflict: 'user_id,source,external_id',
-            ignoreDuplicates: false,
+      if (sessionMode) {
+        // Mode session : insert dans signals_session, pas de user_id, pas de
+        // signal_date (table éphémère minimaliste).
+        const sessionRows = entries.map((e) =>
+          buildSessionRow(
+            {
+              source: 'arxiv',
+              external_id: e.id,
+              url: e.id,
+              title: e.title,
+              raw_payload: {
+                summary: e.summary,
+                published: e.published,
+                authors: e.authors,
+                categories: e.categories,
+              },
+            },
+            routing.config,
+          ),
+        )
+        fetched += sessionRows.length
+        if (sessionRows.length > 0) {
+          // Dedup défensif par external_id (cf. scraper-x bug 21000 ON CONFLICT)
+          const seen = new Set<string>()
+          const deduped = sessionRows.filter((r) => {
+            if (!r.external_id) return true
+            if (seen.has(r.external_id)) return false
+            seen.add(r.external_id)
+            return true
           })
-          .select('id')
-        if (upErr) throw upErr
-        inserted += upserted?.length ?? 0
-      }
+          const { data: ins, error: insErr } = await supabase
+            .from('signals_session')
+            .insert(deduped)
+            .select('id')
+          if (insErr) throw insErr
+          inserted += ins?.length ?? 0
+        }
+      } else {
+        // Mode legacy (user-scoped signals + signal_date)
+        const rows = entries.map((e) => {
+          const d = e.published ? new Date(e.published) : null
+          const signalDate = d && !Number.isNaN(d.getTime()) ? d.toISOString() : null
+          return {
+            user_id: userId!,
+            source: 'arxiv' as const,
+            external_id: e.id,
+            url: e.id,
+            title: e.title,
+            raw_payload: {
+              summary: e.summary,
+              published: e.published,
+              authors: e.authors,
+              categories: e.categories,
+            },
+            signal_date: signalDate,
+          }
+        })
+        fetched += rows.length
 
-      await supabase.from('logs').insert({
-        user_id: user.id,
-        action: 'scrape:arxiv',
-        status: 'ok',
-        payload: { category: cat, fetched: rows.length, returned: rows.length },
-      })
+        if (rows.length > 0) {
+          // Dedup defensif par external_id (cf. scraper-x meme bug 21000 ON CONFLICT)
+          const seenExt = new Set<string>()
+          const dedupedRows: typeof rows = []
+          for (const r of rows) {
+            if (seenExt.has(r.external_id)) continue
+            seenExt.add(r.external_id)
+            dedupedRows.push(r)
+          }
+          const { data: upserted, error: upErr } = await supabase
+            .from('signals')
+            .upsert(dedupedRows, {
+              onConflict: 'user_id,source,external_id',
+              ignoreDuplicates: false,
+            })
+            .select('id')
+          if (upErr) throw upErr
+          inserted += upserted?.length ?? 0
+        }
+
+        if (userId) {
+          await supabase.from('logs').insert({
+            user_id: userId,
+            action: 'scrape:arxiv',
+            status: 'ok',
+            payload: { category: cat, fetched: rows.length, returned: rows.length },
+          })
+        }
+      }
 
       // Rate-limit Arxiv (sauf après le dernier)
       if (i < categories.length - 1) {
@@ -145,24 +221,38 @@ Deno.serve(async (req) => {
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
       errors.push({ category: cat, reason })
-      await supabase.from('logs').insert({
-        user_id: user.id,
-        action: 'scrape:arxiv',
-        status: 'error',
-        payload: { category: cat, error: reason },
-      })
+      if (!sessionMode && userId) {
+        await supabase.from('logs').insert({
+          user_id: userId,
+          action: 'scrape:arxiv',
+          status: 'error',
+          payload: { category: cat, error: reason },
+        })
+      }
     }
   }
 
   // Log end
-  await supabase.from('logs').insert({
-    user_id: user.id,
-    action: 'scrape:arxiv',
-    status: 'ok',
-    payload: { fetched, inserted, errors_count: errors.length, categories },
-  })
+  if (!sessionMode && userId) {
+    await supabase.from('logs').insert({
+      user_id: userId,
+      action: 'scrape:arxiv',
+      status: 'ok',
+      payload: { fetched, inserted, errors_count: errors.length, categories },
+    })
+  }
 
-  return json({ fetched, inserted, errors }, 200)
+  return json(
+    {
+      fetched,
+      inserted,
+      errors,
+      ...(sessionMode
+        ? { session_id: routing.config.sessionId, target_table: 'signals_session' }
+        : {}),
+    },
+    200,
+  )
 })
 
 function parseAtomEntries(xml: string): ArxivEntry[] {

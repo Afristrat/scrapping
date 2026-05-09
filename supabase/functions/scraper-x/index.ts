@@ -1,8 +1,9 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { getUserApiKey } from '../_shared/api-keys.ts'
 import { isQualitySignal } from '../_shared/filter.ts'
-import { formatError, summarizeError } from '../_shared/errors.ts'
+import { formatError, type FormattedError, summarizeError } from '../_shared/errors.ts'
 import { deepSanitizeJson, safeSliceString, sanitizeUnicodeString } from '../_shared/unicode.ts'
+import { buildSessionRow, isSessionMode, parseSessionRouting } from '../_shared/session-routing.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,15 @@ const DEFAULT_MAX_ITEMS = 100
 
 interface RequestBody {
   listIds?: string[]
+  // K03 — routage session (optionnel, rétrocompat préservée)
+  target_table?: 'signals' | 'signals_session'
+  session_id?: string
+  created_by_api_key?: string
+  ttl_hours?: number
+  /** Mode session : token Apify direct (Bassira injecte sa clé). */
+  apify_token?: string
+  /** Mode session : maxItems override. */
+  max_items?: number
 }
 
 Deno.serve(async (req) => {
@@ -24,72 +34,120 @@ Deno.serve(async (req) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) return json({ error: 'missing_authorization' }, 401)
-
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  })
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser()
-  if (userErr || !user) return json({ error: 'invalid_token' }, 401)
-
   let body: RequestBody = {}
   try {
-    body = await req.json()
+    body = (await req.json()) as RequestBody
   } catch {
     // empty body is fine, we read from settings
   }
 
-  const { data: settings } = await supabase
-    .from('settings')
-    .select('apify_config')
-    .eq('user_id', user.id)
-    .single()
+  // Routage signals vs signals_session (K03)
+  const routing = parseSessionRouting(body)
+  if (!routing.ok) return json({ error: routing.error, detail: routing.detail }, routing.status)
+  const sessionMode = isSessionMode(routing.config)
 
-  const apifyConfig = settings?.apify_config ?? {}
-  const listIds = body.listIds ?? apifyConfig.x_list_ids ?? []
-  const maxItems = apifyConfig.x_max_items ?? DEFAULT_MAX_ITEMS
+  // SupabaseClient sans generic Database évite les conflits entre modes
+  // session/legacy (cf. pattern _shared/api-keys.ts).
+  let supabase: SupabaseClient
+  let userId: string | null = null
+  let listIds: string[] = []
+  let maxItems = DEFAULT_MAX_ITEMS
+  let apifyToken: string | null = null
 
-  if (!Array.isArray(listIds) || listIds.length === 0) {
-    return json(
-      {
-        error: 'list_ids_required',
-        detail: 'No X list IDs found in body or settings.apify_config.x_list_ids',
-      },
-      400,
-    )
-  }
+  if (sessionMode) {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !serviceKey) {
+      return json({ error: 'service_role_env_missing' }, 500)
+    }
+    supabase = createClient(supabaseUrl, serviceKey)
 
-  const apifyToken = await getUserApiKey(supabase, user.id, 'apify')
-  if (!apifyToken) {
-    await supabase.from('logs').insert({
-      user_id: user.id,
-      action: 'scrape:x',
-      status: 'degraded',
-      payload: {
-        reason: 'no_apify_key',
-        detail: 'No Apify key in user_api_keys and no APIFY_TOKEN env var',
-      },
+    if (!Array.isArray(body.listIds) || body.listIds.length === 0) {
+      return json(
+        {
+          error: 'list_ids_required',
+          detail: 'target_table=signals_session requires a non-empty listIds[] in body',
+        },
+        400,
+      )
+    }
+    listIds = body.listIds
+    maxItems = typeof body.max_items === 'number' ? body.max_items : DEFAULT_MAX_ITEMS
+    apifyToken = body.apify_token ?? Deno.env.get('APIFY_TOKEN') ?? null
+    if (!apifyToken) {
+      return json(
+        {
+          error: 'apify_token_required',
+          detail: 'target_table=signals_session requires apify_token in body or APIFY_TOKEN env',
+        },
+        400,
+      )
+    }
+  } else {
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) return json({ error: 'missing_authorization' }, 401)
+
+    supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
     })
-    return json({ fetched: 0, inserted: 0, errors: [{ reason: 'no_apify_key' }] }, 200)
+
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser()
+    if (userErr || !user) return json({ error: 'invalid_token' }, 401)
+    userId = user.id
+
+    const { data: settings } = await supabase
+      .from('settings')
+      .select('apify_config')
+      .eq('user_id', user.id)
+      .single()
+
+    const apifyConfig =
+      (settings as { apify_config?: Record<string, unknown> } | null)?.apify_config ?? {}
+    listIds = (body.listIds ?? (apifyConfig.x_list_ids as string[] | undefined) ?? []) as string[]
+    maxItems = (apifyConfig.x_max_items as number | undefined) ?? DEFAULT_MAX_ITEMS
+
+    if (!Array.isArray(listIds) || listIds.length === 0) {
+      return json(
+        {
+          error: 'list_ids_required',
+          detail: 'No X list IDs found in body or settings.apify_config.x_list_ids',
+        },
+        400,
+      )
+    }
+
+    apifyToken = await getUserApiKey(supabase, user.id, 'apify')
+    if (!apifyToken) {
+      await supabase.from('logs').insert({
+        user_id: user.id,
+        action: 'scrape:x',
+        status: 'degraded',
+        payload: {
+          reason: 'no_apify_key',
+          detail: 'No Apify key in user_api_keys and no APIFY_TOKEN env var',
+        },
+      })
+      return json({ fetched: 0, inserted: 0, errors: [{ reason: 'no_apify_key' }] }, 200)
+    }
   }
 
-  await supabase.from('logs').insert({
-    user_id: user.id,
-    action: 'scrape:x',
-    status: 'start',
-    payload: { listIds, maxItems, actor: APIFY_ACTOR },
-  })
+  if (!sessionMode && userId) {
+    await supabase.from('logs').insert({
+      user_id: userId,
+      action: 'scrape:x',
+      status: 'start',
+      payload: { listIds, maxItems, actor: APIFY_ACTOR },
+    })
+  }
 
   let fetched = 0
   let inserted = 0
   let invalidDates = 0
   let filteredOut = 0
-  const errors: Array<Record<string, unknown>> = []
+  const errors: FormattedError[] = []
   const sampleProblems: Array<Record<string, unknown>> = []
   const sanitizeStats = { fixed: 0 }
 
@@ -112,37 +170,39 @@ Deno.serve(async (req) => {
 
     if (tweets.length > 0) {
       const beforeFilter = tweets.length
-      const rows = tweets
-        .map((tweet) => {
-          const tweetId = String(tweet.id ?? tweet.id_str ?? '')
-          const author = tweet.author as Record<string, unknown> | undefined
-          const userName = author?.userName ?? author?.username ?? 'unknown'
-          const createdAtRaw = (tweet.createdAt ?? tweet.created_at) as string | undefined
-          const signalDate = createdAtRaw ? safeIsoDate(createdAtRaw) : null
-          if (createdAtRaw && !signalDate) {
-            invalidDates++
-            if (sampleProblems.length < 3) {
-              sampleProblems.push({
-                kind: 'invalid_date',
-                tweetId,
-                createdAtRaw: String(createdAtRaw).slice(0, 60),
-              })
-            }
+
+      // Items canoniques (extraction commune aux deux modes)
+      const items = tweets.map((tweet) => {
+        const tweetId = String(tweet.id ?? tweet.id_str ?? '')
+        const author = tweet.author as Record<string, unknown> | undefined
+        const userName = author?.userName ?? author?.username ?? 'unknown'
+        const createdAtRaw = (tweet.createdAt ?? tweet.created_at) as string | undefined
+        const signalDate = createdAtRaw ? safeIsoDate(createdAtRaw) : null
+        if (createdAtRaw && !signalDate) {
+          invalidDates++
+          if (sampleProblems.length < 3) {
+            sampleProblems.push({
+              kind: 'invalid_date',
+              tweetId,
+              createdAtRaw: String(createdAtRaw).slice(0, 60),
+            })
           }
-          const rawTitle = String(tweet.text ?? '')
-          const title = sanitizeUnicodeString(safeSliceString(rawTitle, 280))
-          return {
-            user_id: user.id,
-            source: 'x' as const,
-            external_id: tweetId,
-            url: sanitizeUnicodeString(
-              (tweet.url as string) ?? `https://x.com/${userName}/status/${tweetId}`,
-            ),
-            title,
-            raw_payload: deepSanitizeJson(tweet, sanitizeStats),
-            signal_date: signalDate,
-          }
-        })
+        }
+        const rawTitle = String(tweet.text ?? '')
+        const title = sanitizeUnicodeString(safeSliceString(rawTitle, 280))
+        const url = sanitizeUnicodeString(
+          (tweet.url as string) ?? `https://x.com/${userName}/status/${tweetId}`,
+        )
+        return {
+          external_id: tweetId,
+          url,
+          title,
+          raw_payload: deepSanitizeJson(tweet, sanitizeStats) as Record<string, unknown>,
+          signal_date: signalDate,
+        }
+      })
+
+      const filtered = items
         .filter((r) => r.external_id !== '')
         .filter((r) => {
           const keep = isQualitySignal({ title: r.title, raw_payload: r.raw_payload, source: 'x' })
@@ -150,93 +210,138 @@ Deno.serve(async (req) => {
           return keep
         })
 
-      if (rows.length > 0) {
-        // Dedup par external_id — Apify peut retourner 2x le même tweet dans le
-        // batch (notamment quand il y a retweet ou quote). Sans dedup, l upsert
-        // ON CONFLICT plante avec « 21000 ON CONFLICT DO UPDATE command cannot
-        // affect row a second time » et 0 row inseree.
-        const seenExt = new Set<string>()
-        const dedupedRows: typeof rows = []
-        for (const r of rows) {
-          if (seenExt.has(r.external_id)) continue
-          seenExt.add(r.external_id)
-          dedupedRows.push(r)
-        }
+      // Dedup par external_id (cf. bug 21000 ON CONFLICT)
+      const seenExt = new Set<string>()
+      const dedupedItems = filtered.filter((r) => {
+        if (seenExt.has(r.external_id)) return false
+        seenExt.add(r.external_id)
+        return true
+      })
 
-        const { data: upserted, error: upErr } = await supabase
-          .from('signals')
-          .upsert(dedupedRows, {
-            onConflict: 'user_id,source,external_id',
-            ignoreDuplicates: false,
-          })
-          .select('id')
-        if (upErr) throw upErr
-        inserted = upserted?.length ?? 0
+      if (dedupedItems.length > 0) {
+        if (sessionMode) {
+          const sessionRows = dedupedItems.map((it) =>
+            buildSessionRow(
+              {
+                source: 'x',
+                external_id: it.external_id,
+                url: it.url,
+                title: it.title,
+                raw_payload: it.raw_payload,
+              },
+              routing.config,
+            ),
+          )
+          const { data: ins, error: insErr } = await supabase
+            .from('signals_session')
+            .insert(sessionRows)
+            .select('id')
+          if (insErr) throw insErr
+          inserted = ins?.length ?? 0
+        } else {
+          const rows = dedupedItems.map((it) => ({
+            user_id: userId!,
+            source: 'x' as const,
+            external_id: it.external_id,
+            url: it.url,
+            title: it.title,
+            raw_payload: it.raw_payload,
+            signal_date: it.signal_date,
+          }))
+
+          const { data: upserted, error: upErr } = await supabase
+            .from('signals')
+            .upsert(rows, {
+              onConflict: 'user_id,source,external_id',
+              ignoreDuplicates: false,
+            })
+            .select('id')
+          if (upErr) throw upErr
+          inserted = upserted?.length ?? 0
+        }
       }
 
       // Detail log helps debugging when fetched > 0 but inserted == 0
+      if (!sessionMode && userId) {
+        await supabase.from('logs').insert({
+          user_id: userId,
+          action: 'scrape:x',
+          status: 'info',
+          payload: {
+            stage: 'after_filter',
+            fetched: beforeFilter,
+            kept: dedupedItems.length,
+            filtered_out: filteredOut,
+            invalid_dates: invalidDates,
+            unicode_fixes: sanitizeStats.fixed,
+            sample_problems: sampleProblems,
+          },
+        })
+      }
+    }
+
+    if (!sessionMode && userId) {
       await supabase.from('logs').insert({
-        user_id: user.id,
+        user_id: userId,
         action: 'scrape:x',
-        status: 'info',
+        status: 'ok',
         payload: {
-          stage: 'after_filter',
-          fetched: beforeFilter,
-          kept: rows.length,
-          filtered_out: filteredOut,
+          fetched,
+          inserted,
+          listIds,
           invalid_dates: invalidDates,
+          filtered_out: filteredOut,
           unicode_fixes: sanitizeStats.fixed,
-          sample_problems: sampleProblems,
         },
       })
     }
-
-    await supabase.from('logs').insert({
-      user_id: user.id,
-      action: 'scrape:x',
-      status: 'ok',
-      payload: {
-        fetched,
-        inserted,
-        listIds,
-        invalid_dates: invalidDates,
-        filtered_out: filteredOut,
-        unicode_fixes: sanitizeStats.fixed,
-      },
-    })
   } catch (err) {
     const formatted = formatError(err)
     errors.push(formatted)
+    if (!sessionMode && userId) {
+      await supabase.from('logs').insert({
+        user_id: userId,
+        action: 'scrape:x',
+        status: 'error',
+        payload: {
+          ...formatted,
+          summary: summarizeError(err),
+          listIds,
+          fetched_so_far: fetched,
+        },
+      })
+    }
+  }
+
+  if (!sessionMode && userId) {
+    const finalStatus = inserted > 0 ? 'ok' : errors.length > 0 ? 'error' : 'degraded'
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
       action: 'scrape:x',
-      status: 'error',
+      status: finalStatus,
       payload: {
-        ...formatted,
-        summary: summarizeError(err),
+        stage: 'final',
+        fetched,
+        inserted,
+        filtered_out: filteredOut,
+        invalid_dates: invalidDates,
+        errors,
         listIds,
-        fetched_so_far: fetched,
       },
     })
   }
 
-  const finalStatus = inserted > 0 ? 'ok' : errors.length > 0 ? 'error' : 'degraded'
-  await supabase.from('logs').insert({
-    user_id: user.id,
-    action: 'scrape:x',
-    status: finalStatus,
-    payload: {
-      stage: 'final',
+  return json(
+    {
       fetched,
       inserted,
-      filtered_out: filteredOut,
-      invalid_dates: invalidDates,
       errors,
-      listIds,
+      ...(sessionMode
+        ? { session_id: routing.config.sessionId, target_table: 'signals_session' }
+        : {}),
     },
-  })
-
-  return json({ fetched, inserted, errors }, 200)
+    200,
+  )
 })
 
 function json(body: unknown, status: number): Response {
