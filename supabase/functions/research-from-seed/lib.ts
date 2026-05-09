@@ -49,6 +49,7 @@ export interface ApiKeyRow {
   rate_limit_per_min: number
   daily_budget_usd: number | null
   active: boolean
+  proxy_user_id: string | null
 }
 
 export interface ApiKeyValidation {
@@ -57,7 +58,7 @@ export interface ApiKeyValidation {
 }
 export interface ApiKeyValidationFail {
   ok: false
-  error: 'invalid_api_key' | 'inactive' | 'scope_missing'
+  error: 'invalid_api_key' | 'inactive' | 'scope_missing' | 'proxy_user_not_configured'
   status: number
 }
 export type ApiKeyValidationResult = ApiKeyValidation | ApiKeyValidationFail
@@ -92,10 +93,7 @@ export function validateRequestBody(raw: unknown): BodyValidationResult {
   if (trimmed.length > SEED_MAX) return { ok: false, error: 'seed_too_long' }
 
   const lang = obj.lang
-  if (
-    typeof lang !== 'string' ||
-    !(SUPPORTED_LANGS as readonly string[]).includes(lang)
-  ) {
+  if (typeof lang !== 'string' || !(SUPPORTED_LANGS as readonly string[]).includes(lang)) {
     return { ok: false, error: 'lang_unsupported' }
   }
 
@@ -183,7 +181,9 @@ export async function validateApiKey(
 
   const { data, error } = await supabase
     .from('public_api_keys')
-    .select('id, name, key_hash, key_prefix, scopes, rate_limit_per_min, daily_budget_usd, active')
+    .select(
+      'id, name, key_hash, key_prefix, scopes, rate_limit_per_min, daily_budget_usd, active, proxy_user_id',
+    )
     .eq('key_hash', hash)
     .maybeSingle()
 
@@ -204,6 +204,10 @@ export async function validateApiKey(
 
   if (!Array.isArray(row.scopes) || !row.scopes.includes('research-only')) {
     return { ok: false, error: 'scope_missing', status: 403 }
+  }
+
+  if (!row.proxy_user_id) {
+    return { ok: false, error: 'proxy_user_not_configured', status: 500 }
   }
 
   // Best-effort : touche last_used_at sans bloquer le pipeline si ça rate.
@@ -488,10 +492,7 @@ export interface ScoredSignalLike {
  * Filtre les signaux disqualified=true et trie par score décroissant,
  * tronque à `limit`. Stable : signaux sans score finissent en bas.
  */
-export function selectTopSignals<T extends ScoredSignalLike>(
-  signals: T[],
-  limit = 50,
-): T[] {
+export function selectTopSignals<T extends ScoredSignalLike>(signals: T[], limit = 50): T[] {
   const retained = signals.filter((s) => s && s.disqualified !== true)
   retained.sort((a, b) => {
     const sa = typeof a.score === 'number' ? a.score : -1
