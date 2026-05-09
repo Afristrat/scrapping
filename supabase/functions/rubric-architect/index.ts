@@ -17,92 +17,92 @@
 // Inputs : { seed: string, lang: 'fr'|'en'|'ar', research_strategy: object }
 // Outputs : 200 { rubric, telemetry } | 502 dispatch fail | 422 schema fail après retry
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { deepSanitizeJson } from "../_shared/unicode.ts";
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { deepSanitizeJson } from '../_shared/unicode.ts'
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
 // =============================================================================
 // Types
 // =============================================================================
 
-export type Lang = "fr" | "en" | "ar";
+export type Lang = 'fr' | 'en' | 'ar'
 
 export interface RequestBody {
-  seed: string;
-  lang: Lang;
-  research_strategy: Record<string, unknown>;
+  seed: string
+  lang: Lang
+  research_strategy: Record<string, unknown>
 }
 
 export interface CriterionTuple {
-  0: string;
-  1: number;
-  length: 2;
+  0: string
+  1: number
+  length: 2
 }
 
 export interface Disqualifier {
-  id: string;
-  rule: string;
-  rationale: string;
+  id: string
+  rule: string
+  rationale: string
 }
 
 export interface SoftBoost {
-  id: string;
-  rule: string;
-  boost: number;
-  rationale: string;
+  id: string
+  rule: string
+  boost: number
+  rationale: string
 }
 
 export interface CalibrationExample {
-  expected_score: number;
-  signal_archetype: string;
+  expected_score: number
+  signal_archetype: string
 }
 
 export interface Rubric {
-  scoring_prompt: string;
-  criteria: Array<[string, number]>;
-  disqualifiers: Disqualifier[];
-  soft_boosts: SoftBoost[];
-  calibration_examples: CalibrationExample[];
+  scoring_prompt: string
+  criteria: Array<[string, number]>
+  disqualifiers: Disqualifier[]
+  soft_boosts: SoftBoost[]
+  calibration_examples: CalibrationExample[]
 }
 
 export interface ValidationError {
-  code: string;
-  message: string;
+  code: string
+  message: string
 }
 
 export interface ValidationResult {
-  valid: boolean;
-  errors: ValidationError[];
+  valid: boolean
+  errors: ValidationError[]
 }
 
 interface DispatchResponse {
-  ok: boolean;
-  error?: string;
-  detail?: string;
-  content?: string;
-  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
-  model_used?: string;
-  provider_used?: string;
+  ok: boolean
+  error?: string
+  detail?: string
+  content?: string
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number }
+  model_used?: string
+  provider_used?: string
 }
 
-const VALID_LANGS: ReadonlySet<Lang> = new Set(["fr", "en", "ar"]);
+const VALID_LANGS: ReadonlySet<Lang> = new Set(['fr', 'en', 'ar'])
 
 // =============================================================================
 // System prompt builder (spec docs/kairos-bassira-research-prompts.md PROMPT 2)
 // =============================================================================
 
 export function buildSystemPrompt(lang: Lang): string {
-  const langInstruction = lang === "fr"
-    ? "Langue de sortie : français. Accents OBLIGATOIRES partout y compris sur les MAJUSCULES (É, È, À, Ç, Ê, Ô, Î, Ù, Û)."
-    : lang === "ar"
-    ? "Langue de sortie : arabe. Respect RTL. Pas de mélange LTR sauf acronymes/URLs."
-    : "Output language: English.";
+  const langInstruction =
+    lang === 'fr'
+      ? 'Langue de sortie : français. Accents OBLIGATOIRES partout y compris sur les MAJUSCULES (É, È, À, Ç, Ê, Ô, Î, Ù, Û).'
+      : lang === 'ar'
+        ? 'Langue de sortie : arabe. Respect RTL. Pas de mélange LTR sauf acronymes/URLs.'
+        : 'Output language: English.'
 
   return `Tu génères une rubric de scoring TROIS-COUCHES pour évaluer la pertinence
 de signaux d'actualité par rapport à une graine de réalité ET sa
@@ -173,7 +173,7 @@ SCHEMA OUTPUT (JSON STRICT, AUCUN CHAMP SUPPLÉMENTAIRE) :
 }
 
 SOMME DES weight DOIT FAIRE EXACTEMENT 100. Validé en post-process,
-sinon retry du prompt.`;
+sinon retry du prompt.`
 }
 
 export function buildUserPrompt(
@@ -182,7 +182,7 @@ export function buildUserPrompt(
   research_strategy: Record<string, unknown>,
 ): string {
   // Sanitize control chars in seed to prevent prompt-injection-via-graine.
-  const cleanSeed = seed.replace(/[\x00-\x1F\x7F]+/g, " ").trim();
+  const cleanSeed = seed.replace(/[\x00-\x1F\x7F]+/g, ' ').trim()
   return `Graine : ${cleanSeed}
 
 Lang de sortie demandée : ${lang}
@@ -190,7 +190,7 @@ Lang de sortie demandée : ${lang}
 research_strategy (output Prompt 1) :
 ${JSON.stringify(research_strategy, null, 2)}
 
-Génère la rubric en JSON strict suivant le SCHEMA OUTPUT.`;
+Génère la rubric en JSON strict suivant le SCHEMA OUTPUT.`
 }
 
 // =============================================================================
@@ -201,247 +201,223 @@ Génère la rubric en JSON strict suivant le SCHEMA OUTPUT.`;
 // <thinking>let me think</thinking> alongside the JSON output; we must not
 // leave the inner reasoning text floating in the parsed output.
 const FORBIDDEN_TAG_BLOCKS =
-  /<(tool_call|thinking|scratchpad|reasoning|reflection)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+  /<(tool_call|thinking|scratchpad|reasoning|reflection)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
 const FORBIDDEN_TAG_OPEN_OR_SELF =
-  /<\/?(tool_call|thinking|scratchpad|reasoning|reflection)\b[^>]*\/?>/gi;
+  /<\/?(tool_call|thinking|scratchpad|reasoning|reflection)\b[^>]*\/?>/gi
 
 export function sanitizeLlmOutput(raw: string): string {
   // Pass 1 — drop balanced tag blocks with their content.
-  let cleaned = raw.replace(FORBIDDEN_TAG_BLOCKS, "");
+  let cleaned = raw.replace(FORBIDDEN_TAG_BLOCKS, '')
   // Pass 2 — drop residual unbalanced tags (model may emit only an opener).
-  cleaned = cleaned.replace(FORBIDDEN_TAG_OPEN_OR_SELF, "");
+  cleaned = cleaned.replace(FORBIDDEN_TAG_OPEN_OR_SELF, '')
   // Strip BOM + zero-width separators.
-  cleaned = cleaned.replace(/^﻿/, "").replace(/[​-‍﻿]/g, "");
+  cleaned = cleaned.replace(/^﻿/, '').replace(/[​-‍﻿]/g, '')
   // Strip code fences if model wrapped JSON in ```json ... ```
-  cleaned = cleaned.replace(/^\s*```(?:json)?\s*/i, "").replace(
-    /\s*```\s*$/i,
-    "",
-  );
-  return cleaned.trim();
+  cleaned = cleaned.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
+  return cleaned.trim()
 }
 
 // =============================================================================
 // Schema validators (purs, testables)
 // =============================================================================
 
-export function validateWeightSum(
-  criteria: Array<[string, number]>,
-): ValidationResult {
-  const errors: ValidationError[] = [];
+export function validateWeightSum(criteria: Array<[string, number]>): ValidationResult {
+  const errors: ValidationError[] = []
   if (!Array.isArray(criteria) || criteria.length < 4 || criteria.length > 8) {
     errors.push({
-      code: "criteria_length",
+      code: 'criteria_length',
       message: `criteria array length must be 4-8, got ${
-        Array.isArray(criteria) ? criteria.length : "non-array"
+        Array.isArray(criteria) ? criteria.length : 'non-array'
       }`,
-    });
+    })
   }
-  if (!Array.isArray(criteria)) return { valid: false, errors };
+  if (!Array.isArray(criteria)) return { valid: false, errors }
 
-  let sum = 0;
+  let sum = 0
   for (let i = 0; i < criteria.length; i++) {
-    const c = criteria[i];
+    const c = criteria[i]
     if (!Array.isArray(c) || c.length !== 2) {
       errors.push({
-        code: "criterion_shape",
+        code: 'criterion_shape',
         message: `criteria[${i}] must be [label, weight] tuple`,
-      });
-      continue;
+      })
+      continue
     }
-    const [label, weight] = c;
-    if (typeof label !== "string" || label.trim().length === 0) {
+    const [label, weight] = c
+    if (typeof label !== 'string' || label.trim().length === 0) {
       errors.push({
-        code: "criterion_label",
+        code: 'criterion_label',
         message: `criteria[${i}] label invalid`,
-      });
+      })
     }
-    if (
-      typeof weight !== "number" || !Number.isInteger(weight) || weight <= 0
-    ) {
+    if (typeof weight !== 'number' || !Number.isInteger(weight) || weight <= 0) {
       errors.push({
-        code: "criterion_weight",
-        message:
-          `criteria[${i}] weight must be positive integer, got ${weight}`,
-      });
-      continue;
+        code: 'criterion_weight',
+        message: `criteria[${i}] weight must be positive integer, got ${weight}`,
+      })
+      continue
     }
-    sum += weight;
+    sum += weight
   }
 
   if (sum !== 100) {
     errors.push({
-      code: "weight_sum",
+      code: 'weight_sum',
       message: `Sum criteria weights MUST equal 100, was ${sum}`,
-    });
+    })
   }
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors }
 }
 
-export function validateDisqualifiers(
-  disqualifiers: unknown,
-): ValidationResult {
-  const errors: ValidationError[] = [];
+export function validateDisqualifiers(disqualifiers: unknown): ValidationResult {
+  const errors: ValidationError[] = []
   if (!Array.isArray(disqualifiers)) {
     errors.push({
-      code: "disqualifiers_type",
-      message: "disqualifiers must be array",
-    });
-    return { valid: false, errors };
+      code: 'disqualifiers_type',
+      message: 'disqualifiers must be array',
+    })
+    return { valid: false, errors }
   }
   if (disqualifiers.length < 3 || disqualifiers.length > 6) {
     errors.push({
-      code: "disqualifiers_length",
+      code: 'disqualifiers_length',
       message: `disqualifiers length must be 3-6, got ${disqualifiers.length}`,
-    });
+    })
   }
   for (let i = 0; i < disqualifiers.length; i++) {
-    const d = disqualifiers[i] as Partial<Disqualifier>;
-    if (!d || typeof d !== "object") {
+    const d = disqualifiers[i] as Partial<Disqualifier>
+    if (!d || typeof d !== 'object') {
       errors.push({
-        code: "disqualifier_shape",
+        code: 'disqualifier_shape',
         message: `disqualifiers[${i}] not object`,
-      });
-      continue;
+      })
+      continue
     }
-    if (typeof d.id !== "string" || !d.id) {
+    if (typeof d.id !== 'string' || !d.id) {
       errors.push({
-        code: "disqualifier_id",
+        code: 'disqualifier_id',
         message: `disqualifiers[${i}].id missing`,
-      });
+      })
     }
-    if (typeof d.rule !== "string" || d.rule.trim().length < 5) {
+    if (typeof d.rule !== 'string' || d.rule.trim().length < 5) {
       errors.push({
-        code: "disqualifier_rule",
+        code: 'disqualifier_rule',
         message: `disqualifiers[${i}].rule too short or missing`,
-      });
+      })
     }
-    if (typeof d.rationale !== "string" || d.rationale.trim().length < 3) {
+    if (typeof d.rationale !== 'string' || d.rationale.trim().length < 3) {
       errors.push({
-        code: "disqualifier_rationale",
+        code: 'disqualifier_rationale',
         message: `disqualifiers[${i}].rationale too short or missing`,
-      });
+      })
     }
   }
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors }
 }
 
 export function validateSoftBoosts(soft_boosts: unknown): ValidationResult {
-  const errors: ValidationError[] = [];
+  const errors: ValidationError[] = []
   if (!Array.isArray(soft_boosts)) {
     errors.push({
-      code: "soft_boosts_type",
-      message: "soft_boosts must be array",
-    });
-    return { valid: false, errors };
+      code: 'soft_boosts_type',
+      message: 'soft_boosts must be array',
+    })
+    return { valid: false, errors }
   }
   if (soft_boosts.length < 2 || soft_boosts.length > 5) {
     errors.push({
-      code: "soft_boosts_length",
+      code: 'soft_boosts_length',
       message: `soft_boosts length must be 2-5, got ${soft_boosts.length}`,
-    });
+    })
   }
-  let total = 0;
+  let total = 0
   for (let i = 0; i < soft_boosts.length; i++) {
-    const b = soft_boosts[i] as Partial<SoftBoost>;
-    if (!b || typeof b !== "object") {
+    const b = soft_boosts[i] as Partial<SoftBoost>
+    if (!b || typeof b !== 'object') {
       errors.push({
-        code: "soft_boost_shape",
+        code: 'soft_boost_shape',
         message: `soft_boosts[${i}] not object`,
-      });
-      continue;
+      })
+      continue
     }
-    if (typeof b.id !== "string" || !b.id) {
+    if (typeof b.id !== 'string' || !b.id) {
       errors.push({
-        code: "soft_boost_id",
+        code: 'soft_boost_id',
         message: `soft_boosts[${i}].id missing`,
-      });
+      })
     }
-    if (typeof b.rule !== "string" || b.rule.trim().length < 5) {
+    if (typeof b.rule !== 'string' || b.rule.trim().length < 5) {
       errors.push({
-        code: "soft_boost_rule",
+        code: 'soft_boost_rule',
         message: `soft_boosts[${i}].rule missing/short`,
-      });
+      })
     }
-    if (
-      typeof b.boost !== "number" || !Number.isInteger(b.boost) || b.boost <= 0
-    ) {
+    if (typeof b.boost !== 'number' || !Number.isInteger(b.boost) || b.boost <= 0) {
       errors.push({
-        code: "soft_boost_value",
+        code: 'soft_boost_value',
         message: `soft_boosts[${i}].boost must be positive integer`,
-      });
-      continue;
+      })
+      continue
     }
     if (b.boost > 20) {
       errors.push({
-        code: "soft_boost_cap_individual",
-        message:
-          `soft_boosts[${i}].boost=${b.boost} exceeds individual cap of 20`,
-      });
+        code: 'soft_boost_cap_individual',
+        message: `soft_boosts[${i}].boost=${b.boost} exceeds individual cap of 20`,
+      })
     }
-    total += b.boost;
-    if (typeof b.rationale !== "string" || b.rationale.trim().length < 3) {
+    total += b.boost
+    if (typeof b.rationale !== 'string' || b.rationale.trim().length < 3) {
       errors.push({
-        code: "soft_boost_rationale",
+        code: 'soft_boost_rationale',
         message: `soft_boosts[${i}].rationale missing/short`,
-      });
+      })
     }
   }
   if (total >= 50) {
     errors.push({
-      code: "soft_boost_cap_total",
+      code: 'soft_boost_cap_total',
       message: `soft_boosts total=${total} must be strictly < 50`,
-    });
+    })
   }
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors }
 }
 
-export function validateCalibrationExamples(
-  examples: unknown,
-): ValidationResult {
-  const errors: ValidationError[] = [];
+export function validateCalibrationExamples(examples: unknown): ValidationResult {
+  const errors: ValidationError[] = []
   if (!Array.isArray(examples)) {
     errors.push({
-      code: "calibration_type",
-      message: "calibration_examples must be array",
-    });
-    return { valid: false, errors };
+      code: 'calibration_type',
+      message: 'calibration_examples must be array',
+    })
+    return { valid: false, errors }
   }
   if (examples.length !== 3) {
     errors.push({
-      code: "calibration_length",
-      message:
-        `calibration_examples length must be exactly 3, got ${examples.length}`,
-    });
+      code: 'calibration_length',
+      message: `calibration_examples length must be exactly 3, got ${examples.length}`,
+    })
   }
   for (let i = 0; i < examples.length; i++) {
-    const e = examples[i] as Partial<CalibrationExample>;
-    if (!e || typeof e !== "object") {
+    const e = examples[i] as Partial<CalibrationExample>
+    if (!e || typeof e !== 'object') {
       errors.push({
-        code: "calibration_shape",
+        code: 'calibration_shape',
         message: `calibration_examples[${i}] not object`,
-      });
-      continue;
+      })
+      continue
     }
-    if (
-      typeof e.expected_score !== "number" ||
-      e.expected_score < 0 ||
-      e.expected_score > 100
-    ) {
+    if (typeof e.expected_score !== 'number' || e.expected_score < 0 || e.expected_score > 100) {
       errors.push({
-        code: "calibration_score",
+        code: 'calibration_score',
         message: `calibration_examples[${i}].expected_score must be 0-100`,
-      });
+      })
     }
-    if (
-      typeof e.signal_archetype !== "string" ||
-      e.signal_archetype.trim().length < 10
-    ) {
+    if (typeof e.signal_archetype !== 'string' || e.signal_archetype.trim().length < 10) {
       errors.push({
-        code: "calibration_archetype",
-        message:
-          `calibration_examples[${i}].signal_archetype too short or missing`,
-      });
+        code: 'calibration_archetype',
+        message: `calibration_examples[${i}].signal_archetype too short or missing`,
+      })
     }
   }
 
@@ -451,79 +427,80 @@ export function validateCalibrationExamples(
     const scores = (examples as CalibrationExample[])
       .map((e) => e.expected_score)
       .slice()
-      .sort((a, b) => a - b);
-    const [low, mid, high] = scores;
+      .sort((a, b) => a - b)
+    const [low, mid, high] = scores
     if (low > 25) {
       errors.push({
-        code: "calibration_tier_low",
+        code: 'calibration_tier_low',
         message: `lowest calibration score=${low} should be ≤ 25 (bas tier)`,
-      });
+      })
     }
     if (mid < 25 || mid > 70) {
       errors.push({
-        code: "calibration_tier_mid",
+        code: 'calibration_tier_mid',
         message: `mid calibration score=${mid} should be 25-70`,
-      });
+      })
     }
     if (high < 70) {
       errors.push({
-        code: "calibration_tier_high",
+        code: 'calibration_tier_high',
         message: `highest calibration score=${high} should be ≥ 70 (haut tier)`,
-      });
+      })
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors }
 }
 
-export function validateScoringPrompt(
-  scoring_prompt: unknown,
-): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (typeof scoring_prompt !== "string") {
+export function validateScoringPrompt(scoring_prompt: unknown): ValidationResult {
+  const errors: ValidationError[] = []
+  if (typeof scoring_prompt !== 'string') {
     errors.push({
-      code: "scoring_prompt_type",
-      message: "scoring_prompt must be string",
-    });
-    return { valid: false, errors };
+      code: 'scoring_prompt_type',
+      message: 'scoring_prompt must be string',
+    })
+    return { valid: false, errors }
   }
   // Word count: split on whitespace, filter empties.
-  const words = scoring_prompt.trim().split(/\s+/).filter((w) => w.length > 0);
+  const words = scoring_prompt
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0)
   if (words.length < 200 || words.length > 500) {
     errors.push({
-      code: "scoring_prompt_length",
+      code: 'scoring_prompt_length',
       message: `scoring_prompt word count must be 200-500, got ${words.length}`,
-    });
+    })
   }
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors }
 }
 
 export function validateRubricSchema(rubric: unknown): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (!rubric || typeof rubric !== "object") {
+  const errors: ValidationError[] = []
+  if (!rubric || typeof rubric !== 'object') {
     return {
       valid: false,
-      errors: [{ code: "rubric_type", message: "rubric must be object" }],
-    };
+      errors: [{ code: 'rubric_type', message: 'rubric must be object' }],
+    }
   }
-  const r = rubric as Partial<Rubric>;
+  const r = rubric as Partial<Rubric>
 
-  const sp = validateScoringPrompt(r.scoring_prompt);
-  errors.push(...sp.errors);
+  const sp = validateScoringPrompt(r.scoring_prompt)
+  errors.push(...sp.errors)
 
-  const ws = validateWeightSum(r.criteria as Array<[string, number]>);
-  errors.push(...ws.errors);
+  const ws = validateWeightSum(r.criteria as Array<[string, number]>)
+  errors.push(...ws.errors)
 
-  const dq = validateDisqualifiers(r.disqualifiers);
-  errors.push(...dq.errors);
+  const dq = validateDisqualifiers(r.disqualifiers)
+  errors.push(...dq.errors)
 
-  const sb = validateSoftBoosts(r.soft_boosts);
-  errors.push(...sb.errors);
+  const sb = validateSoftBoosts(r.soft_boosts)
+  errors.push(...sb.errors)
 
-  const ce = validateCalibrationExamples(r.calibration_examples);
-  errors.push(...ce.errors);
+  const ce = validateCalibrationExamples(r.calibration_examples)
+  errors.push(...ce.errors)
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors }
 }
 
 // =============================================================================
@@ -531,251 +508,252 @@ export function validateRubricSchema(rubric: unknown): ValidationResult {
 // =============================================================================
 
 interface DispatchArgs {
-  dispatchUrl: string;
-  auth: string;
-  systemPrompt: string;
-  userPrompt: string;
+  dispatchUrl: string
+  auth: string
+  systemPrompt: string
+  userPrompt: string
 }
 
 async function callDispatch(args: DispatchArgs): Promise<DispatchResponse> {
   const res = await fetch(args.dispatchUrl, {
-    method: "POST",
-    headers: { Authorization: args.auth, "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { Authorization: args.auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      task: "enrichment",
+      task: 'enrichment',
       messages: [
-        { role: "system", content: args.systemPrompt },
-        { role: "user", content: args.userPrompt },
+        { role: 'system', content: args.systemPrompt },
+        { role: 'user', content: args.userPrompt },
       ],
       options: {
-        response_format: { type: "json_object" },
+        response_format: { type: 'json_object' },
         temperature: 0.3,
         max_tokens: 2500,
       },
     }),
-  });
-  return (await res.json()) as DispatchResponse;
+  })
+  return (await res.json()) as DispatchResponse
 }
 
 // =============================================================================
 // Edge handler
 // =============================================================================
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS });
+export const handler = async (req: Request): Promise<Response> => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS })
   }
-  if (req.method !== "POST") {
-    return json({ ok: false, error: "method_not_allowed" }, 405);
+  if (req.method !== 'POST') {
+    return json({ ok: false, error: 'method_not_allowed' }, 405)
   }
 
-  const auth = req.headers.get("Authorization");
-  if (!auth) return json({ ok: false, error: "missing_authorization" }, 401);
+  const auth = req.headers.get('Authorization')
+  if (!auth) return json({ ok: false, error: 'missing_authorization' }, 401)
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
   if (!supabaseUrl || !supabaseAnonKey) {
-    return json({ ok: false, error: "supabase_env_missing" }, 500);
+    return json({ ok: false, error: 'supabase_env_missing' }, 500)
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
-  });
+  })
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return json({ ok: false, error: "invalid_token" }, 401);
+  } = await supabase.auth.getUser()
+  if (!user) return json({ ok: false, error: 'invalid_token' }, 401)
 
   // ---- Parse body
-  let body: RequestBody;
+  let body: RequestBody
   try {
-    body = (await req.json()) as RequestBody;
+    body = (await req.json()) as RequestBody
   } catch {
-    return json({ ok: false, error: "invalid_json" }, 400);
+    return json({ ok: false, error: 'invalid_json' }, 400)
   }
 
-  if (typeof body.seed !== "string" || body.seed.trim().length === 0) {
-    return json({ ok: false, error: "seed_required" }, 400);
+  if (typeof body.seed !== 'string' || body.seed.trim().length === 0) {
+    return json({ ok: false, error: 'seed_required' }, 400)
   }
   if (!body.lang || !VALID_LANGS.has(body.lang)) {
-    return json({ ok: false, error: "invalid_lang" }, 400);
+    return json({ ok: false, error: 'invalid_lang' }, 400)
   }
   if (
-    !body.research_strategy || typeof body.research_strategy !== "object" ||
+    !body.research_strategy ||
+    typeof body.research_strategy !== 'object' ||
     Array.isArray(body.research_strategy)
   ) {
-    return json({ ok: false, error: "research_strategy_required" }, 400);
+    return json({ ok: false, error: 'research_strategy_required' }, 400)
   }
 
-  const startedAt = Date.now();
-  const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`;
-  const systemPrompt = buildSystemPrompt(body.lang);
-  const userPrompt = buildUserPrompt(
-    body.seed,
-    body.lang,
-    body.research_strategy,
-  );
+  const startedAt = Date.now()
+  const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`
+  const systemPrompt = buildSystemPrompt(body.lang)
+  const userPrompt = buildUserPrompt(body.seed, body.lang, body.research_strategy)
 
   // ---- First attempt
-  let dispatch: DispatchResponse;
+  let dispatch: DispatchResponse
   try {
     dispatch = await callDispatch({
       dispatchUrl,
       auth,
       systemPrompt,
       userPrompt,
-    });
+    })
   } catch (err) {
     return json(
       {
         ok: false,
-        error: "dispatch_fetch_failed",
+        error: 'dispatch_fetch_failed',
         detail: err instanceof Error ? err.message : String(err),
       },
       502,
-    );
+    )
   }
 
   if (!dispatch.ok || !dispatch.content) {
     return json(
       {
         ok: false,
-        error: "dispatch_failed",
-        detail: dispatch.error ?? dispatch.detail ?? "unknown",
+        error: 'dispatch_failed',
+        detail: dispatch.error ?? dispatch.detail ?? 'unknown',
       },
       502,
-    );
+    )
   }
 
-  let cleaned = sanitizeLlmOutput(dispatch.content);
-  let parsed: unknown;
+  let cleaned = sanitizeLlmOutput(dispatch.content)
+  let parsed: unknown
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(cleaned)
   } catch (err) {
-    parsed = null;
+    parsed = null
     try {
-      await supabase.from("logs").insert({
+      await supabase.from('logs').insert({
         user_id: user.id,
-        action: "rubric-architect:parse_error",
-        status: "error",
+        action: 'rubric-architect:parse_error',
+        status: 'error',
         payload: {
           reason: err instanceof Error ? err.message : String(err),
           raw_head: cleaned.slice(0, 200),
         },
-      });
+      })
     } catch {
       // best-effort log; ignore if logs table unavailable.
     }
   }
 
-  let validation = parsed === null
-    ? {
-      valid: false,
-      errors: [{
-        code: "json_parse",
-        message: "Failed to parse LLM JSON",
-      }] as ValidationError[],
-    }
-    : validateRubricSchema(parsed);
-  let usedRetry = false;
+  let validation =
+    parsed === null
+      ? {
+          valid: false,
+          errors: [
+            {
+              code: 'json_parse',
+              message: 'Failed to parse LLM JSON',
+            },
+          ] as ValidationError[],
+        }
+      : validateRubricSchema(parsed)
+  let usedRetry = false
 
   // ---- Retry once with correction if invalid
   if (!validation.valid) {
-    usedRetry = true;
-    const correctionMsg = buildCorrectionMessage(validation.errors);
-    let retry: DispatchResponse;
+    usedRetry = true
+    const correctionMsg = buildCorrectionMessage(validation.errors)
+    let retry: DispatchResponse
     try {
       retry = await callDispatch({
         dispatchUrl,
         auth,
         systemPrompt,
-        userPrompt:
-          `${userPrompt}\n\nCORRECTION REQUISE :\n${correctionMsg}\n\nRégénère la rubric COMPLÈTE en JSON strict en corrigeant ces points.`,
-      });
+        userPrompt: `${userPrompt}\n\nCORRECTION REQUISE :\n${correctionMsg}\n\nRégénère la rubric COMPLÈTE en JSON strict en corrigeant ces points.`,
+      })
     } catch (err) {
       return json(
         {
           ok: false,
-          error: "dispatch_retry_fetch_failed",
+          error: 'dispatch_retry_fetch_failed',
           detail: err instanceof Error ? err.message : String(err),
         },
         502,
-      );
+      )
     }
 
     if (!retry.ok || !retry.content) {
       return json(
         {
           ok: false,
-          error: "dispatch_retry_failed",
-          detail: retry.error ?? retry.detail ?? "unknown",
+          error: 'dispatch_retry_failed',
+          detail: retry.error ?? retry.detail ?? 'unknown',
         },
         502,
-      );
+      )
     }
 
-    cleaned = sanitizeLlmOutput(retry.content);
+    cleaned = sanitizeLlmOutput(retry.content)
     try {
-      parsed = JSON.parse(cleaned);
+      parsed = JSON.parse(cleaned)
     } catch {
-      parsed = null;
+      parsed = null
     }
-    validation = parsed === null
-      ? {
-        valid: false,
-        errors: [{
-          code: "json_parse_retry",
-          message: "Failed to parse LLM JSON on retry",
-        }],
-      }
-      : validateRubricSchema(parsed);
+    validation =
+      parsed === null
+        ? {
+            valid: false,
+            errors: [
+              {
+                code: 'json_parse_retry',
+                message: 'Failed to parse LLM JSON on retry',
+              },
+            ],
+          }
+        : validateRubricSchema(parsed)
 
     // Aggregate usage if retry succeeded
     if (dispatch.usage && retry.usage) {
       dispatch.usage = {
-        prompt_tokens: (dispatch.usage.prompt_tokens ?? 0) +
-          (retry.usage.prompt_tokens ?? 0),
-        completion_tokens: (dispatch.usage.completion_tokens ?? 0) +
-          (retry.usage.completion_tokens ?? 0),
+        prompt_tokens: (dispatch.usage.prompt_tokens ?? 0) + (retry.usage.prompt_tokens ?? 0),
+        completion_tokens:
+          (dispatch.usage.completion_tokens ?? 0) + (retry.usage.completion_tokens ?? 0),
         cost: (dispatch.usage.cost ?? 0) + (retry.usage.cost ?? 0),
-      };
+      }
     }
-    if (retry.model_used) dispatch.model_used = retry.model_used;
-    if (retry.provider_used) dispatch.provider_used = retry.provider_used;
+    if (retry.model_used) dispatch.model_used = retry.model_used
+    if (retry.provider_used) dispatch.provider_used = retry.provider_used
   }
 
   if (!validation.valid) {
     try {
-      await supabase.from("logs").insert({
+      await supabase.from('logs').insert({
         user_id: user.id,
-        action: "rubric-architect:schema_fail",
-        status: "error",
+        action: 'rubric-architect:schema_fail',
+        status: 'error',
         payload: { errors: validation.errors, retried: usedRetry },
-      });
+      })
     } catch {
       // best-effort log
     }
     return json(
       {
         ok: false,
-        error: "schema_validation_failed",
+        error: 'schema_validation_failed',
         errors: validation.errors,
         retried: usedRetry,
       },
       422,
-    );
+    )
   }
 
   // ---- Sanitize unicode (Postgres JSONB safety)
-  const rubric = deepSanitizeJson(parsed) as Rubric;
-  const duration = Date.now() - startedAt;
+  const rubric = deepSanitizeJson(parsed) as Rubric
+  const duration = Date.now() - startedAt
 
   try {
-    await supabase.from("logs").insert({
+    await supabase.from('logs').insert({
       user_id: user.id,
-      action: "rubric-architect:run",
-      status: "ok",
+      action: 'rubric-architect:run',
+      status: 'ok',
       payload: {
         lang: body.lang,
         retried: usedRetry,
@@ -784,7 +762,7 @@ Deno.serve(async (req) => {
         model_used: dispatch.model_used ?? null,
         provider_used: dispatch.provider_used ?? null,
       },
-    });
+    })
   } catch {
     // best-effort log
   }
@@ -802,8 +780,13 @@ Deno.serve(async (req) => {
       },
     },
     200,
-  );
-});
+  )
+}
+
+// Guard so test runner can `import` this module without booting the listener.
+if (import.meta.main) {
+  Deno.serve(handler)
+}
 
 // =============================================================================
 // Helpers
@@ -811,19 +794,19 @@ Deno.serve(async (req) => {
 
 export function buildCorrectionMessage(errors: ValidationError[]): string {
   // Prioritize weight_sum since it is the most common LLM mistake.
-  const weightErr = errors.find((e) => e.code === "weight_sum");
-  const lines: string[] = [];
-  if (weightErr) lines.push(`- ${weightErr.message}`);
+  const weightErr = errors.find((e) => e.code === 'weight_sum')
+  const lines: string[] = []
+  if (weightErr) lines.push(`- ${weightErr.message}`)
   for (const e of errors) {
-    if (e.code === "weight_sum") continue;
-    lines.push(`- ${e.message}`);
+    if (e.code === 'weight_sum') continue
+    lines.push(`- ${e.message}`)
   }
-  return lines.join("\n");
+  return lines.join('\n')
 }
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  })
 }

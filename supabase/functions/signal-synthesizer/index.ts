@@ -19,297 +19,274 @@
 //      - devil_advocate_topic_id pointe un topic type='devil_advocate'
 //   6. Sanitize unicode, return 200
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { deepSanitizeJson, sanitizeUnicodeString } from "../_shared/unicode.ts";
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { deepSanitizeJson, sanitizeUnicodeString } from '../_shared/unicode.ts'
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
-const MIN_SIGNALS_REQUIRED = 5;
-const MIN_TOPICS = 3;
-const MAX_TOPICS = 8;
-const KEY_SIGNALS_MIN = 3;
-const KEY_SIGNALS_MAX = 6;
-const BRIEF_MIN_CHARS = 250;
-const BRIEF_MAX_CHARS = 400;
+const MIN_SIGNALS_REQUIRED = 5
+const MIN_TOPICS = 3
+const MAX_TOPICS = 8
+const KEY_SIGNALS_MIN = 3
+const KEY_SIGNALS_MAX = 6
+const BRIEF_MIN_CHARS = 250
+const BRIEF_MAX_CHARS = 400
 
-type Lang = "fr" | "en" | "ar";
+type Lang = 'fr' | 'en' | 'ar'
 
 export interface ScoredSignal {
-  id: string;
-  title: string;
-  url: string;
-  source: string;
-  lang: string;
-  score: number;
-  excerpt: string;
-  disqualified: boolean;
-  applied_boosts: string[];
+  id: string
+  title: string
+  url: string
+  source: string
+  lang: string
+  score: number
+  excerpt: string
+  disqualified: boolean
+  applied_boosts: string[]
 }
 
 export interface ResearchStrategySubject {
-  id: string;
-  title: string;
-  angle: string;
+  id: string
+  title: string
+  angle: string
   // Other fields are accepted but not used here.
 }
 
 export interface ResearchStrategy {
-  domain?: string;
-  geo_scope?: string;
-  language_mix?: string[];
-  subjects: ResearchStrategySubject[];
-  tensions?: unknown;
-  blind_spots?: unknown;
-  recursion_budget?: number;
+  domain?: string
+  geo_scope?: string
+  language_mix?: string[]
+  subjects: ResearchStrategySubject[]
+  tensions?: unknown
+  blind_spots?: unknown
+  recursion_budget?: number
 }
 
 interface RequestBody {
-  signals: ScoredSignal[];
-  research_strategy: ResearchStrategy;
-  lang: Lang;
+  signals: ScoredSignal[]
+  research_strategy: ResearchStrategy
+  lang: Lang
 }
 
 interface BriefVariant {
-  framework_hint: string;
-  brief: string;
-  rationale: string;
+  framework_hint: string
+  brief: string
+  rationale: string
 }
 
 interface TopicProvenance {
-  lang_distribution: Record<string, number>;
-  source_diversity_score: number;
-  freshness_median_days: number;
+  lang_distribution: Record<string, number>
+  source_diversity_score: number
+  freshness_median_days: number
 }
 
 interface CrossTopicConflict {
-  topic_id: string;
-  signal_id: string;
+  topic_id: string
+  signal_id: string
 }
 
 export interface SynthesizedTopic {
-  id: string;
-  label: string;
-  summary: string;
-  type: "regular" | "devil_advocate" | "emerging";
-  dominant_angle: string;
-  key_signals_supporting: string[];
-  key_signals_conflicting: string[];
-  cross_topic_conflicts: CrossTopicConflict[];
-  internal_tension: string | null;
-  brief_variants: BriefVariant[];
-  provenance: TopicProvenance;
-  confidence: number;
-  warnings: string[];
+  id: string
+  label: string
+  summary: string
+  type: 'regular' | 'devil_advocate' | 'emerging'
+  dominant_angle: string
+  key_signals_supporting: string[]
+  key_signals_conflicting: string[]
+  cross_topic_conflicts: CrossTopicConflict[]
+  internal_tension: string | null
+  brief_variants: BriefVariant[]
+  provenance: TopicProvenance
+  confidence: number
+  warnings: string[]
 }
 
 interface CoverageMapEntry {
-  signals_count: number;
-  covered: boolean;
-  topics: string[];
+  signals_count: number
+  covered: boolean
+  topics: string[]
 }
 
 interface SynthesizerOutput {
-  topics: SynthesizedTopic[];
-  coverage_map: Record<string, CoverageMapEntry>;
-  cultural_warnings: string[];
-  devil_advocate_topic_id: string;
+  topics: SynthesizedTopic[]
+  coverage_map: Record<string, CoverageMapEntry>
+  cultural_warnings: string[]
+  devil_advocate_topic_id: string
 }
 
 interface DispatchResponse {
-  ok: boolean;
-  error?: string;
-  content?: string;
-  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
-  model_used?: string;
-  provider_used?: string;
+  ok: boolean
+  error?: string
+  content?: string
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number }
+  model_used?: string
+  provider_used?: string
 }
 
 export interface ValidationResult {
-  ok: boolean;
-  errors: string[];
-  warnings: string[];
+  ok: boolean
+  errors: string[]
+  warnings: string[]
   // Hallucinated signal_ids referenced by topics but absent from input.
-  hallucinated_ids: string[];
+  hallucinated_ids: string[]
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS });
+export const handler = async (req: Request): Promise<Response> => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS })
   }
-  if (req.method !== "POST") {
-    return json({ ok: false, error: "method_not_allowed" }, 405);
+  if (req.method !== 'POST') {
+    return json({ ok: false, error: 'method_not_allowed' }, 405)
   }
 
-  const auth = req.headers.get("Authorization");
-  if (!auth) return json({ ok: false, error: "missing_authorization" }, 401);
+  const auth = req.headers.get('Authorization')
+  if (!auth) return json({ ok: false, error: 'missing_authorization' }, 401)
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
   if (!supabaseUrl || !supabaseAnonKey) {
-    return json({ ok: false, error: "supabase_env_missing" }, 500);
+    return json({ ok: false, error: 'supabase_env_missing' }, 500)
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
-  });
+  })
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return json({ ok: false, error: "invalid_token" }, 401);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return json({ ok: false, error: 'invalid_token' }, 401)
 
-  let body: RequestBody;
+  let body: RequestBody
   try {
-    body = await req.json();
+    body = await req.json()
   } catch {
-    return json({ ok: false, error: "invalid_json" }, 400);
+    return json({ ok: false, error: 'invalid_json' }, 400)
   }
 
-  const validation = validateRequestBody(body);
+  const validation = validateRequestBody(body)
   if (!validation.ok) {
-    return json(
-      { ok: false, error: "bad_body", detail: validation.error },
-      400,
-    );
+    return json({ ok: false, error: 'bad_body', detail: validation.error }, 400)
   }
 
-  const { signals, research_strategy, lang } = body;
+  const { signals, research_strategy, lang } = body
 
   // Step 1 : filter disqualified.
-  const retained = signals.filter((s) => !s.disqualified);
+  const retained = signals.filter((s) => !s.disqualified)
 
   // Step 2 : need at least MIN_SIGNALS_REQUIRED to cluster.
   if (retained.length < MIN_SIGNALS_REQUIRED) {
     return json(
       {
         ok: false,
-        error: "INSUFFICIENT_SIGNALS",
-        detail:
-          `Need at least ${MIN_SIGNALS_REQUIRED} non-disqualified signals, got ${retained.length}.`,
+        error: 'INSUFFICIENT_SIGNALS',
+        detail: `Need at least ${MIN_SIGNALS_REQUIRED} non-disqualified signals, got ${retained.length}.`,
       },
       422,
-    );
+    )
   }
 
-  const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`;
-  const validIdsSet = new Set(retained.map((s) => s.id));
-  const subjectIds = research_strategy.subjects.map((s) => s.id);
+  const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`
+  const validIdsSet = new Set(retained.map((s) => s.id))
+  const subjectIds = research_strategy.subjects.map((s) => s.id)
 
-  const systemPrompt = buildSystemPrompt(lang);
-  const userPrompt = buildUserPrompt(retained, research_strategy, lang);
+  const systemPrompt = buildSystemPrompt(lang)
+  const userPrompt = buildUserPrompt(retained, research_strategy, lang)
 
   // First pass.
-  const t0 = Date.now();
-  const firstCall = await callDispatch(
-    dispatchUrl,
-    auth,
-    systemPrompt,
-    userPrompt,
-  );
+  const t0 = Date.now()
+  const firstCall = await callDispatch(dispatchUrl, auth, systemPrompt, userPrompt)
   if (!firstCall.ok) {
     return json(
       {
         ok: false,
-        error: "dispatch_failed",
-        detail: firstCall.error ?? "unknown",
+        error: 'dispatch_failed',
+        detail: firstCall.error ?? 'unknown',
       },
       502,
-    );
+    )
   }
 
-  let parsed: SynthesizerOutput | null = null;
-  let parseError: string | null = null;
+  let parsed: SynthesizerOutput | null = null
+  let parseError: string | null = null
   try {
-    parsed = JSON.parse(firstCall.content ?? "{}") as SynthesizerOutput;
+    parsed = JSON.parse(firstCall.content ?? '{}') as SynthesizerOutput
   } catch (err) {
-    parseError = err instanceof Error ? err.message : "parse_failed";
+    parseError = err instanceof Error ? err.message : 'parse_failed'
   }
 
-  let usedRetry = false;
+  let usedRetry = false
   let validation1: ValidationResult = {
     ok: false,
-    errors: parseError ? [parseError] : ["no_parse"],
+    errors: parseError ? [parseError] : ['no_parse'],
     warnings: [],
     hallucinated_ids: [],
-  };
+  }
   if (parsed) {
-    validation1 = validateSynthesizerOutput(parsed, validIdsSet, subjectIds);
+    validation1 = validateSynthesizerOutput(parsed, validIdsSet, subjectIds)
   }
 
   // Retry 1× on hallucination or schema break, with explicit correction message.
-  let final: SynthesizerOutput | null = parsed && validation1.ok
-    ? parsed
-    : null;
-  let finalValidation: ValidationResult = validation1;
+  let final: SynthesizerOutput | null = parsed && validation1.ok ? parsed : null
+  let finalValidation: ValidationResult = validation1
 
   if (!final) {
-    usedRetry = true;
-    const correctionUser = buildCorrectionPrompt(
-      userPrompt,
-      firstCall.content ?? "",
-      validation1,
-    );
-    const secondCall = await callDispatch(
-      dispatchUrl,
-      auth,
-      systemPrompt,
-      correctionUser,
-    );
+    usedRetry = true
+    const correctionUser = buildCorrectionPrompt(userPrompt, firstCall.content ?? '', validation1)
+    const secondCall = await callDispatch(dispatchUrl, auth, systemPrompt, correctionUser)
     if (!secondCall.ok) {
       return json(
         {
           ok: false,
-          error: "validation_failed",
+          error: 'validation_failed',
           detail: validation1.errors,
           hallucinated_ids: validation1.hallucinated_ids,
         },
         422,
-      );
+      )
     }
-    let parsed2: SynthesizerOutput | null = null;
+    let parsed2: SynthesizerOutput | null = null
     try {
-      parsed2 = JSON.parse(secondCall.content ?? "{}") as SynthesizerOutput;
+      parsed2 = JSON.parse(secondCall.content ?? '{}') as SynthesizerOutput
     } catch (err) {
       return json(
         {
           ok: false,
-          error: "validation_failed_after_retry",
-          detail: err instanceof Error ? err.message : "parse_failed",
+          error: 'validation_failed_after_retry',
+          detail: err instanceof Error ? err.message : 'parse_failed',
         },
         422,
-      );
+      )
     }
-    const validation2 = validateSynthesizerOutput(
-      parsed2,
-      validIdsSet,
-      subjectIds,
-    );
+    const validation2 = validateSynthesizerOutput(parsed2, validIdsSet, subjectIds)
     if (!validation2.ok) {
       return json(
         {
           ok: false,
-          error: "validation_failed_after_retry",
+          error: 'validation_failed_after_retry',
           detail: validation2.errors,
           hallucinated_ids: validation2.hallucinated_ids,
         },
         422,
-      );
+      )
     }
-    final = parsed2;
-    finalValidation = validation2;
+    final = parsed2
+    finalValidation = validation2
   }
 
   // Sanitize all string fields.
-  const sanitized = deepSanitizeJson(final);
+  const sanitized = deepSanitizeJson(final)
   for (const t of sanitized.topics) {
-    t.label = sanitizeUnicodeString(t.label);
-    t.summary = sanitizeUnicodeString(t.summary);
+    t.label = sanitizeUnicodeString(t.label)
+    t.summary = sanitizeUnicodeString(t.summary)
   }
 
-  const totalCost = firstCall.usage?.cost ?? 0;
+  const totalCost = firstCall.usage?.cost ?? 0
   const telemetry = {
     signals_in: signals.length,
     signals_retained: retained.length,
@@ -319,16 +296,16 @@ Deno.serve(async (req) => {
     latency_ms: Date.now() - t0,
     model_used: firstCall.model_used ?? null,
     cost_usd: totalCost,
-  };
+  }
 
   // Best-effort log (do not fail on log error).
   try {
-    await supabase.from("logs").insert({
+    await supabase.from('logs').insert({
       user_id: user.id,
-      action: "signal-synthesizer:run",
-      status: "ok",
+      action: 'signal-synthesizer:run',
+      status: 'ok',
       payload: telemetry,
-    });
+    })
   } catch {
     // ignore
   }
@@ -343,34 +320,37 @@ Deno.serve(async (req) => {
       telemetry,
     },
     200,
-  );
-});
+  )
+}
+
+// Guard so test runner can `import` this module without booting the listener.
+if (import.meta.main) {
+  Deno.serve(handler)
+}
 
 // --------------------------------------------------------------------------
 // Validation helpers — exported for testing
 // --------------------------------------------------------------------------
 
-export function validateRequestBody(
-  body: unknown,
-): { ok: true } | { ok: false; error: string } {
-  if (!body || typeof body !== "object") {
-    return { ok: false, error: "body_not_object" };
+export function validateRequestBody(body: unknown): { ok: true } | { ok: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { ok: false, error: 'body_not_object' }
   }
-  const b = body as Record<string, unknown>;
+  const b = body as Record<string, unknown>
   if (!Array.isArray(b.signals)) {
-    return { ok: false, error: "signals_must_be_array" };
+    return { ok: false, error: 'signals_must_be_array' }
   }
-  if (!b.research_strategy || typeof b.research_strategy !== "object") {
-    return { ok: false, error: "research_strategy_required" };
+  if (!b.research_strategy || typeof b.research_strategy !== 'object') {
+    return { ok: false, error: 'research_strategy_required' }
   }
-  const rs = b.research_strategy as Record<string, unknown>;
+  const rs = b.research_strategy as Record<string, unknown>
   if (!Array.isArray(rs.subjects) || rs.subjects.length === 0) {
-    return { ok: false, error: "research_strategy.subjects_required" };
+    return { ok: false, error: 'research_strategy.subjects_required' }
   }
-  if (b.lang !== "fr" && b.lang !== "en" && b.lang !== "ar") {
-    return { ok: false, error: "lang_invalid" };
+  if (b.lang !== 'fr' && b.lang !== 'en' && b.lang !== 'ar') {
+    return { ok: false, error: 'lang_invalid' }
   }
-  return { ok: true };
+  return { ok: true }
 }
 
 /**
@@ -383,227 +363,211 @@ export function validateSynthesizerOutput(
   validSignalIds: Set<string>,
   subjectIds: string[],
 ): ValidationResult {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const hallucinated_ids: string[] = [];
+  const errors: string[] = []
+  const warnings: string[] = []
+  const hallucinated_ids: string[] = []
 
-  if (!output || typeof output !== "object") {
+  if (!output || typeof output !== 'object') {
     return {
       ok: false,
-      errors: ["output_not_object"],
+      errors: ['output_not_object'],
       warnings,
       hallucinated_ids,
-    };
+    }
   }
 
-  const o = output as Record<string, unknown>;
+  const o = output as Record<string, unknown>
 
   // topics
   if (!Array.isArray(o.topics)) {
     return {
       ok: false,
-      errors: ["topics_not_array"],
+      errors: ['topics_not_array'],
       warnings,
       hallucinated_ids,
-    };
+    }
   }
-  const topics = o.topics as Record<string, unknown>[];
+  const topics = o.topics as Record<string, unknown>[]
   if (topics.length < MIN_TOPICS || topics.length > MAX_TOPICS) {
     errors.push(
       `topics_count_out_of_range: ${topics.length} (expected ${MIN_TOPICS}-${MAX_TOPICS})`,
-    );
+    )
   }
 
-  const topicIds = new Set<string>();
-  let devilAdvocateCount = 0;
+  const topicIds = new Set<string>()
+  let devilAdvocateCount = 0
 
   for (const [i, t] of topics.entries()) {
-    if (typeof t.id !== "string" || !t.id) {
-      errors.push(`topic[${i}].id_missing`);
-      continue;
+    if (typeof t.id !== 'string' || !t.id) {
+      errors.push(`topic[${i}].id_missing`)
+      continue
     }
-    if (topicIds.has(t.id)) errors.push(`topic[${i}].id_duplicate:${t.id}`);
-    topicIds.add(t.id);
+    if (topicIds.has(t.id)) errors.push(`topic[${i}].id_duplicate:${t.id}`)
+    topicIds.add(t.id)
 
-    if (typeof t.label !== "string") {
-      errors.push(`topic[${t.id}].label_missing`);
+    if (typeof t.label !== 'string') {
+      errors.push(`topic[${t.id}].label_missing`)
     }
-    if (typeof t.summary !== "string") {
-      errors.push(`topic[${t.id}].summary_missing`);
+    if (typeof t.summary !== 'string') {
+      errors.push(`topic[${t.id}].summary_missing`)
     }
-    if (
-      t.type !== "regular" && t.type !== "devil_advocate" &&
-      t.type !== "emerging"
-    ) {
-      errors.push(`topic[${t.id}].type_invalid:${String(t.type)}`);
+    if (t.type !== 'regular' && t.type !== 'devil_advocate' && t.type !== 'emerging') {
+      errors.push(`topic[${t.id}].type_invalid:${String(t.type)}`)
     }
-    if (t.type === "devil_advocate") devilAdvocateCount += 1;
+    if (t.type === 'devil_advocate') devilAdvocateCount += 1
 
     // key_signals_supporting : 3-6 ids
-    const supporting = t.key_signals_supporting;
+    const supporting = t.key_signals_supporting
     if (!Array.isArray(supporting)) {
-      errors.push(`topic[${t.id}].key_signals_supporting_not_array`);
+      errors.push(`topic[${t.id}].key_signals_supporting_not_array`)
     } else {
-      if (
-        supporting.length < KEY_SIGNALS_MIN ||
-        supporting.length > KEY_SIGNALS_MAX
-      ) {
+      if (supporting.length < KEY_SIGNALS_MIN || supporting.length > KEY_SIGNALS_MAX) {
         errors.push(
           `topic[${t.id}].key_signals_supporting_count:${supporting.length} (expected ${KEY_SIGNALS_MIN}-${KEY_SIGNALS_MAX})`,
-        );
+        )
       }
       for (const sid of supporting) {
-        if (typeof sid !== "string") {
-          errors.push(`topic[${t.id}].supporting_non_string`);
-          continue;
+        if (typeof sid !== 'string') {
+          errors.push(`topic[${t.id}].supporting_non_string`)
+          continue
         }
         if (!validSignalIds.has(sid)) {
-          hallucinated_ids.push(sid);
-          errors.push(`topic[${t.id}].supporting_hallucinated:${sid}`);
+          hallucinated_ids.push(sid)
+          errors.push(`topic[${t.id}].supporting_hallucinated:${sid}`)
         }
       }
     }
 
     // key_signals_conflicting (optional but must be array if present)
-    const conflicting = t.key_signals_conflicting;
+    const conflicting = t.key_signals_conflicting
     if (conflicting !== undefined && conflicting !== null) {
       if (!Array.isArray(conflicting)) {
-        errors.push(`topic[${t.id}].key_signals_conflicting_not_array`);
+        errors.push(`topic[${t.id}].key_signals_conflicting_not_array`)
       } else {
         for (const sid of conflicting) {
-          if (typeof sid !== "string") {
-            errors.push(`topic[${t.id}].conflicting_non_string`);
-            continue;
+          if (typeof sid !== 'string') {
+            errors.push(`topic[${t.id}].conflicting_non_string`)
+            continue
           }
           if (!validSignalIds.has(sid)) {
-            hallucinated_ids.push(sid);
-            errors.push(`topic[${t.id}].conflicting_hallucinated:${sid}`);
+            hallucinated_ids.push(sid)
+            errors.push(`topic[${t.id}].conflicting_hallucinated:${sid}`)
           }
         }
       }
     }
 
     // cross_topic_conflicts
-    const xConflicts = t.cross_topic_conflicts;
+    const xConflicts = t.cross_topic_conflicts
     if (xConflicts !== undefined && xConflicts !== null) {
       if (!Array.isArray(xConflicts)) {
-        errors.push(`topic[${t.id}].cross_topic_conflicts_not_array`);
+        errors.push(`topic[${t.id}].cross_topic_conflicts_not_array`)
       } else {
         for (const c of xConflicts) {
-          if (!c || typeof c !== "object") {
-            errors.push(`topic[${t.id}].cross_topic_conflicts_entry_invalid`);
-            continue;
+          if (!c || typeof c !== 'object') {
+            errors.push(`topic[${t.id}].cross_topic_conflicts_entry_invalid`)
+            continue
           }
-          const obj = c as Record<string, unknown>;
-          if (typeof obj.signal_id !== "string") {
-            errors.push(
-              `topic[${t.id}].cross_topic_conflicts.signal_id_missing`,
-            );
-            continue;
+          const obj = c as Record<string, unknown>
+          if (typeof obj.signal_id !== 'string') {
+            errors.push(`topic[${t.id}].cross_topic_conflicts.signal_id_missing`)
+            continue
           }
           if (!validSignalIds.has(obj.signal_id)) {
-            hallucinated_ids.push(obj.signal_id);
-            errors.push(
-              `topic[${t.id}].cross_topic_conflict_hallucinated:${obj.signal_id}`,
-            );
+            hallucinated_ids.push(obj.signal_id)
+            errors.push(`topic[${t.id}].cross_topic_conflict_hallucinated:${obj.signal_id}`)
           }
         }
       }
     }
 
     // brief_variants
-    const variants = t.brief_variants;
+    const variants = t.brief_variants
     if (!Array.isArray(variants)) {
-      errors.push(`topic[${t.id}].brief_variants_not_array`);
+      errors.push(`topic[${t.id}].brief_variants_not_array`)
     } else {
       if (variants.length < 1 || variants.length > 3) {
-        errors.push(
-          `topic[${t.id}].brief_variants_count:${variants.length} (expected 1-3)`,
-        );
+        errors.push(`topic[${t.id}].brief_variants_count:${variants.length} (expected 1-3)`)
       }
       for (const [j, v] of variants.entries()) {
-        if (!v || typeof v !== "object") {
-          errors.push(`topic[${t.id}].brief_variants[${j}]_not_object`);
-          continue;
+        if (!v || typeof v !== 'object') {
+          errors.push(`topic[${t.id}].brief_variants[${j}]_not_object`)
+          continue
         }
-        const vObj = v as Record<string, unknown>;
-        const brief = vObj.brief;
-        if (typeof brief !== "string") {
-          errors.push(`topic[${t.id}].brief_variants[${j}].brief_missing`);
-          continue;
+        const vObj = v as Record<string, unknown>
+        const brief = vObj.brief
+        if (typeof brief !== 'string') {
+          errors.push(`topic[${t.id}].brief_variants[${j}].brief_missing`)
+          continue
         }
         if (brief.length < BRIEF_MIN_CHARS || brief.length > BRIEF_MAX_CHARS) {
           errors.push(
             `topic[${t.id}].brief_variants[${j}].brief_length:${brief.length} (expected ${BRIEF_MIN_CHARS}-${BRIEF_MAX_CHARS})`,
-          );
+          )
         }
       }
     }
 
     // mono-source warning : provenance.source_diversity_score < 0.2 → flag.
-    const prov = t.provenance as Record<string, unknown> | undefined;
-    if (prov && typeof prov.source_diversity_score === "number") {
+    const prov = t.provenance as Record<string, unknown> | undefined
+    if (prov && typeof prov.source_diversity_score === 'number') {
       if (prov.source_diversity_score < 0.2) {
-        warnings.push(`topic[${t.id}].mono_source_warning`);
+        warnings.push(`topic[${t.id}].mono_source_warning`)
       }
     }
   }
 
   // devil_advocate_topic_id present + points an existing devil_advocate topic
-  const devilId = o.devil_advocate_topic_id;
-  if (typeof devilId !== "string" || !devilId) {
-    errors.push("devil_advocate_topic_id_missing");
+  const devilId = o.devil_advocate_topic_id
+  if (typeof devilId !== 'string' || !devilId) {
+    errors.push('devil_advocate_topic_id_missing')
   } else if (!topicIds.has(devilId)) {
-    errors.push(`devil_advocate_topic_id_unknown:${devilId}`);
+    errors.push(`devil_advocate_topic_id_unknown:${devilId}`)
   } else {
-    const devilTopic = topics.find((t) => t.id === devilId);
-    if (devilTopic && devilTopic.type !== "devil_advocate") {
-      errors.push(
-        `devil_advocate_topic_id_type_mismatch:${String(devilTopic.type)}`,
-      );
+    const devilTopic = topics.find((t) => t.id === devilId)
+    if (devilTopic && devilTopic.type !== 'devil_advocate') {
+      errors.push(`devil_advocate_topic_id_type_mismatch:${String(devilTopic.type)}`)
     }
   }
 
   if (devilAdvocateCount === 0) {
-    errors.push("no_devil_advocate_topic");
+    errors.push('no_devil_advocate_topic')
   }
 
   // coverage_map : entry for EACH subject of research_strategy
-  const cm = o.coverage_map;
-  if (!cm || typeof cm !== "object") {
-    errors.push("coverage_map_not_object");
+  const cm = o.coverage_map
+  if (!cm || typeof cm !== 'object') {
+    errors.push('coverage_map_not_object')
   } else {
-    const map = cm as Record<string, unknown>;
+    const map = cm as Record<string, unknown>
     for (const sid of subjectIds) {
       if (!(sid in map)) {
-        errors.push(`coverage_map.missing_subject:${sid}`);
-        continue;
+        errors.push(`coverage_map.missing_subject:${sid}`)
+        continue
       }
-      const entry = map[sid] as Record<string, unknown> | undefined;
-      if (!entry || typeof entry !== "object") {
-        errors.push(`coverage_map.${sid}_not_object`);
-        continue;
+      const entry = map[sid] as Record<string, unknown> | undefined
+      if (!entry || typeof entry !== 'object') {
+        errors.push(`coverage_map.${sid}_not_object`)
+        continue
       }
-      if (typeof entry.signals_count !== "number") {
-        errors.push(`coverage_map.${sid}.signals_count_missing`);
+      if (typeof entry.signals_count !== 'number') {
+        errors.push(`coverage_map.${sid}.signals_count_missing`)
       }
-      if (typeof entry.covered !== "boolean") {
-        errors.push(`coverage_map.${sid}.covered_missing`);
+      if (typeof entry.covered !== 'boolean') {
+        errors.push(`coverage_map.${sid}.covered_missing`)
       }
       if (!Array.isArray(entry.topics)) {
-        errors.push(`coverage_map.${sid}.topics_not_array`);
+        errors.push(`coverage_map.${sid}.topics_not_array`)
       }
     }
   }
 
   // cultural_warnings : array (may be empty)
-  if (
-    o.cultural_warnings !== undefined && !Array.isArray(o.cultural_warnings)
-  ) {
-    errors.push("cultural_warnings_not_array");
+  if (o.cultural_warnings !== undefined && !Array.isArray(o.cultural_warnings)) {
+    errors.push('cultural_warnings_not_array')
   }
 
-  return { ok: errors.length === 0, errors, warnings, hallucinated_ids };
+  return { ok: errors.length === 0, errors, warnings, hallucinated_ids }
 }
 
 /**
@@ -614,13 +578,13 @@ export function computeLangDistribution(
   signals: ScoredSignal[],
   ids: string[],
 ): Record<string, number> {
-  const out: Record<string, number> = {};
+  const out: Record<string, number> = {}
   for (const id of ids) {
-    const s = signals.find((sig) => sig.id === id);
-    if (!s) continue;
-    out[s.lang] = (out[s.lang] ?? 0) + 1;
+    const s = signals.find((sig) => sig.id === id)
+    if (!s) continue
+    out[s.lang] = (out[s.lang] ?? 0) + 1
   }
-  return out;
+  return out
 }
 
 // --------------------------------------------------------------------------
@@ -632,11 +596,12 @@ export function computeLangDistribution(
  * (kairos-bassira-research-prompts.md).
  */
 export function buildSystemPrompt(lang: Lang): string {
-  const langLine = lang === "fr"
-    ? "Langue de sortie : français. Accents majuscules obligatoires (É, È, À, Ç, Ê, Ô, Î, Ù, Û)."
-    : lang === "ar"
-    ? "Langue de sortie : العربية. RTL respect, pas de mélange LTR sauf acronymes/URLs."
-    : "Output language: English.";
+  const langLine =
+    lang === 'fr'
+      ? 'Langue de sortie : français. Accents majuscules obligatoires (É, È, À, Ç, Ê, Ô, Î, Ù, Û).'
+      : lang === 'ar'
+        ? 'Langue de sortie : العربية. RTL respect, pas de mélange LTR sauf acronymes/URLs.'
+        : 'Output language: English.'
 
   return `Tu reçois 30-80 signaux SCORÉS (id, titre, URL, source, lang, score 0-100, extrait court 200 chars, disqualified: bool, applied_boosts: [string]).
 Tu reçois aussi la research_strategy (subjects, tensions, blind_spots).
@@ -739,14 +704,10 @@ SCHEMA OUTPUT (JSON strict, aucun préambule, aucune balise XML, aucun markdown)
   },
   "cultural_warnings": [],
   "devil_advocate_topic_id": "t_007"
-}`;
+}`
 }
 
-export function buildUserPrompt(
-  signals: ScoredSignal[],
-  rs: ResearchStrategy,
-  lang: Lang,
-): string {
+export function buildUserPrompt(signals: ScoredSignal[], rs: ResearchStrategy, lang: Lang): string {
   // Cap excerpt length defensively (200 chars per spec).
   const compactSignals = signals.map((s) => ({
     id: s.id,
@@ -755,27 +716,27 @@ export function buildUserPrompt(
     source: s.source,
     lang: s.lang,
     score: s.score,
-    excerpt: (s.excerpt ?? "").slice(0, 200),
+    excerpt: (s.excerpt ?? '').slice(0, 200),
     applied_boosts: s.applied_boosts ?? [],
-  }));
+  }))
 
   const subjects = rs.subjects.map((s) => ({
     id: s.id,
     title: s.title,
     angle: s.angle,
-  }));
+  }))
 
   return [
     `Output language: ${lang}.`,
-    `research_strategy.domain = ${rs.domain ?? "unknown"}`,
-    `research_strategy.geo_scope = ${rs.geo_scope ?? "unknown"}`,
+    `research_strategy.domain = ${rs.domain ?? 'unknown'}`,
+    `research_strategy.geo_scope = ${rs.geo_scope ?? 'unknown'}`,
     `research_strategy.language_mix = ${JSON.stringify(rs.language_mix ?? [])}`,
-    "research_strategy.subjects =",
+    'research_strategy.subjects =',
     JSON.stringify(subjects, null, 2),
     `signals (${signals.length} retenus, disqualified déjà filtrés) =`,
     JSON.stringify(compactSignals, null, 2),
-    "Réponds UNIQUEMENT avec le JSON décrit dans le system prompt.",
-  ].join("\n");
+    'Réponds UNIQUEMENT avec le JSON décrit dans le system prompt.',
+  ].join('\n')
 }
 
 function buildCorrectionPrompt(
@@ -783,25 +744,26 @@ function buildCorrectionPrompt(
   rawFirstResponse: string,
   validation: ValidationResult,
 ): string {
-  const trimmedRaw = rawFirstResponse.length > 4000
-    ? `${rawFirstResponse.slice(0, 4000)}…[truncated]`
-    : rawFirstResponse;
+  const trimmedRaw =
+    rawFirstResponse.length > 4000
+      ? `${rawFirstResponse.slice(0, 4000)}…[truncated]`
+      : rawFirstResponse
   return [
     originalUser,
-    "",
-    "TA RÉPONSE PRÉCÉDENTE EST INVALIDE. Voici les erreurs détectées :",
-    validation.errors.map((e) => `  - ${e}`).join("\n"),
+    '',
+    'TA RÉPONSE PRÉCÉDENTE EST INVALIDE. Voici les erreurs détectées :',
+    validation.errors.map((e) => `  - ${e}`).join('\n'),
     validation.hallucinated_ids.length > 0
-      ? `Signal_ids inventés (NE PAS RÉUTILISER) : ${
-        validation.hallucinated_ids.join(", ")
-      }`
-      : "",
-    "",
-    "Précédente sortie partielle (pour contexte uniquement) :",
+      ? `Signal_ids inventés (NE PAS RÉUTILISER) : ${validation.hallucinated_ids.join(', ')}`
+      : '',
+    '',
+    'Précédente sortie partielle (pour contexte uniquement) :',
     trimmedRaw,
-    "",
-    "Corrige TOUS les défauts et retourne le JSON strict, complet, conforme au schéma. Aucun préambule.",
-  ].filter(Boolean).join("\n");
+    '',
+    'Corrige TOUS les défauts et retourne le JSON strict, complet, conforme au schéma. Aucun préambule.',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 // --------------------------------------------------------------------------
@@ -815,27 +777,27 @@ async function callDispatch(
   userPrompt: string,
 ): Promise<DispatchResponse> {
   const res = await fetch(dispatchUrl, {
-    method: "POST",
-    headers: { Authorization: auth, "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      task: "enrichment",
+      task: 'enrichment',
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
       ],
       options: {
-        response_format: { type: "json_object" },
+        response_format: { type: 'json_object' },
         temperature: 0.5,
         max_tokens: 4000,
       },
     }),
-  });
-  return (await res.json()) as DispatchResponse;
+  })
+  return (await res.json()) as DispatchResponse
 }
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  })
 }
