@@ -26,7 +26,7 @@ export function formatError(err: unknown): FormattedError {
       out.stack = err.stack.split('\n').slice(0, 6).join('\n')
     }
     // OpenAI / fetch-style errors often attach status & code
-    const anyErr = err as Record<string, unknown>
+    const anyErr = err as unknown as Record<string, unknown>
     if (typeof anyErr.status === 'number') out.status = anyErr.status
     if (typeof anyErr.code === 'string' || typeof anyErr.code === 'number')
       out.code = anyErr.code as string | number
