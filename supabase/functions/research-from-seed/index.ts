@@ -50,7 +50,7 @@ import {
   validateApiKey,
   validateRequestBody,
 } from './lib.ts'
-import { signUserJwt } from '../_shared/sign-user-jwt.ts'
+import { getProxyUserJwt, makeSupabaseSignInFn } from '../_shared/proxy-user-jwt.ts'
 
 // ---------------------------------------------------------------------------
 // Telemetry helpers
@@ -219,17 +219,27 @@ export const handler = async (req: Request): Promise<Response> => {
 
   const fnUrl = (name: string) => `${supabaseUrl}/functions/v1/${name}`
 
-  // ─── Proxy user JWT (Option A — BYOK delegation) ──────────────────────
+  // ─── Proxy user JWT (Option A bis — BYOK delegation via signInWithPassword) ──
   // Pour les appels aux fns Phase 1 (research-strategist, rubric-architect,
-  // signal-synthesizer, quality-auditor, llm-score-batch), on signe un JWT
-  // user HS256 pour le proxy_user_id désigné côté public_api_keys. Ce user
-  // Kairos détient les credentials BYOK (settings.model_config + user_api_keys)
-  // utilisés par dispatch-llm. Coûts trackés sur ce user.
+  // signal-synthesizer, quality-auditor, llm-score-batch), on récupère un JWT
+  // user via signInWithPassword au nom du proxy_user désigné côté
+  // public_api_keys. Ce user Kairos détient les credentials BYOK
+  // (settings.model_config + user_api_keys) utilisés par dispatch-llm.
+  // Coûts trackés sur llm_costs.user_id = proxy_user_id.
+  //
+  // Le password proxy est stocké en secret Edge Function KAIROS_PROXY_USER_PASSWORD.
+  // Le JWT est cached 50 min instance-level pour amortir la latence ~100ms
+  // de signInWithPassword.
+  //
   // Pour les scrapers en mode signals_session (table service_role-only),
   // on garde le serviceKey direct.
-  const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET')
-  if (!jwtSecret) {
-    return jsonResp({ ok: false, error: 'jwt_secret_env_missing' }, 500, cors)
+  const proxyPassword = Deno.env.get('KAIROS_PROXY_USER_PASSWORD')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!proxyPassword) {
+    return jsonResp({ ok: false, error: 'proxy_user_password_env_missing' }, 500, cors)
+  }
+  if (!supabaseAnonKey) {
+    return jsonResp({ ok: false, error: 'anon_key_env_missing' }, 500, cors)
   }
 
   const proxyUserId = apiKeyRow.proxy_user_id!
@@ -242,12 +252,27 @@ export const handler = async (req: Request): Promise<Response> => {
       cors,
     )
   }
-  const proxyJwt = await signUserJwt({
-    userId: proxyUserId,
-    email: proxyUserData.user.email ?? `${proxyUserId}@proxy.kairos`,
-    jwtSecret,
-    ttlSeconds: 180, // pipeline budget ~75s + marge
-  })
+  const proxyEmail = proxyUserData.user.email
+  if (!proxyEmail) {
+    return jsonResp({ ok: false, error: 'proxy_user_no_email' }, 500, cors)
+  }
+
+  let proxyJwt: string
+  try {
+    const signInFn = makeSupabaseSignInFn(supabaseUrl, supabaseAnonKey)
+    const result = await getProxyUserJwt(proxyEmail, proxyPassword, signInFn)
+    proxyJwt = result.jwt
+  } catch (err) {
+    return jsonResp(
+      {
+        ok: false,
+        error: 'proxy_signin_failed',
+        detail: err instanceof Error ? err.message : String(err),
+      },
+      500,
+      cors,
+    )
+  }
 
   // ─── Stage 1+2 PARALLEL : research-strategist + rubric-architect ──────
   // research-strategist d'abord (rubric a besoin de research_strategy en
