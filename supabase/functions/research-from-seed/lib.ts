@@ -297,6 +297,7 @@ export async function callInternal<T>(
   serviceJwt: string,
   timeoutMs: number,
   fetchImpl: typeof fetch = fetch,
+  extraHeaders: Record<string, string> = {},
 ): Promise<InternalCallResult<T>> {
   const startedAt = Date.now()
   const ctrl = new AbortController()
@@ -308,6 +309,7 @@ export async function callInternal<T>(
       headers: {
         Authorization: `Bearer ${serviceJwt}`,
         'Content-Type': 'application/json',
+        ...extraHeaders,
       },
       body: JSON.stringify(body),
       signal: ctrl.signal,
