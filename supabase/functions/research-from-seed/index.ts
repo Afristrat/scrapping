@@ -146,17 +146,35 @@ interface QualityAuditorResp {
 // Handler
 // ---------------------------------------------------------------------------
 
+// Top-level handler — dispatche GET (poll status) | POST (lance pipeline async) | OPTIONS.
 export const handler = async (req: Request): Promise<Response> => {
   const origin = req.headers.get('Origin')
   const cors = buildCorsHeaders(origin)
 
   if (req.method === 'OPTIONS') {
-    // CORS preflight — refus si origine pas dans la whitelist
     if (!resolveCorsOrigin(origin)) {
       return new Response(null, { status: 403, headers: cors })
     }
     return new Response(null, { status: 204, headers: cors })
   }
+
+  if (req.method === 'GET') {
+    return await handleGetStatus(req, cors)
+  }
+
+  if (req.method === 'POST') {
+    return await handlePostAsync(req, cors)
+  }
+
+  return jsonResp({ ok: false, error: 'method_not_allowed' }, 405, cors)
+}
+
+// Le handler POST originel reste comme fn interne (pipeline synchrone complet).
+// Il est appelé en background via EdgeRuntime.waitUntil par handlePostAsync.
+const handlerPipelineSync = async (req: Request): Promise<Response> => {
+  const origin = req.headers.get('Origin')
+  const cors = buildCorsHeaders(origin)
+
   if (req.method !== 'POST') {
     return jsonResp({ ok: false, error: 'method_not_allowed' }, 405, cors)
   }
@@ -634,6 +652,183 @@ function jsonResp(body: unknown, status: number, cors: Record<string, string>): 
     status,
     headers: { ...cors, 'Content-Type': 'application/json' },
   })
+}
+
+// ---------------------------------------------------------------------------
+// GET status endpoint — poll session_id
+// ---------------------------------------------------------------------------
+async function handleGetStatus(req: Request, cors: Record<string, string>): Promise<Response> {
+  const url = new URL(req.url)
+  const sessionId = url.searchParams.get('session_id')
+  if (!sessionId) {
+    return jsonResp({ ok: false, error: 'session_id_required' }, 400, cors)
+  }
+
+  // x-api-key requis pour empêcher l'énumération de sessions arbitraires
+  const apiKey = req.headers.get('x-api-key')
+  if (!apiKey) {
+    return jsonResp({ ok: false, error: 'missing_api_key' }, 401, cors)
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !serviceKey) {
+    return jsonResp({ ok: false, error: 'service_role_env_missing' }, 500, cors)
+  }
+  const supabase = createClient(supabaseUrl, serviceKey)
+
+  const keyValidation = await validateApiKey(supabase, apiKey)
+  if (!keyValidation.ok) {
+    return jsonResp({ ok: false, error: keyValidation.error }, keyValidation.status, cors)
+  }
+
+  const { data, error } = await supabase
+    .from('research_sessions')
+    .select('id, status, result, error_detail, telemetry, created_at, completed_at')
+    .eq('id', sessionId)
+    .eq('api_key_id', keyValidation.key.id)
+    .maybeSingle()
+
+  if (error || !data) {
+    return jsonResp({ ok: false, error: 'session_not_found' }, 404, cors)
+  }
+
+  return jsonResp(
+    {
+      ok: true,
+      session_id: data.id,
+      status: data.status,
+      result: data.result,
+      error_detail: data.error_detail,
+      telemetry: data.telemetry,
+      created_at: data.created_at,
+      completed_at: data.completed_at,
+    },
+    200,
+    cors,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// POST async — pre-valide, crée row, lance pipeline waitUntil, return 202
+// ---------------------------------------------------------------------------
+async function handlePostAsync(req: Request, cors: Record<string, string>): Promise<Response> {
+  // CORS check (same as pipeline)
+  const origin = req.headers.get('Origin')
+  if (origin && !resolveCorsOrigin(origin)) {
+    return jsonResp({ ok: false, error: 'cors_origin_not_allowed' }, 403, cors)
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !serviceKey) {
+    return jsonResp({ ok: false, error: 'service_role_env_missing' }, 500, cors)
+  }
+  const supabase = createClient(supabaseUrl, serviceKey)
+
+  const apiKey = req.headers.get('x-api-key')
+  if (!apiKey) return jsonResp({ ok: false, error: 'missing_api_key' }, 401, cors)
+
+  const keyValidation = await validateApiKey(supabase, apiKey)
+  if (!keyValidation.ok) {
+    return jsonResp({ ok: false, error: keyValidation.error }, keyValidation.status, cors)
+  }
+  const apiKeyRow = keyValidation.key
+
+  const allowed = await checkRateLimit(supabase, apiKeyRow.id, apiKeyRow.rate_limit_per_min)
+  if (!allowed) return jsonResp({ ok: false, error: 'rate_limited' }, 429, cors)
+
+  let raw: unknown
+  try {
+    raw = await req.json()
+  } catch {
+    return jsonResp({ ok: false, error: 'invalid_json' }, 400, cors)
+  }
+  const validation = validateRequestBody(raw)
+  if (!validation.ok) {
+    return jsonResp({ ok: false, error: validation.error }, 400, cors)
+  }
+
+  // Create session row
+  const sessionId = crypto.randomUUID()
+  const insertRes = await supabase.from('research_sessions').insert({
+    id: sessionId,
+    api_key_id: apiKeyRow.id,
+    proxy_user_id: apiKeyRow.proxy_user_id,
+    status: 'running',
+    seed: validation.body.seed,
+    lang: validation.body.lang,
+    sector_hint: validation.body.sector_hint ?? null,
+    depth_hint: validation.body.depth_hint ?? null,
+  })
+  if (insertRes.error) {
+    return jsonResp(
+      { ok: false, error: 'session_create_failed', detail: insertRes.error.message },
+      500,
+      cors,
+    )
+  }
+
+  // Reconstruire la request pour le pipeline sync (req.json() ne peut être lu qu'une fois)
+  const reqClone = new Request(req.url, {
+    method: 'POST',
+    headers: req.headers,
+    body: JSON.stringify(validation.body),
+  })
+
+  // Background pipeline + persistance résultat
+  const pipelinePromise = (async () => {
+    try {
+      const pipelineResp = await handlerPipelineSync(reqClone)
+      const pipelineBody = await pipelineResp.json()
+      const isOk = pipelineBody?.ok === true
+      await supabase
+        .from('research_sessions')
+        .update({
+          status: isOk ? 'completed' : 'failed',
+          result: isOk ? pipelineBody : null,
+          error_detail: isOk ? null : pipelineBody,
+          telemetry: pipelineBody?.telemetry ?? null,
+          updated_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId)
+    } catch (err) {
+      await supabase
+        .from('research_sessions')
+        .update({
+          status: 'failed',
+          error_detail: {
+            message: err instanceof Error ? err.message : String(err),
+            stage: 'background_unhandled',
+          },
+          updated_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId)
+    }
+  })()
+
+  // EdgeRuntime.waitUntil pour fire-and-forget (Supabase Edge specific global)
+  // deno-lint-ignore no-explicit-any
+  const er = (globalThis as any).EdgeRuntime
+  if (er && typeof er.waitUntil === 'function') {
+    er.waitUntil(pipelinePromise)
+  } else {
+    // Fallback runtimes sans EdgeRuntime — best-effort, on ne block pas
+    pipelinePromise.catch(() => {})
+  }
+
+  return jsonResp(
+    {
+      ok: true,
+      session_id: sessionId,
+      status: 'running',
+      message: `Pipeline started. Poll GET ?session_id=${sessionId} for status.`,
+    },
+    202,
+    cors,
+  )
 }
 
 // Guard so test runner can `import` this module without booting the listener.
