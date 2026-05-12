@@ -78,3 +78,26 @@ export async function resolveAuthOrProxy(
   if (!user) return { ok: false, error: 'invalid_token' }
   return { ok: true, mode: 'user', userId: user.id }
 }
+
+/**
+ * Retourne les headers à ajouter à un fetch interne vers dispatch-llm (ou
+ * toute autre fn dual-mode) pour propager le contexte proxy depuis la
+ * request entrante. Si la request entrante n'a pas de x-proxy-user-id
+ * (mode user JWT classique), retourne un objet vide.
+ *
+ * Usage typique dans une fn appelée par K06 qui chaîne vers dispatch-llm :
+ *
+ *   const res = await fetch(dispatchUrl, {
+ *     method: 'POST',
+ *     headers: {
+ *       Authorization: auth,
+ *       'Content-Type': 'application/json',
+ *       ...propagateProxyHeader(req),
+ *     },
+ *     body: JSON.stringify(...)
+ *   })
+ */
+export function propagateProxyHeader(req: Request): Record<string, string> {
+  const proxyId = req.headers.get('x-proxy-user-id')?.trim()
+  return proxyId ? { 'x-proxy-user-id': proxyId } : {}
+}

@@ -69,6 +69,7 @@ async function callDispatchOnce(
   systemPrompt: string,
   userMessage: string,
   correctionHint: string | null,
+  extraHeaders: Record<string, string> = {},
 ): Promise<DispatchResponse> {
   const messages = [
     { role: 'system' as const, content: systemPrompt },
@@ -80,7 +81,7 @@ async function callDispatchOnce(
 
   const res = await fetch(dispatchUrl, {
     method: 'POST',
-    headers: { Authorization: auth, 'Content-Type': 'application/json' },
+    headers: { Authorization: auth, 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify({
       task: 'enrichment',
       messages,
@@ -98,6 +99,7 @@ async function runResearchStrategist(
   dispatchUrl: string,
   auth: string,
   body: RequestBody,
+  extraHeaders: Record<string, string> = {},
 ): Promise<CallResult> {
   const systemPrompt = buildSystemPrompt(body.lang)
   const userMessage = buildUserMessage(body)
@@ -117,6 +119,7 @@ async function runResearchStrategist(
         systemPrompt,
         userMessage,
         correctionHint,
+        extraHeaders,
       )
     } catch (err) {
       // erreur réseau / fetch failed → retry une fois si premier coup
@@ -227,8 +230,12 @@ Deno.serve(async (req) => {
   })
 
   try {
+    const proxyHeader = req.headers.get('x-proxy-user-id')?.trim()
+    const extraHeaders: Record<string, string> = proxyHeader
+      ? { 'x-proxy-user-id': proxyHeader }
+      : {}
     const result = await Promise.race([
-      runResearchStrategist(dispatchUrl, auth, validation.body),
+      runResearchStrategist(dispatchUrl, auth, validation.body, extraHeaders),
       timeoutPromise,
     ])
     if (timeoutId !== undefined) clearTimeout(timeoutId)

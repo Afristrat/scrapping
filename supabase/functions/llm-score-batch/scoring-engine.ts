@@ -55,12 +55,17 @@ export type DispatchCaller = (args: {
 export function makeFetchDispatchCaller(args: {
   supabaseUrl: string
   auth: string
+  extraHeaders?: Record<string, string>
 }): DispatchCaller {
   return async ({ task, prompt, maxTokens }) => {
     try {
       const res = await fetch(`${args.supabaseUrl}/functions/v1/dispatch-llm`, {
         method: 'POST',
-        headers: { Authorization: args.auth, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: args.auth,
+          'Content-Type': 'application/json',
+          ...(args.extraHeaders ?? {}),
+        },
         body: JSON.stringify({
           task,
           messages: [{ role: 'user', content: prompt }],
@@ -130,7 +135,15 @@ export async function scoreSignalWithRubric(args: {
     if (gateRes.usage?.cost) totalCost += gateRes.usage.cost
     if (gateRes.model_used) lastModel = gateRes.model_used
 
-    return finalize({ signal, rubric, criteriaRes, disqualifiedId, appliedBoostIds, costSoFar: totalCost, modelSoFar: lastModel })
+    return finalize({
+      signal,
+      rubric,
+      criteriaRes,
+      disqualifiedId,
+      appliedBoostIds,
+      costSoFar: totalCost,
+      modelSoFar: lastModel,
+    })
   }
 
   // ─── Mode split : 2 appels gates séparés ─────────────────────────────────
@@ -154,7 +167,8 @@ export async function scoreSignalWithRubric(args: {
 
   const [criteriaRes, dqRes, sbRes] = await Promise.all([
     criteriaPromise,
-    dqPromise ?? Promise.resolve<DispatchResponse>({ ok: true, content: '{"disqualified_id": null}' }),
+    dqPromise ??
+      Promise.resolve<DispatchResponse>({ ok: true, content: '{"disqualified_id": null}' }),
     sbPromise ?? Promise.resolve<DispatchResponse>({ ok: true, content: '{"applied": []}' }),
   ])
 
@@ -172,7 +186,15 @@ export async function scoreSignalWithRubric(args: {
   if (sbRes.usage?.cost) totalCost += sbRes.usage.cost
   if (sbRes.model_used) lastModel = sbRes.model_used
 
-  return finalize({ signal, rubric, criteriaRes, disqualifiedId, appliedBoostIds, costSoFar: totalCost, modelSoFar: lastModel })
+  return finalize({
+    signal,
+    rubric,
+    criteriaRes,
+    disqualifiedId,
+    appliedBoostIds,
+    costSoFar: totalCost,
+    modelSoFar: lastModel,
+  })
 }
 
 function finalize(args: {
