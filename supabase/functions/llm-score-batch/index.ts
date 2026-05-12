@@ -184,6 +184,7 @@ async function callDispatchForModel(
   signalCount: number,
   modelSpec: string,
   knownIds: Set<string>,
+  extraHeaders: Record<string, string> = {},
 ): Promise<ConsensusScoreResult | null> {
   const [provider, ...modelParts] = modelSpec.split(':')
   const modelId = modelParts.join(':')
@@ -192,7 +193,7 @@ async function callDispatchForModel(
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
       method: 'POST',
-      headers: { Authorization: auth, 'Content-Type': 'application/json' },
+      headers: { Authorization: auth, 'Content-Type': 'application/json', ...extraHeaders },
       body: JSON.stringify({
         task: 'scoring',
         provider_override: provider,
@@ -262,6 +263,10 @@ export const handler = async (req: Request): Promise<Response> => {
   }
   const callerUserId = authResolved.userId
 
+  // Propage x-proxy-user-id aux appels internes vers dispatch-llm.
+  const proxyId = req.headers.get('x-proxy-user-id')?.trim()
+  const extraHeaders: Record<string, string> = proxyId ? { 'x-proxy-user-id': proxyId } : {}
+
   let rawBody: unknown
   try {
     rawBody = await req.json()
@@ -287,6 +292,7 @@ export const handler = async (req: Request): Promise<Response> => {
       userId: callerUserId,
       signals: body.signals_input!,
       rubric: body.rubric_override!,
+      extraHeaders,
     })
   }
 
@@ -339,6 +345,7 @@ export const handler = async (req: Request): Promise<Response> => {
       userId: callerUserId,
       signals: signalsInput,
       rubric: body.rubric_override!,
+      extraHeaders,
     })
   }
 
@@ -691,9 +698,10 @@ async function handleAdHocOrHybridScoring(args: {
   userId: string
   signals: ScoredSignalInput[]
   rubric: RubricOverride
+  extraHeaders?: Record<string, string>
 }): Promise<Response> {
-  const { supabase, supabaseUrl, auth, userId, signals, rubric } = args
-  const dispatch = makeFetchDispatchCaller({ supabaseUrl, auth })
+  const { supabase, supabaseUrl, auth, userId, signals, rubric, extraHeaders } = args
+  const dispatch = makeFetchDispatchCaller({ supabaseUrl, auth, extraHeaders })
 
   // Limite par batch — éviter l'explosion de coût/latence
   const limited = signals.slice(0, 30)

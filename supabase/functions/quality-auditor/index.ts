@@ -159,6 +159,8 @@ Deno.serve(async (req) => {
   let llmError: string | null = null
 
   try {
+    const proxyId = req.headers.get('x-proxy-user-id')?.trim()
+    const extraHeaders: Record<string, string> = proxyId ? { 'x-proxy-user-id': proxyId } : {}
     const llmResp = await callLlmAudit(
       dispatchUrl,
       auth,
@@ -166,6 +168,7 @@ Deno.serve(async (req) => {
       body.rubric,
       body.topics_output,
       body.lang,
+      extraHeaders,
     )
     llmLatency = Date.now() - llmStart
     if (llmResp.ok) {
@@ -261,13 +264,14 @@ async function callLlmAudit(
   rubric: Record<string, unknown>,
   topicsOutput: TopicsOutput,
   lang: 'fr' | 'en' | 'ar',
+  extraHeaders: Record<string, string> = {},
 ): Promise<DispatchResponse> {
   const systemPrompt = buildSystemPrompt(lang)
   const userPayload = buildUserPayload(strategy, rubric, topicsOutput)
 
   const res = await fetch(dispatchUrl, {
     method: 'POST',
-    headers: { Authorization: auth, 'Content-Type': 'application/json' },
+    headers: { Authorization: auth, 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify({
       task: 'enrichment',
       messages: [

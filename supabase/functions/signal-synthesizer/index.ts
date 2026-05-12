@@ -200,10 +200,12 @@ export const handler = async (req: Request): Promise<Response> => {
 
   const systemPrompt = buildSystemPrompt(lang)
   const userPrompt = buildUserPrompt(retained, research_strategy, lang)
+  const proxyId = req.headers.get('x-proxy-user-id')?.trim()
+  const extraHeaders: Record<string, string> = proxyId ? { 'x-proxy-user-id': proxyId } : {}
 
   // First pass.
   const t0 = Date.now()
-  const firstCall = await callDispatch(dispatchUrl, auth, systemPrompt, userPrompt)
+  const firstCall = await callDispatch(dispatchUrl, auth, systemPrompt, userPrompt, extraHeaders)
   if (!firstCall.ok) {
     return json(
       {
@@ -241,7 +243,13 @@ export const handler = async (req: Request): Promise<Response> => {
   if (!final) {
     usedRetry = true
     const correctionUser = buildCorrectionPrompt(userPrompt, firstCall.content ?? '', validation1)
-    const secondCall = await callDispatch(dispatchUrl, auth, systemPrompt, correctionUser)
+    const secondCall = await callDispatch(
+      dispatchUrl,
+      auth,
+      systemPrompt,
+      correctionUser,
+      extraHeaders,
+    )
     if (!secondCall.ok) {
       return json(
         {
@@ -778,10 +786,11 @@ async function callDispatch(
   auth: string,
   systemPrompt: string,
   userPrompt: string,
+  extraHeaders: Record<string, string> = {},
 ): Promise<DispatchResponse> {
   const res = await fetch(dispatchUrl, {
     method: 'POST',
-    headers: { Authorization: auth, 'Content-Type': 'application/json' },
+    headers: { Authorization: auth, 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify({
       task: 'enrichment',
       messages: [

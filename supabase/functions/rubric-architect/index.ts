@@ -513,12 +513,17 @@ interface DispatchArgs {
   auth: string
   systemPrompt: string
   userPrompt: string
+  extraHeaders?: Record<string, string>
 }
 
 async function callDispatch(args: DispatchArgs): Promise<DispatchResponse> {
   const res = await fetch(args.dispatchUrl, {
     method: 'POST',
-    headers: { Authorization: args.auth, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: args.auth,
+      'Content-Type': 'application/json',
+      ...(args.extraHeaders ?? {}),
+    },
     body: JSON.stringify({
       task: 'enrichment',
       messages: [
@@ -593,6 +598,8 @@ export const handler = async (req: Request): Promise<Response> => {
   const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`
   const systemPrompt = buildSystemPrompt(body.lang)
   const userPrompt = buildUserPrompt(body.seed, body.lang, body.research_strategy)
+  const proxyId = req.headers.get('x-proxy-user-id')?.trim()
+  const extraHeaders: Record<string, string> = proxyId ? { 'x-proxy-user-id': proxyId } : {}
 
   // ---- First attempt
   let dispatch: DispatchResponse
@@ -602,6 +609,7 @@ export const handler = async (req: Request): Promise<Response> => {
       auth,
       systemPrompt,
       userPrompt,
+      extraHeaders,
     })
   } catch (err) {
     return json(
@@ -671,6 +679,7 @@ export const handler = async (req: Request): Promise<Response> => {
         auth,
         systemPrompt,
         userPrompt: `${userPrompt}\n\nCORRECTION REQUISE :\n${correctionMsg}\n\nRégénère la rubric COMPLÈTE en JSON strict en corrigeant ces points.`,
+        extraHeaders,
       })
     } catch (err) {
       return json(
