@@ -599,7 +599,10 @@ export const handler = async (req: Request): Promise<Response> => {
   const systemPrompt = buildSystemPrompt(body.lang)
   const userPrompt = buildUserPrompt(body.seed, body.lang, body.research_strategy)
   const proxyId = req.headers.get('x-proxy-user-id')?.trim()
-  const extraHeaders: Record<string, string> = proxyId ? { 'x-proxy-user-id': proxyId } : {}
+  const internalAuth = req.headers.get('x-internal-auth')?.trim()
+  const extraHeaders: Record<string, string> = {}
+  if (proxyId) extraHeaders['x-proxy-user-id'] = proxyId
+  if (internalAuth) extraHeaders['x-internal-auth'] = internalAuth
 
   // ---- First attempt
   let dispatch: DispatchResponse

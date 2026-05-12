@@ -65,6 +65,24 @@ const VALID_TASKS: ReadonlySet<Task> = new Set([
 ])
 
 Deno.serve(async (req) => {
+  try {
+    return await handleRequest(req)
+  } catch (err) {
+    // Catch-all : si n'importe quel throw uncatched arrive (boot, runtime),
+    // retourne JSON détaillé au lieu d'un 500 HTML "Internal Server Error".
+    return json(
+      {
+        ok: false,
+        error: 'unhandled_exception',
+        detail: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack?.slice(0, 500) : undefined,
+      },
+      500,
+    )
+  }
+})
+
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405)
 
@@ -77,7 +95,7 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  let supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
   })
 
@@ -89,6 +107,16 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: authResolved.error }, status)
   }
   const callerUserId = authResolved.userId
+
+  // En mode internal, re-créer le client avec service_role pour bypass RLS
+  // lors des reads sur settings/user_api_keys du proxy user.
+  if (authResolved.mode === 'internal') {
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!serviceKey) {
+      return json({ ok: false, error: 'service_role_env_missing_for_internal_mode' }, 500)
+    }
+    supabase = createClient(supabaseUrl, serviceKey)
+  }
 
   let body: RequestBody
   try {
@@ -226,7 +254,7 @@ Deno.serve(async (req) => {
     },
     200,
   )
-})
+}
 
 function resolveProviderAndModel(
   settings: SettingsRow,
