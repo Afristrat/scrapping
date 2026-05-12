@@ -3,6 +3,7 @@ import OpenAI from 'npm:openai@4'
 import { getUserApiKey } from '../_shared/api-keys.ts'
 import { retryWithBackoff } from '../_shared/retry.ts'
 import { getProviderConfig } from '../_shared/providers.ts'
+import { resolveAuthOrProxy } from '../_shared/service-role-auth.ts'
 
 /**
  * dispatch-llm — Single edge function that centralizes BYOK provider
@@ -80,10 +81,14 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: auth } },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ ok: false, error: 'invalid_token' }, 401)
+  // Dual-mode auth : user JWT classique OU service_role + x-proxy-user-id
+  // (appel orchestré depuis research-from-seed).
+  const authResolved = await resolveAuthOrProxy(supabase, req)
+  if (!authResolved.ok) {
+    const status = authResolved.error === 'internal_missing_proxy_header' ? 400 : 401
+    return json({ ok: false, error: authResolved.error }, status)
+  }
+  const callerUserId = authResolved.userId
 
   let body: RequestBody
   try {
@@ -113,7 +118,7 @@ Deno.serve(async (req) => {
   const settingsRes = await supabase
     .from('settings')
     .select('model_config')
-    .eq('user_id', user.id)
+    .eq('user_id', callerUserId)
     .maybeSingle()
 
   const settings: SettingsRow = (settingsRes.data as SettingsRow | null) ?? { model_config: null }
@@ -129,7 +134,7 @@ Deno.serve(async (req) => {
   // The BYOK migration extended user_api_keys.provider to arbitrary strings, but
   // we deliberately don't modify _shared/api-keys.ts as part of this refactor —
   // so we cast to the historic literal union to keep the call typed.
-  const apiKey = await getUserApiKey(supabase, user.id, providerId as 'openrouter' | 'apify')
+  const apiKey = await getUserApiKey(supabase, callerUserId, providerId as 'openrouter' | 'apify')
   if (!apiKey && providerCfg.modelsRequiresAuth) {
     return json({ ok: false, error: 'missing_api_key', provider: providerId }, 500)
   }
@@ -162,7 +167,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: callerUserId,
       action: 'dispatch-llm:error',
       status: 'error',
       payload: {
@@ -199,7 +204,7 @@ Deno.serve(async (req) => {
   if (rawUsage?.cost === undefined) {
     cost = await computeCostFromProviderModels(
       supabase,
-      user.id,
+      callerUserId,
       providerId,
       modelId,
       promptTokens,

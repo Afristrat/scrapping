@@ -50,7 +50,6 @@ import {
   validateApiKey,
   validateRequestBody,
 } from './lib.ts'
-import { getProxyUserJwt, makeSupabaseSignInFn } from '../_shared/proxy-user-jwt.ts'
 
 // ---------------------------------------------------------------------------
 // Telemetry helpers
@@ -219,60 +218,22 @@ export const handler = async (req: Request): Promise<Response> => {
 
   const fnUrl = (name: string) => `${supabaseUrl}/functions/v1/${name}`
 
-  // ─── Proxy user JWT (Option A bis — BYOK delegation via signInWithPassword) ──
+  // ─── Proxy user identification (Option C — dual-mode header) ──────────
   // Pour les appels aux fns Phase 1 (research-strategist, rubric-architect,
-  // signal-synthesizer, quality-auditor, llm-score-batch), on récupère un JWT
-  // user via signInWithPassword au nom du proxy_user désigné côté
-  // public_api_keys. Ce user Kairos détient les credentials BYOK
-  // (settings.model_config + user_api_keys) utilisés par dispatch-llm.
+  // signal-synthesizer, quality-auditor, llm-score-batch) et dispatch-llm,
+  // on envoie le service_role en Authorization + header x-proxy-user-id
+  // pointant le proxy_user_id désigné côté public_api_keys. Les fns voient
+  // un caller "internal" et utilisent ce user_id comme identité pour le
+  // BYOK lookup (settings.model_config + user_api_keys).
   // Coûts trackés sur llm_costs.user_id = proxy_user_id.
   //
-  // Le password proxy est stocké en secret Edge Function KAIROS_PROXY_USER_PASSWORD.
-  // Le JWT est cached 50 min instance-level pour amortir la latence ~100ms
-  // de signInWithPassword.
+  // Sécurité : le service_role NE TRANSITE JAMAIS par Bassira. K06 le
+  // résout depuis env. Le proxy_user_id authoritatif vient de
+  // public_api_keys.proxy_user_id, pas du body Bassira.
   //
-  // Pour les scrapers en mode signals_session (table service_role-only),
-  // on garde le serviceKey direct.
-  const proxyPassword = Deno.env.get('KAIROS_PROXY_USER_PASSWORD')
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  if (!proxyPassword) {
-    return jsonResp({ ok: false, error: 'proxy_user_password_env_missing' }, 500, cors)
-  }
-  if (!supabaseAnonKey) {
-    return jsonResp({ ok: false, error: 'anon_key_env_missing' }, 500, cors)
-  }
-
+  // Pour les scrapers en mode signals_session, on garde aussi le serviceKey
+  // direct (table service_role-only).
   const proxyUserId = apiKeyRow.proxy_user_id!
-  const { data: proxyUserData, error: proxyUserErr } =
-    await supabase.auth.admin.getUserById(proxyUserId)
-  if (proxyUserErr || !proxyUserData?.user) {
-    return jsonResp(
-      { ok: false, error: 'proxy_user_lookup_failed', detail: proxyUserErr?.message },
-      500,
-      cors,
-    )
-  }
-  const proxyEmail = proxyUserData.user.email
-  if (!proxyEmail) {
-    return jsonResp({ ok: false, error: 'proxy_user_no_email' }, 500, cors)
-  }
-
-  let proxyJwt: string
-  try {
-    const signInFn = makeSupabaseSignInFn(supabaseUrl, supabaseAnonKey)
-    const result = await getProxyUserJwt(proxyEmail, proxyPassword, signInFn)
-    proxyJwt = result.jwt
-  } catch (err) {
-    return jsonResp(
-      {
-        ok: false,
-        error: 'proxy_signin_failed',
-        detail: err instanceof Error ? err.message : String(err),
-      },
-      500,
-      cors,
-    )
-  }
 
   // ─── Stage 1+2 PARALLEL : research-strategist + rubric-architect ──────
   // research-strategist d'abord (rubric a besoin de research_strategy en
@@ -283,11 +244,14 @@ export const handler = async (req: Request): Promise<Response> => {
   // Compromis : research-strategist seul d'abord, puis rubric-architect.
 
   const stratStart = Date.now()
+  const proxyHeader = { 'x-proxy-user-id': proxyUserId }
   const stratRes = await callInternal<ResearchStrategistResp>(
     fnUrl('research-strategist'),
     { seed: body.seed, lang: body.lang, sector_hint: body.sector_hint },
-    proxyJwt,
+    serviceKey,
     STAGE_TIMEOUTS_MS.research_strategist,
+    fetch,
+    proxyHeader,
   )
   pushStage(telemetry, 'research-strategist', stratStart, {
     ok: stratRes.ok,
@@ -312,8 +276,10 @@ export const handler = async (req: Request): Promise<Response> => {
   const rubricRes = await callInternal<RubricArchitectResp>(
     fnUrl('rubric-architect'),
     { seed: body.seed, lang: body.lang, research_strategy: researchStrategy },
-    proxyJwt,
+    serviceKey,
     STAGE_TIMEOUTS_MS.rubric_architect,
+    fetch,
+    proxyHeader,
   )
   pushStage(telemetry, 'rubric-architect', rubricStart, {
     ok: rubricRes.ok,
@@ -439,8 +405,10 @@ export const handler = async (req: Request): Promise<Response> => {
   const scoreRes = await callInternal<LlmScoreBatchResp>(
     fnUrl('llm-score-batch'),
     { signals_input: scoringInput, rubric_override: rubric },
-    proxyJwt,
+    serviceKey,
     STAGE_TIMEOUTS_MS.score,
+    fetch,
+    proxyHeader,
   )
   pushStage(telemetry, 'llm-score-batch', scoreStart, {
     ok: scoreRes.ok,
@@ -498,8 +466,10 @@ export const handler = async (req: Request): Promise<Response> => {
       research_strategy: researchStrategy,
       lang: body.lang,
     },
-    proxyJwt,
+    serviceKey,
     STAGE_TIMEOUTS_MS.synthesize,
+    fetch,
+    proxyHeader,
   )
   pushStage(telemetry, 'signal-synthesizer', synthStart, {
     ok: synthRes.ok,
@@ -538,8 +508,10 @@ export const handler = async (req: Request): Promise<Response> => {
       lang: body.lang,
       signals_input: topSignals.map((s) => ({ id: s.id, source: s.source, lang: s.lang })),
     },
-    proxyJwt,
+    serviceKey,
     STAGE_TIMEOUTS_MS.audit,
+    fetch,
+    proxyHeader,
   )
   pushStage(telemetry, 'quality-auditor', auditStart, {
     ok: auditRes.ok,
