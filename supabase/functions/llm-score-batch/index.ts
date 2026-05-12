@@ -265,7 +265,10 @@ export const handler = async (req: Request): Promise<Response> => {
 
   // Propage x-proxy-user-id aux appels internes vers dispatch-llm.
   const proxyId = req.headers.get('x-proxy-user-id')?.trim()
-  const extraHeaders: Record<string, string> = proxyId ? { 'x-proxy-user-id': proxyId } : {}
+  const internalAuth = req.headers.get('x-internal-auth')?.trim()
+  const extraHeaders: Record<string, string> = {}
+  if (proxyId) extraHeaders['x-proxy-user-id'] = proxyId
+  if (internalAuth) extraHeaders['x-internal-auth'] = internalAuth
 
   let rawBody: unknown
   try {

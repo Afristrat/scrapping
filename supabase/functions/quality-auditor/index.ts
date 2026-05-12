@@ -160,7 +160,10 @@ Deno.serve(async (req) => {
 
   try {
     const proxyId = req.headers.get('x-proxy-user-id')?.trim()
-    const extraHeaders: Record<string, string> = proxyId ? { 'x-proxy-user-id': proxyId } : {}
+    const internalAuth = req.headers.get('x-internal-auth')?.trim()
+    const extraHeaders: Record<string, string> = {}
+    if (proxyId) extraHeaders['x-proxy-user-id'] = proxyId
+    if (internalAuth) extraHeaders['x-internal-auth'] = internalAuth
     const llmResp = await callLlmAudit(
       dispatchUrl,
       auth,

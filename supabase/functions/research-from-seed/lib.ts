@@ -16,12 +16,12 @@ import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 // ---------------------------------------------------------------------------
 
 export const STAGE_TIMEOUTS_MS = {
-  research_strategist: 10_000,
-  rubric_architect: 5_000,
-  scrape: 30_000,
-  score: 15_000,
-  synthesize: 10_000,
-  audit: 5_000,
+  research_strategist: 120_000,
+  rubric_architect: 60_000,
+  scrape: 90_000,
+  score: 90_000,
+  synthesize: 90_000,
+  audit: 60_000,
 } as const
 
 export type Stage = keyof typeof STAGE_TIMEOUTS_MS

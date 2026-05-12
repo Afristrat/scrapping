@@ -37,7 +37,7 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const TIMEOUT_MS = 30_000
+const TIMEOUT_MS = 90_000
 
 interface DispatchResponse {
   ok: boolean
@@ -230,10 +230,11 @@ Deno.serve(async (req) => {
   })
 
   try {
-    const proxyHeader = req.headers.get('x-proxy-user-id')?.trim()
-    const extraHeaders: Record<string, string> = proxyHeader
-      ? { 'x-proxy-user-id': proxyHeader }
-      : {}
+    const proxyId = req.headers.get('x-proxy-user-id')?.trim()
+    const internalAuth = req.headers.get('x-internal-auth')?.trim()
+    const extraHeaders: Record<string, string> = {}
+    if (proxyId) extraHeaders['x-proxy-user-id'] = proxyId
+    if (internalAuth) extraHeaders['x-internal-auth'] = internalAuth
     const result = await Promise.race([
       runResearchStrategist(dispatchUrl, auth, validation.body, extraHeaders),
       timeoutPromise,

@@ -244,7 +244,11 @@ export const handler = async (req: Request): Promise<Response> => {
   // Compromis : research-strategist seul d'abord, puis rubric-architect.
 
   const stratStart = Date.now()
-  const proxyHeader = { 'x-proxy-user-id': proxyUserId }
+  const internalToken = Deno.env.get('KAIROS_INTERNAL_TOKEN') ?? ''
+  const proxyHeader: Record<string, string> = {
+    'x-proxy-user-id': proxyUserId,
+    ...(internalToken ? { 'x-internal-auth': internalToken } : {}),
+  }
   const stratRes = await callInternal<ResearchStrategistResp>(
     fnUrl('research-strategist'),
     { seed: body.seed, lang: body.lang, sector_hint: body.sector_hint },

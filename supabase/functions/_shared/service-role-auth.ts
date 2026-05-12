@@ -61,10 +61,28 @@ export async function resolveAuthOrProxy(
   const token = match[1].trim()
   if (!token) return { ok: false, error: 'missing_authorization' }
 
+  // Mode internal #1 : header dédié x-internal-auth = env KAIROS_INTERNAL_TOKEN
+  // (préféré, fiable, ne dépend pas du comportement subtil du
+  // SUPABASE_SERVICE_ROLE_KEY auto-injecté côté Supabase Edge runtime).
+  const internalToken = Deno.env.get('KAIROS_INTERNAL_TOKEN')
+  const providedInternalToken = req.headers.get('x-internal-auth')?.trim() ?? ''
+  if (
+    internalToken &&
+    providedInternalToken &&
+    constantTimeEquals(providedInternalToken, internalToken)
+  ) {
+    const proxyId = req.headers.get('x-proxy-user-id')?.trim() ?? ''
+    if (!proxyId || !isUuid(proxyId)) {
+      return { ok: false, error: 'internal_missing_proxy_header' }
+    }
+    return { ok: true, mode: 'internal', userId: proxyId }
+  }
+
+  // Mode internal #2 (legacy/fallback) : Bearer == service_role key.
+  // Conservé pour rétrocompat si le pattern x-internal-auth n'est pas
+  // encore propagé partout. À retirer une fois la migration complète.
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (serviceRoleKey && constantTimeEquals(token, serviceRoleKey)) {
-    // Internal orchestrator call. Le header x-proxy-user-id est OBLIGATOIRE
-    // pour éviter qu'un caller interne ne fasse de queries sans identité.
     const proxyId = req.headers.get('x-proxy-user-id')?.trim() ?? ''
     if (!proxyId || !isUuid(proxyId)) {
       return { ok: false, error: 'internal_missing_proxy_header' }
@@ -98,6 +116,10 @@ export async function resolveAuthOrProxy(
  *   })
  */
 export function propagateProxyHeader(req: Request): Record<string, string> {
+  const headers: Record<string, string> = {}
   const proxyId = req.headers.get('x-proxy-user-id')?.trim()
-  return proxyId ? { 'x-proxy-user-id': proxyId } : {}
+  if (proxyId) headers['x-proxy-user-id'] = proxyId
+  const internalAuth = req.headers.get('x-internal-auth')?.trim()
+  if (internalAuth) headers['x-internal-auth'] = internalAuth
+  return headers
 }
