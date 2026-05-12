@@ -19,6 +19,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { deepSanitizeJson } from '../_shared/unicode.ts'
+import { resolveAuthOrProxy } from '../_shared/service-role-auth.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -559,10 +560,12 @@ export const handler = async (req: Request): Promise<Response> => {
     global: { headers: { Authorization: auth } },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ ok: false, error: 'invalid_token' }, 401)
+  const authResolved = await resolveAuthOrProxy(supabase, req)
+  if (!authResolved.ok) {
+    const status = authResolved.error === 'internal_missing_proxy_header' ? 400 : 401
+    return json({ ok: false, error: authResolved.error }, status)
+  }
+  const callerUserId = authResolved.userId
 
   // ---- Parse body
   let body: RequestBody
@@ -630,7 +633,7 @@ export const handler = async (req: Request): Promise<Response> => {
     parsed = null
     try {
       await supabase.from('logs').insert({
-        user_id: user.id,
+        user_id: callerUserId,
         action: 'rubric-architect:parse_error',
         status: 'error',
         payload: {
@@ -726,7 +729,7 @@ export const handler = async (req: Request): Promise<Response> => {
   if (!validation.valid) {
     try {
       await supabase.from('logs').insert({
-        user_id: user.id,
+        user_id: callerUserId,
         action: 'rubric-architect:schema_fail',
         status: 'error',
         payload: { errors: validation.errors, retried: usedRetry },
@@ -751,7 +754,7 @@ export const handler = async (req: Request): Promise<Response> => {
 
   try {
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: callerUserId,
       action: 'rubric-architect:run',
       status: 'ok',
       payload: {

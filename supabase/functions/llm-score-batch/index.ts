@@ -28,6 +28,7 @@
  */
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
+import { resolveAuthOrProxy } from '../_shared/service-role-auth.ts'
 import { formatError, summarizeError } from '../_shared/errors.ts'
 import { parseScoringResponse, ScoreParseError } from '../_shared/parse-score.ts'
 import { buildEnrichPayload, triggerEnrichSignal } from './enrich-trigger.ts'
@@ -254,10 +255,12 @@ export const handler = async (req: Request): Promise<Response> => {
     global: { headers: { Authorization: auth } },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ error: 'invalid_token' }, 401)
+  const authResolved = await resolveAuthOrProxy(supabase, req)
+  if (!authResolved.ok) {
+    const status = authResolved.error === 'internal_missing_proxy_header' ? 400 : 401
+    return json({ error: authResolved.error }, status)
+  }
+  const callerUserId = authResolved.userId
 
   let rawBody: unknown
   try {
@@ -281,7 +284,7 @@ export const handler = async (req: Request): Promise<Response> => {
       supabase,
       supabaseUrl,
       auth,
-      userId: user.id,
+      userId: callerUserId,
       signals: body.signals_input!,
       rubric: body.rubric_override!,
     })
@@ -306,7 +309,7 @@ export const handler = async (req: Request): Promise<Response> => {
     if (signalsRes.error || !signalsRes.data) {
       const f = formatError(signalsRes.error)
       await supabase.from('logs').insert({
-        user_id: user.id,
+        user_id: callerUserId,
         action: 'llm:score-batch',
         status: 'error',
         payload: {
@@ -333,7 +336,7 @@ export const handler = async (req: Request): Promise<Response> => {
       supabase,
       supabaseUrl,
       auth,
-      userId: user.id,
+      userId: callerUserId,
       signals: signalsInput,
       rubric: body.rubric_override!,
     })
@@ -344,12 +347,12 @@ export const handler = async (req: Request): Promise<Response> => {
   // ─────────────────────────────────────────────────────────────────────────
   const [signalsRes, settingsRes] = await Promise.all([
     signalsQuery,
-    supabase.from('settings').select('*').eq('user_id', user.id).single(),
+    supabase.from('settings').select('*').eq('user_id', callerUserId).single(),
   ])
   if (signalsRes.error || !signalsRes.data) {
     const f = formatError(signalsRes.error)
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: callerUserId,
       action: 'llm:score-batch',
       status: 'error',
       payload: { stage: 'fetch_signals', ids_count: ids.length, ...f },
@@ -359,7 +362,7 @@ export const handler = async (req: Request): Promise<Response> => {
   if (settingsRes.error || !settingsRes.data) {
     const f = formatError(settingsRes.error)
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: callerUserId,
       action: 'llm:score-batch',
       status: 'error',
       payload: { stage: 'fetch_settings', ...f },
@@ -445,7 +448,7 @@ export const handler = async (req: Request): Promise<Response> => {
       } catch (err) {
         const formatted = formatError(err)
         await supabase.from('logs').insert({
-          user_id: user.id,
+          user_id: callerUserId,
           action: 'llm:score-batch',
           status: 'error',
           payload: { stage: 'dispatch_fetch_fallback', count: signals.length, ...formatted },
@@ -457,7 +460,7 @@ export const handler = async (req: Request): Promise<Response> => {
         supabase,
         dispatchResult,
         signals,
-        user.id,
+        callerUserId,
         auth,
         supabaseUrl,
         prompt,
@@ -488,7 +491,7 @@ export const handler = async (req: Request): Promise<Response> => {
         scoreRunsRows.push({
           signal_id: sig.id,
           org_id: sigOrgId,
-          user_id: user.id,
+          user_id: callerUserId,
           model: result.model,
           provider: result.provider,
           score: v.score,
@@ -506,7 +509,7 @@ export const handler = async (req: Request): Promise<Response> => {
       if (runsErr) {
         const f = formatError(runsErr)
         await supabase.from('logs').insert({
-          user_id: user.id,
+          user_id: callerUserId,
           action: 'llm:score-consensus',
           status: 'error',
           payload: { stage: 'db_insert_score_runs', count: scoreRunsRows.length, ...f },
@@ -547,7 +550,7 @@ export const handler = async (req: Request): Promise<Response> => {
 
       scoreRows.push({
         signal_id: sig.id,
-        user_id: user.id,
+        user_id: callerUserId,
         score: Math.round(mean),
         reasoning: primaryReasoning,
         model_used: modelsUsed[0] ?? 'consensus',
@@ -565,7 +568,7 @@ export const handler = async (req: Request): Promise<Response> => {
     if (scoreErr) {
       const formatted = formatError(scoreErr)
       await supabase.from('logs').insert({
-        user_id: user.id,
+        user_id: callerUserId,
         action: 'llm:score-consensus',
         status: 'error',
         payload: {
@@ -589,7 +592,7 @@ export const handler = async (req: Request): Promise<Response> => {
     }
 
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: callerUserId,
       action: 'llm:score-consensus',
       status: 'ok',
       payload: {
@@ -645,7 +648,7 @@ export const handler = async (req: Request): Promise<Response> => {
   } catch (err) {
     const formatted = formatError(err)
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: callerUserId,
       action: 'llm:score-batch',
       status: 'error',
       payload: {
@@ -664,7 +667,7 @@ export const handler = async (req: Request): Promise<Response> => {
     supabase,
     dispatchResult,
     signals,
-    user.id,
+    callerUserId,
     auth,
     supabaseUrl,
     prompt,
@@ -701,8 +704,9 @@ async function handleAdHocOrHybridScoring(args: {
   )
 
   const results = settled
-    .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof scoreSignalWithRubric>>> =>
-      r.status === 'fulfilled',
+    .filter(
+      (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof scoreSignalWithRubric>>> =>
+        r.status === 'fulfilled',
     )
     .map((r) => r.value)
 
