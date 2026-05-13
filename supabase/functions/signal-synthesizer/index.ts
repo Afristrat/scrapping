@@ -498,14 +498,19 @@ export function validateSynthesizerOutput(
     }
     if (t.type === 'devil_advocate') devilAdvocateCount += 1
 
-    // key_signals_supporting : 3-6 ids
+    // key_signals_supporting : 3-6 ids pour les topics réguliers/emerging,
+    // 1-6 pour les devil_advocate (le system prompt dit explicitement
+    // "≥ 3, sauf devil's advocate qui peut être moins"). On gardait
+    // l'ancien minimum 3 partout, ce qui faisait planter le pipeline avec
+    // `key_signals_supporting_count:2` sur des devil's advocate légitimes.
     const supporting = t.key_signals_supporting
+    const minSupporting = t.type === 'devil_advocate' ? 1 : KEY_SIGNALS_MIN
     if (!Array.isArray(supporting)) {
       errors.push(`topic[${t.id}].key_signals_supporting_not_array`)
     } else {
-      if (supporting.length < KEY_SIGNALS_MIN || supporting.length > KEY_SIGNALS_MAX) {
+      if (supporting.length < minSupporting || supporting.length > KEY_SIGNALS_MAX) {
         errors.push(
-          `topic[${t.id}].key_signals_supporting_count:${supporting.length} (expected ${KEY_SIGNALS_MIN}-${KEY_SIGNALS_MAX})`,
+          `topic[${t.id}].key_signals_supporting_count:${supporting.length} (expected ${minSupporting}-${KEY_SIGNALS_MAX})`,
         )
       }
       for (const sid of supporting) {
