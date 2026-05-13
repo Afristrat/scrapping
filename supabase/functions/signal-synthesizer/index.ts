@@ -781,8 +781,11 @@ UN TOPIC RICHE EN PROSPECTIVE A 4 PROPRIÉTÉS :
    par cross_topic_conflicts.
 
 4. Génère 1-${cfg.maxBriefVariants} BRIEF VARIANTS par topic. Règles brief :
-   - ${BRIEF_MIN_CHARS}-${cfg.briefMaxChars} caractères stricts (espaces inclus).
-   - Question simulable avec horizon temporel explicite.
+   - LONGUEUR (CRITIQUE — rejet automatique si non respecté) :
+       * Borne stricte : ${BRIEF_MIN_CHARS}-${cfg.briefMaxChars} caractères (espaces inclus).
+       * Vise ≈ ${Math.round((BRIEF_MIN_CHARS + cfg.briefMaxChars) / 2 / 5.5)}-${Math.round((cfg.briefMaxChars * 0.95) / 5.5)} mots (~${Math.round((BRIEF_MIN_CHARS + cfg.briefMaxChars) / 2)}-${Math.round(cfg.briefMaxChars * 0.95)} chars) pour rester confortablement dans la fourchette — JAMAIS sous ${BRIEF_MIN_CHARS} chars.
+       * Compte mentalement tes mots avant de fermer le champ "brief". Si < ${Math.round(BRIEF_MIN_CHARS / 5.5)} mots, AJOUTE un détail quantifiable supplémentaire (chiffre, date, acteur secondaire) jusqu'à atteindre la cible. Ne raccourcis JAMAIS sous prétexte de concision.
+   - Question simulable avec horizon temporel explicite (date, échéance, fenêtre de N mois).
    - 2-4 acteurs identifiables nommés.
    - Seuil quantifiable si possible (taux, montant, %, date).
    - Commence par le scénario, jamais par "Le sujet de" ou "Étudions".
