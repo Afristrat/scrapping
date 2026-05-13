@@ -862,6 +862,74 @@ export type Database = {
           },
         ]
       }
+      public_api_keys: {
+        Row: {
+          active: boolean
+          created_at: string
+          daily_budget_usd: number | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          notes: string | null
+          proxy_user_id: string | null
+          rate_limit_per_min: number
+          scopes: string[]
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          daily_budget_usd?: number | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          notes?: string | null
+          proxy_user_id?: string | null
+          rate_limit_per_min?: number
+          scopes?: string[]
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          daily_budget_usd?: number | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          notes?: string | null
+          proxy_user_id?: string | null
+          rate_limit_per_min?: number
+          scopes?: string[]
+        }
+        Relationships: []
+      }
+      public_api_rate_hits: {
+        Row: {
+          api_key_id: string
+          hit_at: string
+        }
+        Insert: {
+          api_key_id: string
+          hit_at?: string
+        }
+        Update: {
+          api_key_id?: string
+          hit_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_api_rate_hits_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "public_api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       public_shares: {
         Row: {
           created_at: string
@@ -909,6 +977,71 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      research_sessions: {
+        Row: {
+          api_key_id: string | null
+          completed_at: string | null
+          created_at: string
+          depth_hint: number | null
+          error_detail: Json | null
+          expires_at: string
+          id: string
+          lang: string
+          output_profile: string | null
+          proxy_user_id: string | null
+          result: Json | null
+          sector_hint: string | null
+          seed: string
+          status: string
+          telemetry: Json | null
+          updated_at: string
+        }
+        Insert: {
+          api_key_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          depth_hint?: number | null
+          error_detail?: Json | null
+          expires_at?: string
+          id?: string
+          lang: string
+          output_profile?: string | null
+          proxy_user_id?: string | null
+          result?: Json | null
+          sector_hint?: string | null
+          seed: string
+          status?: string
+          telemetry?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          api_key_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          depth_hint?: number | null
+          error_detail?: Json | null
+          expires_at?: string
+          id?: string
+          lang?: string
+          output_profile?: string | null
+          proxy_user_id?: string | null
+          result?: Json | null
+          sector_hint?: string | null
+          seed?: string
+          status?: string
+          telemetry?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_sessions_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "public_api_keys"
             referencedColumns: ["id"]
           },
         ]
@@ -1526,6 +1659,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      signals_session: {
+        Row: {
+          created_by_api_key: string | null
+          expires_at: string
+          external_id: string | null
+          id: string
+          raw_payload: Json | null
+          scraped_at: string
+          session_id: string
+          source: string
+          title: string | null
+          url: string | null
+        }
+        Insert: {
+          created_by_api_key?: string | null
+          expires_at?: string
+          external_id?: string | null
+          id?: string
+          raw_payload?: Json | null
+          scraped_at?: string
+          session_id: string
+          source: string
+          title?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_by_api_key?: string | null
+          expires_at?: string
+          external_id?: string | null
+          id?: string
+          raw_payload?: Json | null
+          scraped_at?: string
+          session_id?: string
+          source?: string
+          title?: string | null
+          url?: string | null
+        }
+        Relationships: []
       }
       subscription_seats: {
         Row: {
