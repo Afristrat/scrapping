@@ -17,7 +17,13 @@ import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
 export const STAGE_TIMEOUTS_MS = {
   research_strategist: 120_000,
-  rubric_architect: 60_000,
+  // rubric-architect fait jusqu'à 2 appels LLM (prompt + retry sur
+  // schema_validation) sur un prompt riche (4-8 critères + soft_boosts
+  // + disqualifiers + calibration_examples). 60s timeoutait sur
+  // DeepSeek-v4-flash pour graines politico-sociales complexes
+  // (cf. session 2b5e6ec9 2026-05-13). Bumpé à 120s pour permettre
+  // le retry sans dépasser le gateway Edge.
+  rubric_architect: 120_000,
   scrape: 90_000,
   score: 90_000,
   // signal-synthesizer fait jusqu'à 2 appels LLM (prompt + retry sur
