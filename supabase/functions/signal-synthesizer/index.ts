@@ -876,7 +876,14 @@ async function callDispatch(
       options: {
         response_format: { type: 'json_object' },
         temperature: 0.5,
-        max_tokens: 4000,
+        // Bumpé de 4000 → 8000 → 16000 : le schéma synthesizer (3-8
+        // topics × jusqu'à 3 brief_variants × 250-400 chars chacun
+        // + coverage_map + cross_topic_conflicts + provenance) peut
+        // taper >7k chars en JSON. À 4000 tokens, troncation à 5400.
+        // À 8000, troncation à 7600. À 16000, on a assez de marge
+        // même avec un modèle BYOK qui sur-encode (cf. sessions
+        // bae8775b et cad4364d : « Unterminated string in JSON »).
+        max_tokens: 16000,
       },
     }),
   })
