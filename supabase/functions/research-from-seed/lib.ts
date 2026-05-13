@@ -287,6 +287,15 @@ export interface InternalCallErr {
   status: number
   error: string
   detail?: string
+  /**
+   * Detailed validation errors propagated from the upstream edge fn.
+   * Populated when the upstream body carries an `errors` array (typical
+   * of rubric-architect schema_validation_failed or signal-synthesizer
+   * validation_failed_after_retry). Lets the orchestrator surface the
+   * exact failure cause to the Bassira frontend without forcing the
+   * operator to dig in Edge logs.
+   */
+  errors?: unknown[]
   durationMs: number
 }
 export type InternalCallResult<T> = InternalCallOk<T> | InternalCallErr
@@ -330,12 +339,13 @@ export async function callInternal<T>(
     }
 
     if (!res.ok) {
-      const errBody = parsed as { error?: string; detail?: string } | null
+      const errBody = parsed as { error?: string; detail?: string; errors?: unknown[] } | null
       return {
         ok: false,
         status: res.status,
         error: errBody?.error ?? `http_${res.status}`,
         detail: errBody?.detail,
+        errors: Array.isArray(errBody?.errors) ? errBody.errors : undefined,
         durationMs: Date.now() - startedAt,
       }
     }

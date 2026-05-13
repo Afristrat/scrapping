@@ -628,7 +628,7 @@ function pushStage(tel: PipelineTelemetry, stage: string, startMs: number, res: 
 function stageFail(
   tel: PipelineTelemetry,
   stage: string,
-  res: { status: number; error: string; detail?: string },
+  res: { status: number; error: string; detail?: string; errors?: unknown[] },
   cors: Record<string, string>,
 ): Response {
   tel.total_duration_ms = tel.stages.reduce((acc, s) => acc + s.duration_ms, 0)
@@ -640,6 +640,11 @@ function stageFail(
       error: isTimeout ? 'STAGE_TIMEOUT' : 'STAGE_FAILED',
       stage,
       detail: res.detail ?? res.error,
+      // Propagate the upstream validation errors when available so the
+      // Bassira frontend (and operators reading research_sessions.error_detail)
+      // can show the exact failure cause instead of an opaque
+      // "schema_validation_failed".
+      ...(res.errors && res.errors.length > 0 ? { upstream_errors: res.errors } : {}),
       telemetry: tel,
     },
     isTimeout ? 504 : res.status >= 400 && res.status < 600 ? res.status : 502,

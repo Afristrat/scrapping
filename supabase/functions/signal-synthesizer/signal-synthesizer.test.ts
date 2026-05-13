@@ -467,6 +467,46 @@ Deno.test('key_signals_supporting : 2 ids → fails', () => {
   assertEquals(r.ok, false)
 })
 
+Deno.test('key_signals_supporting : devil_advocate 2 ids → OK (min relâché)', () => {
+  // Le system prompt dit explicitement "≥ 3, sauf devil's advocate qui
+  // peut être moins". Le validator faisait planter le pipeline sur
+  // un devil's advocate avec 2 signaux (cf. session d5612766 prod
+  // 2026-05-13). Min relâché à 1 pour ce type uniquement.
+  const out = makeValidOutput({
+    topics: [
+      makeTopic(),
+      makeTopic({ id: 't_002' }),
+      makeDevilTopic({ key_signals_supporting: ['sig_004', 'sig_005'] }),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
+  assertEquals(r.ok, true)
+})
+
+Deno.test('key_signals_supporting : devil_advocate 1 id → OK (min=1)', () => {
+  const out = makeValidOutput({
+    topics: [
+      makeTopic(),
+      makeTopic({ id: 't_002' }),
+      makeDevilTopic({ key_signals_supporting: ['sig_004'] }),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
+  assertEquals(r.ok, true)
+})
+
+Deno.test('key_signals_supporting : devil_advocate 0 ids → fails (min=1)', () => {
+  const out = makeValidOutput({
+    topics: [
+      makeTopic(),
+      makeTopic({ id: 't_002' }),
+      makeDevilTopic({ key_signals_supporting: [] }),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
+  assertEquals(r.ok, false)
+})
+
 Deno.test('key_signals_supporting : 7 ids → fails', () => {
   const out = makeValidOutput({
     topics: [
