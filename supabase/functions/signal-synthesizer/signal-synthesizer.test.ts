@@ -229,14 +229,14 @@ Deno.test('validateSynthesizerOutput : detects hallucinated cross_topic_conflict
 // Tests : brief length boundaries (250-400 strict)
 // --------------------------------------------------------------------------
 
-Deno.test('brief 249 chars → fails', () => {
+Deno.test('brief 199 chars → fails (min relâché à 200)', () => {
   const out = makeValidOutput({
     topics: [
       makeTopic({
         brief_variants: [
           {
             framework_hint: 'policy',
-            brief: brief(249),
+            brief: brief(199),
             rationale: 'x',
           },
         ],
@@ -251,14 +251,14 @@ Deno.test('brief 249 chars → fails', () => {
   assertEquals(typeof lengthErr, 'string')
 })
 
-Deno.test('brief 250 chars → ok', () => {
+Deno.test('brief 200 chars → ok (borne inférieure relâchée)', () => {
   const out = makeValidOutput({
     topics: [
       makeTopic({
         brief_variants: [
           {
             framework_hint: 'policy',
-            brief: brief(250),
+            brief: brief(200),
             rationale: 'x',
           },
         ],
@@ -507,6 +507,120 @@ Deno.test('key_signals_supporting : devil_advocate 0 ids → fails (min=1)', () 
   assertEquals(r.ok, false)
 })
 
+// --------------------------------------------------------------------------
+// Tests : output_profile (light vs full) — bornes adaptatives
+// --------------------------------------------------------------------------
+
+Deno.test('profile=full (défaut) : 6 topics → ok (≤ 8 autorisés)', () => {
+  const out = makeValidOutput({
+    topics: [
+      makeTopic({ id: 't_001' }),
+      makeTopic({ id: 't_002' }),
+      makeTopic({ id: 't_003' }),
+      makeTopic({ id: 't_004' }),
+      makeTopic({ id: 't_005' }),
+      makeDevilTopic(),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
+  assertEquals(r.ok, true)
+})
+
+Deno.test('profile=light : 6 topics → fails (max 5)', () => {
+  const out = makeValidOutput({
+    topics: [
+      makeTopic({ id: 't_001' }),
+      makeTopic({ id: 't_002' }),
+      makeTopic({ id: 't_003' }),
+      makeTopic({ id: 't_004' }),
+      makeTopic({ id: 't_005' }),
+      makeDevilTopic(),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'], 'light')
+  assertEquals(r.ok, false)
+  const err = r.errors.find((e) => e.includes('topics_count_out_of_range'))
+  assertEquals(typeof err, 'string')
+})
+
+Deno.test('profile=light : 5 topics → ok', () => {
+  const out = makeValidOutput({
+    topics: [
+      makeTopic({ id: 't_001' }),
+      makeTopic({ id: 't_002' }),
+      makeTopic({ id: 't_003' }),
+      makeTopic({ id: 't_004' }),
+      makeDevilTopic(),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'], 'light')
+  assertEquals(r.ok, true)
+})
+
+Deno.test('profile=light : 3 brief_variants → fails (max 2)', () => {
+  const out = makeValidOutput({
+    topics: [
+      makeTopic({
+        brief_variants: [
+          { framework_hint: 'policy', brief: brief(280), rationale: 'r1' },
+          { framework_hint: 'market', brief: brief(280), rationale: 'r2' },
+          { framework_hint: 'crisis', brief: brief(280), rationale: 'r3' },
+        ],
+      }),
+      makeTopic({ id: 't_002' }),
+      makeDevilTopic(),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'], 'light')
+  assertEquals(r.ok, false)
+  const err = r.errors.find((e) => e.includes('brief_variants_count'))
+  assertEquals(typeof err, 'string')
+})
+
+Deno.test('profile=light : brief 301 chars → fails (max 300)', () => {
+  const out = makeValidOutput({
+    topics: [
+      makeTopic({
+        brief_variants: [{ framework_hint: 'policy', brief: brief(301), rationale: 'r' }],
+      }),
+      makeTopic({ id: 't_002' }),
+      makeDevilTopic(),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'], 'light')
+  assertEquals(r.ok, false)
+  const err = r.errors.find((e) => e.includes('brief_length'))
+  assertEquals(typeof err, 'string')
+})
+
+Deno.test('profile=light : brief 300 chars → ok (borne supérieure)', () => {
+  const out = makeValidOutput({
+    topics: [
+      makeTopic({
+        brief_variants: [{ framework_hint: 'policy', brief: brief(300), rationale: 'r' }],
+      }),
+      makeTopic({ id: 't_002' }),
+      makeDevilTopic(),
+    ],
+  })
+  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'], 'light')
+  assertEquals(r.ok, true)
+})
+
+Deno.test('buildSystemPrompt : profile=light reflète les bornes 5/2/300', () => {
+  const p = buildSystemPrompt('fr', 'light')
+  assertStringIncludes(p, '3-5 topics MACRO')
+  assertStringIncludes(p, '1-2 VARIANTES')
+  assertStringIncludes(p, '200-300 caractères')
+})
+
+Deno.test('buildSystemPrompt : profile=full (défaut) conserve les bornes 8/3/400', () => {
+  const p = buildSystemPrompt('fr')
+  assertStringIncludes(p, '3-8 topics MACRO')
+  assertStringIncludes(p, '1-3 VARIANTES')
+  assertStringIncludes(p, '200-400 caractères')
+})
+
 Deno.test('key_signals_supporting : 7 ids → fails', () => {
   const out = makeValidOutput({
     topics: [
@@ -536,7 +650,7 @@ Deno.test('key_signals_supporting : 7 ids → fails', () => {
 Deno.test('buildSystemPrompt : FR includes accent rule', () => {
   const p = buildSystemPrompt('fr')
   assertStringIncludes(p, 'Accents majuscules obligatoires')
-  assertStringIncludes(p, '250-400')
+  assertStringIncludes(p, '200-400')
   assertStringIncludes(p, 'devil_advocate')
 })
 

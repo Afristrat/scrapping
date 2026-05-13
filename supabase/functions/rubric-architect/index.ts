@@ -218,6 +218,45 @@ export function sanitizeLlmOutput(raw: string): string {
   return cleaned.trim()
 }
 
+/**
+ * Tolerant JSON parse on sanitized LLM output. Two extra passes after
+ * the first strict attempt failed :
+ *   1. slice to outermost { … } block (drops prose preamble / suffix)
+ *   2. repair trailing commas before `}` and `]` (most common LLM bug)
+ *
+ * Returns null when none of the 3 attempts produce valid JSON. Aligned
+ * with the pattern shipped in signal-synthesizer's `safeJsonParse`
+ * (cf. hotfix #1 K05+K06 2026-05-13).
+ */
+export function tolerantJsonParse(sanitized: string): unknown | null {
+  if (!sanitized) return null
+  // Strict
+  try {
+    return JSON.parse(sanitized)
+  } catch (_) {
+    // fall through
+  }
+  // Slice outermost { … }
+  let candidate = sanitized
+  const firstBrace = candidate.indexOf('{')
+  const lastBrace = candidate.lastIndexOf('}')
+  if (firstBrace > 0 && lastBrace > firstBrace) {
+    candidate = candidate.slice(firstBrace, lastBrace + 1)
+  }
+  try {
+    return JSON.parse(candidate)
+  } catch (_) {
+    // fall through
+  }
+  // Repair trailing commas
+  const repaired = candidate.replace(/,(\s*[}\]])/g, '$1')
+  try {
+    return JSON.parse(repaired)
+  } catch (_) {
+    return null
+  }
+}
+
 // =============================================================================
 // Schema validators (purs, testables)
 // =============================================================================
@@ -637,18 +676,15 @@ export const handler = async (req: Request): Promise<Response> => {
   }
 
   let cleaned = sanitizeLlmOutput(dispatch.content)
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(cleaned)
-  } catch (err) {
-    parsed = null
+  let parsed = tolerantJsonParse(cleaned)
+  if (parsed === null) {
     try {
       await supabase.from('logs').insert({
         user_id: callerUserId,
         action: 'rubric-architect:parse_error',
         status: 'error',
         payload: {
-          reason: err instanceof Error ? err.message : String(err),
+          reason: 'tolerant_parse_failed',
           raw_head: cleaned.slice(0, 200),
         },
       })
@@ -707,11 +743,7 @@ export const handler = async (req: Request): Promise<Response> => {
     }
 
     cleaned = sanitizeLlmOutput(retry.content)
-    try {
-      parsed = JSON.parse(cleaned)
-    } catch {
-      parsed = null
-    }
+    parsed = tolerantJsonParse(cleaned)
     validation =
       parsed === null
         ? {

@@ -480,6 +480,14 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
   const topSignals = selectTopSignals(scoredSignals, 50)
 
   // ─── Stage 6 : signal-synthesizer ────────────────────────────────────
+  // Tous les appels passés par research-from-seed transitent par
+  // x-api-key (mode public API, ex. Bassira). Le profile `light`
+  // (5 topics × 2 variants × 300 chars) garde le pipeline sous les
+  // limites max_tokens/latence du modèle BYOK même sur graines
+  // complexes — vs `full` (8/3/400) qui saturait DeepSeek-v4-flash
+  // (cf. sessions cad4364d/bae8775b 2026-05-13).
+  // Les callers internes en JWT direct (UI Kairos) appellent
+  // signal-synthesizer sans cet override → profile=full par défaut.
   const synthStart = Date.now()
   const synthRes = await callInternal<SignalSynthesizerResp>(
     fnUrl('signal-synthesizer'),
@@ -487,6 +495,7 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
       signals: topSignals,
       research_strategy: researchStrategy,
       lang: body.lang,
+      output_profile: 'light',
     },
     serviceKey,
     STAGE_TIMEOUTS_MS.synthesize,

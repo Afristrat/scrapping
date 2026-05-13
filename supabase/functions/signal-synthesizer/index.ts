@@ -30,12 +30,49 @@ const CORS = {
 }
 
 const MIN_SIGNALS_REQUIRED = 5
-const MIN_TOPICS = 3
-const MAX_TOPICS = 8
-const KEY_SIGNALS_MIN = 3
 const KEY_SIGNALS_MAX = 6
-const BRIEF_MIN_CHARS = 250
+const KEY_SIGNALS_MIN = 3
+// MIN_TOPICS reste constant — un pipeline avec <3 topics n'a pas
+// de matière prospective.
+const MIN_TOPICS = 3
+// Conservés pour rétro-compat des call sites internes ; les valeurs
+// effectives sont désormais portées par OUTPUT_PROFILES.
+const MAX_TOPICS = 8
+// Bumpé de 250 → 200 le 2026-05-13 : DeepSeek-v4-flash produisait
+// régulièrement des briefs 200-249 chars sur graines complexes en
+// profile light (cf. session 9a60c617). 200 chars = ~30-50 mots,
+// reste suffisant pour décrire un scénario simulable avec acteurs +
+// horizon + seuil. Si on monte de qualité du modèle BYOK plus tard,
+// remonter à 250 pour forcer la densité.
+const BRIEF_MIN_CHARS = 200
 const BRIEF_MAX_CHARS = 400
+
+/**
+ * Profils d'output pour adapter la taille de la réponse au caller.
+ *
+ *   - `full` : profil historique pour les callers internes (UI Kairos
+ *     direct via JWT). 8 topics × 3 variants × 400 chars max.
+ *   - `light` : profil pour les callers externes via x-api-key
+ *     (Bassira et autres). 5 topics × 2 variants × 300 chars max.
+ *     Réduit la taille de réponse JSON d'environ moitié → reste sous
+ *     les limites max_tokens/latence du modèle BYOK même sur graines
+ *     complexes (cf. sessions cad4364d / bae8775b 2026-05-13 où le
+ *     profil `full` saturait DeepSeek-v4-flash).
+ *
+ * Choix du profil :
+ *   - body.output_profile='light' → light
+ *   - sinon (absent ou 'full') → full
+ */
+export const OUTPUT_PROFILES = {
+  full: { maxTopics: 8, maxBriefVariants: 3, briefMaxChars: 400 },
+  light: { maxTopics: 5, maxBriefVariants: 2, briefMaxChars: 300 },
+} as const
+
+export type OutputProfile = keyof typeof OUTPUT_PROFILES
+
+function pickProfile(raw: unknown): OutputProfile {
+  return raw === 'light' ? 'light' : 'full'
+}
 
 type Lang = 'fr' | 'en' | 'ar'
 
@@ -72,6 +109,8 @@ interface RequestBody {
   signals: ScoredSignal[]
   research_strategy: ResearchStrategy
   lang: Lang
+  /** Optionnel — défaut 'full'. Voir OUTPUT_PROFILES. */
+  output_profile?: OutputProfile
 }
 
 interface BriefVariant {
@@ -178,6 +217,8 @@ export const handler = async (req: Request): Promise<Response> => {
   }
 
   const { signals, research_strategy, lang } = body
+  const profile = pickProfile(body.output_profile)
+  const profileCfg = OUTPUT_PROFILES[profile]
 
   // Step 1 : filter disqualified.
   const retained = signals.filter((s) => !s.disqualified)
@@ -198,7 +239,7 @@ export const handler = async (req: Request): Promise<Response> => {
   const validIdsSet = new Set(retained.map((s) => s.id))
   const subjectIds = research_strategy.subjects.map((s) => s.id)
 
-  const systemPrompt = buildSystemPrompt(lang)
+  const systemPrompt = buildSystemPrompt(lang, profile)
   const userPrompt = buildUserPrompt(retained, research_strategy, lang)
   const proxyId = req.headers.get('x-proxy-user-id')?.trim()
   const internalAuth = req.headers.get('x-internal-auth')?.trim()
@@ -237,7 +278,7 @@ export const handler = async (req: Request): Promise<Response> => {
     hallucinated_ids: [],
   }
   if (parsed) {
-    validation1 = validateSynthesizerOutput(parsed, validIdsSet, subjectIds)
+    validation1 = validateSynthesizerOutput(parsed, validIdsSet, subjectIds, profile)
   }
 
   // Retry 1× on hallucination or schema break, with explicit correction message.
@@ -277,7 +318,7 @@ export const handler = async (req: Request): Promise<Response> => {
       )
     }
     const parsed2 = secondParsed.value as SynthesizerOutput
-    const validation2 = validateSynthesizerOutput(parsed2, validIdsSet, subjectIds)
+    const validation2 = validateSynthesizerOutput(parsed2, validIdsSet, subjectIds, profile)
     if (!validation2.ok) {
       return json(
         {
@@ -439,12 +480,21 @@ export function validateRequestBody(body: unknown): { ok: true } | { ok: false; 
  * Strict schema validation matching PROMPT 3 spec.
  * Collects every error rather than short-circuiting, so a single retry
  * can correct everything at once.
+ *
+ * Le quatrième argument `profile` permet d'adapter les bornes (topics
+ * count + brief_variants count + brief length) au profile de sortie
+ * demandé par le caller. Défaut 'full' (rétro-compat).
  */
 export function validateSynthesizerOutput(
   output: unknown,
   validSignalIds: Set<string>,
   subjectIds: string[],
+  profile: OutputProfile = 'full',
 ): ValidationResult {
+  const cfg = OUTPUT_PROFILES[profile]
+  const maxTopics = cfg.maxTopics
+  const maxBriefVariants = cfg.maxBriefVariants
+  const briefMaxChars = cfg.briefMaxChars
   const errors: string[] = []
   const warnings: string[] = []
   const hallucinated_ids: string[] = []
@@ -470,10 +520,8 @@ export function validateSynthesizerOutput(
     }
   }
   const topics = o.topics as Record<string, unknown>[]
-  if (topics.length < MIN_TOPICS || topics.length > MAX_TOPICS) {
-    errors.push(
-      `topics_count_out_of_range: ${topics.length} (expected ${MIN_TOPICS}-${MAX_TOPICS})`,
-    )
+  if (topics.length < MIN_TOPICS || topics.length > maxTopics) {
+    errors.push(`topics_count_out_of_range: ${topics.length} (expected ${MIN_TOPICS}-${maxTopics})`)
   }
 
   const topicIds = new Set<string>()
@@ -573,8 +621,10 @@ export function validateSynthesizerOutput(
     if (!Array.isArray(variants)) {
       errors.push(`topic[${t.id}].brief_variants_not_array`)
     } else {
-      if (variants.length < 1 || variants.length > 3) {
-        errors.push(`topic[${t.id}].brief_variants_count:${variants.length} (expected 1-3)`)
+      if (variants.length < 1 || variants.length > maxBriefVariants) {
+        errors.push(
+          `topic[${t.id}].brief_variants_count:${variants.length} (expected 1-${maxBriefVariants})`,
+        )
       }
       for (const [j, v] of variants.entries()) {
         if (!v || typeof v !== 'object') {
@@ -587,9 +637,9 @@ export function validateSynthesizerOutput(
           errors.push(`topic[${t.id}].brief_variants[${j}].brief_missing`)
           continue
         }
-        if (brief.length < BRIEF_MIN_CHARS || brief.length > BRIEF_MAX_CHARS) {
+        if (brief.length < BRIEF_MIN_CHARS || brief.length > briefMaxChars) {
           errors.push(
-            `topic[${t.id}].brief_variants[${j}].brief_length:${brief.length} (expected ${BRIEF_MIN_CHARS}-${BRIEF_MAX_CHARS})`,
+            `topic[${t.id}].brief_variants[${j}].brief_length:${brief.length} (expected ${BRIEF_MIN_CHARS}-${briefMaxChars})`,
           )
         }
       }
@@ -681,8 +731,13 @@ export function computeLangDistribution(
 /**
  * System prompt — verbatim from PROMPT 3 spec section
  * (kairos-bassira-research-prompts.md).
+ *
+ * Les bornes (max_topics, max_brief_variants, brief_max_chars) sont
+ * injectées dynamiquement depuis OUTPUT_PROFILES[profile] pour permettre
+ * un profil `light` (Bassira via x-api-key) plus court que `full`.
  */
-export function buildSystemPrompt(lang: Lang): string {
+export function buildSystemPrompt(lang: Lang, profile: OutputProfile = 'full'): string {
+  const cfg = OUTPUT_PROFILES[profile]
   const langLine =
     lang === 'fr'
       ? 'Langue de sortie : français. Accents majuscules obligatoires (É, È, À, Ç, Ê, Ô, Î, Ù, Û).'
@@ -702,7 +757,7 @@ UN TOPIC RICHE EN PROSPECTIVE A 4 PROPRIÉTÉS :
 2. UNE TENSION INTERNE ou un GAP ASSUMÉ (les signaux ne sont pas tous
    d'accord, ou il manque un acteur clé). Les topics tout-convergents
    sont des culs-de-sac.
-3. UN BRIEF en 1-3 VARIANTES (frames différents : market, decision,
+3. UN BRIEF en 1-${cfg.maxBriefVariants} VARIANTES (frames différents : market, decision,
    crisis, policy, cerberus). Chaque variante simulable indépendamment
    avec un framework Bassira approprié.
 4. UNE PROVENANCE TRACÉE : key_signals supporting, key_signals
@@ -714,7 +769,8 @@ UN TOPIC RICHE EN PROSPECTIVE A 4 PROPRIÉTÉS :
    pas au clustering.
 
 2. Clusterise sémantiquement les signaux retenus. Adaptatif :
-   - 3-8 topics MACRO.
+   - ${MIN_TOPICS}-${cfg.maxTopics} topics MACRO. Privilégie la concision : moins de topics
+     plus denses > plus de topics dilués.
    - Si un topic macro contient ≥ 8 signaux, propose 2-3 sub-topics.
 
 3. Pour chaque topic, identifie EXPLICITEMENT :
@@ -724,8 +780,8 @@ UN TOPIC RICHE EN PROSPECTIVE A 4 PROPRIÉTÉS :
    AUTRES topics si un signal d'un cluster voisin contredit. Référence
    par cross_topic_conflicts.
 
-4. Génère 1-3 BRIEF VARIANTS par topic. Règles brief :
-   - 250-400 caractères stricts (espaces inclus).
+4. Génère 1-${cfg.maxBriefVariants} BRIEF VARIANTS par topic. Règles brief :
+   - ${BRIEF_MIN_CHARS}-${cfg.briefMaxChars} caractères stricts (espaces inclus).
    - Question simulable avec horizon temporel explicite.
    - 2-4 acteurs identifiables nommés.
    - Seuil quantifiable si possible (taux, montant, %, date).
@@ -749,7 +805,9 @@ UN TOPIC RICHE EN PROSPECTIVE A 4 PROPRIÉTÉS :
 INTERDICTIONS :
 - Inventer un signal_id absent de l'input.
 - Mettre en key_signals_supporting plus de 6 ids (resté en focus).
-- Brief hors longueur 250-400.
+- Plus de ${cfg.maxTopics} topics au total.
+- Plus de ${cfg.maxBriefVariants} brief_variants par topic.
+- Brief hors longueur ${BRIEF_MIN_CHARS}-${cfg.briefMaxChars}.
 - Brief en langue ≠ ${lang}.
 - Brief copy-collé à la graine.
 - Topic mono-source (tous les signaux d'un cluster viennent de la
@@ -773,7 +831,7 @@ SCHEMA OUTPUT (JSON strict, aucun préambule, aucune balise XML, aucun markdown)
       "brief_variants": [
         {
           "framework_hint": "cerberus|market|decision|crisis|policy",
-          "brief": "string 250-400 chars",
+          "brief": "string ${BRIEF_MIN_CHARS}-${cfg.briefMaxChars} chars",
           "rationale": "10-20 mots — pourquoi ce frame ici"
         }
       ],
