@@ -20,7 +20,12 @@ export const STAGE_TIMEOUTS_MS = {
   rubric_architect: 60_000,
   scrape: 90_000,
   score: 90_000,
-  synthesize: 90_000,
+  // signal-synthesizer fait jusqu'à 2 appels LLM (prompt + retry sur
+  // validation) sur un prompt riche (30-80 signaux). Sur graines
+  // complexes le pipeline réel tape 80-90s — 90s produisait des
+  // STAGE_TIMEOUT (cf. session 3293d2ef). Bumpé à 150s pour permettre
+  // le retry sans dépasser le gateway Supabase Edge (~150s).
+  synthesize: 150_000,
   audit: 60_000,
 } as const
 

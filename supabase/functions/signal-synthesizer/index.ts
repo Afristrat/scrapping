@@ -222,10 +222,11 @@ export const handler = async (req: Request): Promise<Response> => {
 
   let parsed: SynthesizerOutput | null = null
   let parseError: string | null = null
-  try {
-    parsed = JSON.parse(firstCall.content ?? '{}') as SynthesizerOutput
-  } catch (err) {
-    parseError = err instanceof Error ? err.message : 'parse_failed'
+  const firstParsed = safeJsonParse(firstCall.content ?? '')
+  if (firstParsed.ok) {
+    parsed = firstParsed.value as SynthesizerOutput
+  } else {
+    parseError = firstParsed.error
   }
 
   let usedRetry = false
@@ -264,19 +265,18 @@ export const handler = async (req: Request): Promise<Response> => {
         422,
       )
     }
-    let parsed2: SynthesizerOutput | null = null
-    try {
-      parsed2 = JSON.parse(secondCall.content ?? '{}') as SynthesizerOutput
-    } catch (err) {
+    const secondParsed = safeJsonParse(secondCall.content ?? '')
+    if (!secondParsed.ok) {
       return json(
         {
           ok: false,
           error: 'validation_failed_after_retry',
-          detail: err instanceof Error ? err.message : 'parse_failed',
+          detail: secondParsed.error,
         },
         422,
       )
     }
+    const parsed2 = secondParsed.value as SynthesizerOutput
     const validation2 = validateSynthesizerOutput(parsed2, validIdsSet, subjectIds)
     if (!validation2.ok) {
       return json(
@@ -340,6 +340,74 @@ export const handler = async (req: Request): Promise<Response> => {
 // Guard so test runner can `import` this module without booting the listener.
 if (import.meta.main) {
   Deno.serve(handler)
+}
+
+// --------------------------------------------------------------------------
+// JSON parsing — exported for testing
+// --------------------------------------------------------------------------
+
+export type SafeJsonResult =
+  | { ok: true; value: unknown; repaired: boolean }
+  | { ok: false; error: string }
+
+/**
+ * Tolerant JSON parser for LLM outputs.
+ *
+ * DeepSeek / Qwen / Claude vary on whether they wrap JSON in markdown fences,
+ * add a preamble, or emit trailing commas. Three escalating passes :
+ *   1. strict JSON.parse on the trimmed input
+ *   2. strip surrounding ```json … ``` fences (same regex as quality-auditor)
+ *      + slice to outermost { … } if there's a preamble, then re-parse
+ *   3. repair trailing commas (`, }` / `, ]`) — the most common LLM mistake
+ *      that breaks strict JSON, then re-parse
+ *
+ * Returns { ok: true, value, repaired } on success (repaired=true means
+ * we had to clean the input). On failure, returns { ok: false, error }
+ * with a stable error message for the test suite.
+ *
+ * Defensively never throws.
+ */
+export function safeJsonParse(raw: string): SafeJsonResult {
+  if (typeof raw !== 'string') {
+    return { ok: false, error: 'parse_failed:not_a_string' }
+  }
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return { ok: false, error: 'parse_failed:empty' }
+  }
+  // Pass 1 — strict parse on trimmed input.
+  try {
+    return { ok: true, value: JSON.parse(trimmed), repaired: false }
+  } catch (_e1) {
+    // fall through
+  }
+  // Pass 2 — strip markdown fences (same regex as quality-auditor) and
+  // slice to the outermost {…} block when a preamble or trailing prose
+  // surrounds the JSON.
+  let cleaned = trimmed
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim()
+  const firstBrace = cleaned.indexOf('{')
+  const lastBrace = cleaned.lastIndexOf('}')
+  if (firstBrace > 0 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1)
+  } else if (firstBrace === -1) {
+    return { ok: false, error: 'parse_failed:no_json_object_found' }
+  }
+  try {
+    return { ok: true, value: JSON.parse(cleaned), repaired: true }
+  } catch (_e2) {
+    // fall through
+  }
+  // Pass 3 — repair trailing commas before } and ] (most common LLM bug).
+  const repaired = cleaned.replace(/,(\s*[}\]])/g, '$1')
+  try {
+    return { ok: true, value: JSON.parse(repaired), repaired: true }
+  } catch (e3) {
+    const msg = e3 instanceof Error ? e3.message : 'parse_failed:unknown'
+    return { ok: false, error: `parse_failed:${msg}` }
+  }
 }
 
 // --------------------------------------------------------------------------
