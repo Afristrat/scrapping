@@ -556,7 +556,16 @@ export function validateSynthesizerOutput(
     if (!Array.isArray(supporting)) {
       errors.push(`topic[${t.id}].key_signals_supporting_not_array`)
     } else {
-      if (supporting.length < minSupporting || supporting.length > KEY_SIGNALS_MAX) {
+      // Hotfix 2026-05-14 : si DeepSeek dépasse KEY_SIGNALS_MAX (vu 15
+      // sur session 065f4f36), on truncate déterministiquement plutôt
+      // que de fail. Garde l'invariant côté caller, warning tracé.
+      if (supporting.length > KEY_SIGNALS_MAX) {
+        warnings.push(
+          `topic[${t.id}].key_signals_supporting_truncated:${supporting.length}→${KEY_SIGNALS_MAX}`,
+        )
+        supporting.length = KEY_SIGNALS_MAX
+      }
+      if (supporting.length < minSupporting) {
         errors.push(
           `topic[${t.id}].key_signals_supporting_count:${supporting.length} (expected ${minSupporting}-${KEY_SIGNALS_MAX})`,
         )
