@@ -454,14 +454,12 @@ Deno.test('computeLangDistribution : ignores unknown ids gracefully', () => {
 // Tests : topics count bounds (3-8)
 // --------------------------------------------------------------------------
 
-Deno.test('topics count : 2 → fails', () => {
+Deno.test('topics count : 2 → ok (MIN_TOPICS relâché à 1 hotfix 2026-05-14)', () => {
   const out = makeValidOutput({
     topics: [makeTopic(), makeDevilTopic()],
   })
   const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
-  assertEquals(r.ok, false)
-  const cErr = r.errors.find((e) => e.includes('topics_count_out_of_range'))
-  assertEquals(typeof cErr, 'string')
+  assertEquals(r.ok, true)
 })
 
 Deno.test('topics count : 9 → fails', () => {
@@ -481,17 +479,20 @@ Deno.test('topics count : 9 → fails', () => {
 // Tests : key_signals_supporting bounds (3-6)
 // --------------------------------------------------------------------------
 
-Deno.test('key_signals_supporting : 2 ids → fails', () => {
-  const out = makeValidOutput({
-    topics: [
-      makeTopic({ key_signals_supporting: ['sig_001', 'sig_002'] }),
-      makeTopic({ id: 't_002' }),
-      makeDevilTopic(),
-    ],
-  })
-  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
-  assertEquals(r.ok, false)
-})
+Deno.test(
+  'key_signals_supporting : 2 ids regular → ok (KEY_SIGNALS_MIN=1 hotfix 2026-05-14)',
+  () => {
+    const out = makeValidOutput({
+      topics: [
+        makeTopic({ key_signals_supporting: ['sig_001', 'sig_002'] }),
+        makeTopic({ id: 't_002' }),
+        makeDevilTopic(),
+      ],
+    })
+    const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
+    assertEquals(r.ok, true)
+  },
+)
 
 Deno.test('key_signals_supporting : devil_advocate 2 ids → OK (min relâché)', () => {
   // Le system prompt dit explicitement "≥ 3, sauf devil's advocate qui
@@ -642,7 +643,7 @@ Deno.test('buildSystemPrompt : profile=light reflète les bornes 5/2/300', () =>
 
 Deno.test('buildSystemPrompt : profile=full (défaut) conserve les bornes 8/3/400', () => {
   const p = buildSystemPrompt('fr')
-  assertStringIncludes(p, '3-8 topics MACRO')
+  assertStringIncludes(p, '1-8 topics MACRO')
   assertStringIncludes(p, '1-3 VARIANTES')
   assertStringIncludes(p, '200-400 caractères')
 })
