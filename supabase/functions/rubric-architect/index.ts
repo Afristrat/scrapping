@@ -141,9 +141,18 @@ RÈGLES :
 - INTERDIT : critères vagues ("intérêt", "qualité"), critères qui se
   chevauchent ("pertinence" et "rapport au sujet"), pondération
   uniforme.
-- Le scoring_prompt (200-500 mots) doit RÉCAPITULER les 3 couches
-  pour le LLM scoreur, et donner 2-3 exemples calibrés (un signal
-  qui mérite 80+, un autour de 40, un autour de 10).
+- Le scoring_prompt (CRITIQUE — rejet automatique si non respecté) :
+  * Borne stricte : 200-500 mots (séparés par des espaces).
+  * Vise ≈ 320-450 mots pour rester confortablement dans la fourchette —
+    JAMAIS sous 200 mots.
+  * Compte mentalement tes mots avant de fermer le champ "scoring_prompt".
+    Si < 220 mots, AJOUTE : (a) une explication détaillée d'un disqualifier
+    supplémentaire, (b) un exemple calibré additionnel, ou (c) une nuance
+    sur la pondération d'un criterion. Ne raccourcis JAMAIS sous prétexte
+    de concision — la longueur sert au LLM scoreur en aval.
+  * Doit RÉCAPITULER les 3 couches (criteria, disqualifiers, soft_boosts)
+    pour le LLM scoreur, et donner 2-3 exemples calibrés (un signal qui
+    mérite 80+, un autour de 40, un autour de 10).
 
 INTERDICTIONS :
 - Pas de balise <tool_call>, <thinking>, <scratchpad>, ni markdown,

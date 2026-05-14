@@ -175,55 +175,81 @@ Deno.test('validateRequestBody : research_strategy.subjects empty → reject', (
 // Tests : hallucination detection
 // --------------------------------------------------------------------------
 
-Deno.test('validateSynthesizerOutput : detects hallucinated supporting signal_id', () => {
-  const out = makeValidOutput({
-    topics: [
-      makeTopic({
-        key_signals_supporting: ['sig_001', 'sig_FAKE', 'sig_003'],
-      }),
-      makeTopic({ id: 't_002' }),
-      makeDevilTopic(),
-    ],
-  })
-  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
-  assertEquals(r.ok, false)
-  assertEquals(r.hallucinated_ids.includes('sig_FAKE'), true)
-})
+// Hotfix 2026-05-14 : hallucinations tracées en warnings + hallucinated_ids,
+// mais ne font plus fail la validation (DeepSeek-v4-flash invente régulièrement
+// des signal_ids sur graines politico-sociales complexes — cf. session a71bb8f5).
+// L'audit reste possible via le champ warnings et le tableau hallucinated_ids.
 
-Deno.test('validateSynthesizerOutput : detects hallucinated conflicting signal_id', () => {
-  const out = makeValidOutput({
-    topics: [
-      makeTopic({
-        key_signals_conflicting: ['sig_GHOST'],
-      }),
-      makeTopic({ id: 't_002' }),
-      makeDevilTopic(),
-    ],
-  })
-  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
-  assertEquals(r.ok, false)
-  assertEquals(r.hallucinated_ids.includes('sig_GHOST'), true)
-})
+Deno.test(
+  'validateSynthesizerOutput : hallucinated supporting signal_id → warning, ok stays true',
+  () => {
+    const out = makeValidOutput({
+      topics: [
+        makeTopic({
+          key_signals_supporting: ['sig_001', 'sig_FAKE', 'sig_003'],
+        }),
+        makeTopic({ id: 't_002' }),
+        makeDevilTopic(),
+      ],
+    })
+    const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
+    assertEquals(r.ok, true)
+    assertEquals(r.hallucinated_ids.includes('sig_FAKE'), true)
+    assertEquals(
+      r.warnings.some((w) => w.includes('supporting_hallucinated:sig_FAKE')),
+      true,
+    )
+  },
+)
 
-Deno.test('validateSynthesizerOutput : detects hallucinated cross_topic_conflict signal_id', () => {
-  const out = makeValidOutput({
-    topics: [
-      makeTopic({
-        cross_topic_conflicts: [
-          {
-            topic_id: 't_002',
-            signal_id: 'sig_PHANTOM',
-          },
-        ],
-      }),
-      makeTopic({ id: 't_002' }),
-      makeDevilTopic(),
-    ],
-  })
-  const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
-  assertEquals(r.ok, false)
-  assertEquals(r.hallucinated_ids.includes('sig_PHANTOM'), true)
-})
+Deno.test(
+  'validateSynthesizerOutput : hallucinated conflicting signal_id → warning, ok stays true',
+  () => {
+    const out = makeValidOutput({
+      topics: [
+        makeTopic({
+          key_signals_conflicting: ['sig_GHOST'],
+        }),
+        makeTopic({ id: 't_002' }),
+        makeDevilTopic(),
+      ],
+    })
+    const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
+    assertEquals(r.ok, true)
+    assertEquals(r.hallucinated_ids.includes('sig_GHOST'), true)
+    assertEquals(
+      r.warnings.some((w) => w.includes('conflicting_hallucinated:sig_GHOST')),
+      true,
+    )
+  },
+)
+
+Deno.test(
+  'validateSynthesizerOutput : hallucinated cross_topic_conflict signal_id → warning, ok stays true',
+  () => {
+    const out = makeValidOutput({
+      topics: [
+        makeTopic({
+          cross_topic_conflicts: [
+            {
+              topic_id: 't_002',
+              signal_id: 'sig_PHANTOM',
+            },
+          ],
+        }),
+        makeTopic({ id: 't_002' }),
+        makeDevilTopic(),
+      ],
+    })
+    const r = validateSynthesizerOutput(out, VALID_IDS, ['s_001', 's_002'])
+    assertEquals(r.ok, true)
+    assertEquals(r.hallucinated_ids.includes('sig_PHANTOM'), true)
+    assertEquals(
+      r.warnings.some((w) => w.includes('cross_topic_conflict_hallucinated:sig_PHANTOM')),
+      true,
+    )
+  },
+)
 
 // --------------------------------------------------------------------------
 // Tests : brief length boundaries (250-400 strict)

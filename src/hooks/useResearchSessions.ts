@@ -148,9 +148,9 @@ export function useResearchSessions(
       if (filters.status !== 'all') {
         q = q.eq('status', filters.status)
       }
-      if (filters.keyPrefix.trim().length > 0) {
-        q = q.ilike('api_key.key_prefix', `${filters.keyPrefix.trim()}%`)
-      }
+      // NB : on ne peut PAS filtrer sur api_key.key_prefix côté PostgREST —
+      // les filtres .ilike sur table embedded sont silencieusement ignorés.
+      // Le filtrage par préfixe se fait donc en mémoire après fetch.
       if (filters.search.trim().length > 0) {
         q = q.ilike('seed', `%${filters.search.trim()}%`)
       }
@@ -160,7 +160,14 @@ export function useResearchSessions(
         .limit(SESSIONS_LIST_LIMIT)
 
       if (error) throw new Error(error.message)
-      return (data ?? []) as ResearchSessionListItem[]
+
+      let rows = (data ?? []) as ResearchSessionListItem[]
+      const keyPrefix = filters.keyPrefix.trim()
+      if (keyPrefix.length > 0) {
+        const needle = keyPrefix.toLowerCase()
+        rows = rows.filter((r) => r.api_key?.key_prefix?.toLowerCase().startsWith(needle) ?? false)
+      }
+      return rows
     },
   })
 }
@@ -173,17 +180,6 @@ export interface ResearchSessionDetail {
   session: ResearchSessionListItem
   logs: ResearchLogRow[]
 }
-
-const PIPELINE_LOG_ACTIONS = [
-  'research-strategist',
-  'rubric-architect',
-  'scraper-x',
-  'scraper-reddit',
-  'scraper-arxiv',
-  'llm-score-batch',
-  'signal-synthesizer',
-  'quality-auditor',
-]
 
 export function useResearchSessionDetail(
   sessionId: string | null,
@@ -215,32 +211,22 @@ export function useResearchSessionDetail(
 
       const session = sessionData as ResearchSessionListItem
 
-      // Logs liés : fenêtre temporelle + user_id proxy + actions pipeline.
-      // Best-effort : si la table logs a une RLS user-scoped et que le
-      // proxy_user_id n'est pas l'app_admin connecté, on récupèrera 0 row.
-      // C'est OK — la page n'a pas vocation à voir les logs d'autres orgs.
+      // Logs liés via RPC `get_session_logs` (SECURITY DEFINER, gate is_app_admin).
+      // La table `logs` a une RLS user-scoped — un SELECT direct retournerait
+      // toujours 0 rows pour un admin différent du proxy_user. La RPC by-passe
+      // proprement la RLS et applique elle-même la gate admin.
       let logs: ResearchLogRow[] = []
-      const lowerBound = session.created_at
-      const upperBound = session.completed_at ?? new Date().toISOString()
-
-      if (session.proxy_user_id) {
-        const { data: logsData, error: logsErr } = await client
-          .from('logs')
-          .select('id, user_id, action, payload, status, ts')
-          .eq('user_id', session.proxy_user_id)
-          .gte('ts', lowerBound)
-          .lte('ts', upperBound)
-          .order('ts', { ascending: true })
-          .limit(200)
-
-        if (logsErr) {
-          // Non-bloquant : on retourne quand même la session sans les logs.
-          logs = []
-        } else {
-          logs = (logsData ?? []).filter((row) =>
-            PIPELINE_LOG_ACTIONS.some((a) => row.action.startsWith(a)),
-          )
-        }
+      const rpcClient = supabase as unknown as {
+        rpc: (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: ResearchLogRow[] | null; error: { message: string } | null }>
+      }
+      const { data: logsData, error: logsErr } = await rpcClient.rpc('get_session_logs', {
+        p_session_id: sessionId,
+      })
+      if (!logsErr) {
+        logs = logsData ?? []
       }
 
       return { session, logs }
