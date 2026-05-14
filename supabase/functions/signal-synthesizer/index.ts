@@ -29,12 +29,16 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const MIN_SIGNALS_REQUIRED = 5
+// Hotfix 2026-05-14 : seuils dégradés pour graines aux sources pauvres
+// (cf. session f9eb2923 : 1 signal scrapé seulement, Reddit+ArXiv ont
+// silencieusement retourné 0 sur le 2e run alors que le 1er run de la
+// même graine avait ramené 119 signaux). Le pipeline doit pouvoir aboutir
+// même avec très peu de matière — quitte à produire un résultat dégradé
+// avec un cultural_warning explicite.
+const MIN_SIGNALS_REQUIRED = 1
 const KEY_SIGNALS_MAX = 6
-const KEY_SIGNALS_MIN = 3
-// MIN_TOPICS reste constant — un pipeline avec <3 topics n'a pas
-// de matière prospective.
-const MIN_TOPICS = 3
+const KEY_SIGNALS_MIN = 1
+const MIN_TOPICS = 1
 // Conservés pour rétro-compat des call sites internes ; les valeurs
 // effectives sont désormais portées par OUTPUT_PROFILES.
 const MAX_TOPICS = 8
