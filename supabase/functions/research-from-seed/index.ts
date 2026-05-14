@@ -774,6 +774,7 @@ async function handlePostAsync(req: Request, cors: Record<string, string>): Prom
     lang: validation.body.lang,
     sector_hint: validation.body.sector_hint ?? null,
     depth_hint: validation.body.depth_hint ?? null,
+    output_profile: validation.body.output_profile ?? null,
   })
   if (insertRes.error) {
     return jsonResp(
