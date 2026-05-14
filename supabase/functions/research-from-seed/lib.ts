@@ -49,6 +49,7 @@ export interface RequestBody {
   lang: Lang
   sector_hint?: string
   depth_hint?: 0 | 1 | 2
+  output_profile?: string
 }
 
 export interface ApiKeyRow {
@@ -129,6 +130,18 @@ export function validateRequestBody(raw: unknown): BodyValidationResult {
     depth_hint = obj.depth_hint as 0 | 1 | 2
   }
 
+  // output_profile : optionnel, accepté brut pour traçabilité côté
+  // research_sessions.output_profile (page /admin/api-inbound). Le pipeline
+  // continue à forcer 'light' côté signal-synthesizer — ce champ sert
+  // uniquement à savoir ce que le caller a demandé.
+  let output_profile: string | undefined
+  if (obj.output_profile !== undefined && obj.output_profile !== null) {
+    if (typeof obj.output_profile !== 'string') {
+      return { ok: false, error: 'output_profile_must_be_string' }
+    }
+    output_profile = obj.output_profile.slice(0, 32)
+  }
+
   return {
     ok: true,
     body: {
@@ -136,6 +149,7 @@ export function validateRequestBody(raw: unknown): BodyValidationResult {
       lang: lang as Lang,
       ...(sector_hint !== undefined ? { sector_hint } : {}),
       ...(depth_hint !== undefined ? { depth_hint } : {}),
+      ...(output_profile !== undefined ? { output_profile } : {}),
     },
   }
 }
