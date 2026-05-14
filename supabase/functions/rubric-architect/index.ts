@@ -270,6 +270,62 @@ export function tolerantJsonParse(sanitized: string): unknown | null {
 // Schema validators (purs, testables)
 // =============================================================================
 
+/**
+ * Auto-normalise la somme des weights à 100 si elle est dans une marge
+ * raisonnable [50, 200] mais ≠ 100. Hotfix 2026-05-14 : DeepSeek-v4-flash
+ * échoue régulièrement l'arithmétique exacte sum=100 sur graines complexes
+ * (cf. session f82084e4 : sum=110). Plutôt que de retry au LLM, on
+ * normalise côté serveur de manière déterministe.
+ *
+ * Mute le tableau en place. Conserve les entiers > 0 et redistribue
+ * l'écart d'arrondi sur le criterion avec le plus gros poids.
+ *
+ * Si la somme initiale est hors [50, 200] ou si le tableau est mal formé,
+ * la fonction ne touche à rien — la validation normale signalera l'erreur.
+ */
+export function normalizeCriteriaWeights(criteria: unknown): void {
+  if (!Array.isArray(criteria) || criteria.length === 0) return
+
+  // On exige que CHAQUE entrée soit un tuple [string, number-positive-int].
+  let sum = 0
+  for (const c of criteria) {
+    if (!Array.isArray(c) || c.length !== 2) return
+    const w = c[1]
+    if (typeof w !== 'number' || !Number.isFinite(w) || w <= 0) return
+    sum += w
+  }
+
+  if (sum === 100) return // rien à faire
+  if (sum < 50 || sum > 200) return // trop loin, on laisse fail
+
+  // Scale proportionnel + round.
+  const scale = 100 / sum
+  let total = 0
+  let maxIdx = 0
+  let maxVal = -Infinity
+  for (let i = 0; i < criteria.length; i++) {
+    const c = criteria[i] as [string, number]
+    let nw = Math.round(c[1] * scale)
+    if (nw < 1) nw = 1 // garde l'invariant > 0
+    c[1] = nw
+    total += nw
+    if (nw > maxVal) {
+      maxVal = nw
+      maxIdx = i
+    }
+  }
+
+  // Absorbe le résidu d'arrondi sur le plus gros critère.
+  const delta = 100 - total
+  if (delta !== 0) {
+    const c = criteria[maxIdx] as [string, number]
+    const adjusted = c[1] + delta
+    if (adjusted > 0) {
+      c[1] = adjusted
+    }
+  }
+}
+
 export function validateWeightSum(criteria: Array<[string, number]>): ValidationResult {
   const errors: ValidationError[] = []
   if (!Array.isArray(criteria) || criteria.length < 4 || criteria.length > 8) {
@@ -536,6 +592,12 @@ export function validateRubricSchema(rubric: unknown): ValidationResult {
 
   const sp = validateScoringPrompt(r.scoring_prompt)
   errors.push(...sp.errors)
+
+  // Hotfix 2026-05-14 : auto-normalise les poids avant la validation.
+  // DeepSeek-v4-flash échoue régulièrement l'arithmétique exacte sum=100
+  // (cf. session f82084e4 : sum=110). On normalise déterministiquement
+  // dans la marge [50, 200] plutôt que de retry au LLM.
+  normalizeCriteriaWeights(r.criteria as unknown)
 
   const ws = validateWeightSum(r.criteria as Array<[string, number]>)
   errors.push(...ws.errors)
