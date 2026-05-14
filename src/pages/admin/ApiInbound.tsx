@@ -253,7 +253,11 @@ export default function ApiInbound(): React.ReactElement {
               <p className="text-error text-sm">Erreur : {detailQuery.error.message}</p>
             ) : detailQuery.data ? (
               <DetailPanel session={detailQuery.data.session} logs={detailQuery.data.logs} />
-            ) : null}
+            ) : (
+              <p className="text-on-surface-variant py-8 text-center text-sm">
+                Session introuvable ou expirée (TTL 24 h).
+              </p>
+            )}
           </div>
         </SheetContent>
       </Sheet>

@@ -567,8 +567,12 @@ export function validateSynthesizerOutput(
           continue
         }
         if (!validSignalIds.has(sid)) {
+          // Hallucination tolérée (warning, pas erreur fatale) — cf. hotfix
+          // 2026-05-14 : DeepSeek-v4-flash hallucine régulièrement des
+          // signal_ids sur graines politico-sociales complexes (sessions
+          // a71bb8f5 etc.). Le hallucinated_ids reste tracé pour audit/UI.
           hallucinated_ids.push(sid)
-          errors.push(`topic[${t.id}].supporting_hallucinated:${sid}`)
+          warnings.push(`topic[${t.id}].supporting_hallucinated:${sid}`)
         }
       }
     }
@@ -586,7 +590,7 @@ export function validateSynthesizerOutput(
           }
           if (!validSignalIds.has(sid)) {
             hallucinated_ids.push(sid)
-            errors.push(`topic[${t.id}].conflicting_hallucinated:${sid}`)
+            warnings.push(`topic[${t.id}].conflicting_hallucinated:${sid}`)
           }
         }
       }
@@ -610,7 +614,7 @@ export function validateSynthesizerOutput(
           }
           if (!validSignalIds.has(obj.signal_id)) {
             hallucinated_ids.push(obj.signal_id)
-            errors.push(`topic[${t.id}].cross_topic_conflict_hallucinated:${obj.signal_id}`)
+            warnings.push(`topic[${t.id}].cross_topic_conflict_hallucinated:${obj.signal_id}`)
           }
         }
       }
