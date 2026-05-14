@@ -643,7 +643,12 @@ async function callDispatch(args: DispatchArgs): Promise<DispatchResponse> {
       options: {
         response_format: { type: 'json_object' },
         temperature: 0.3,
-        max_tokens: 2500,
+        // Bumpé 2500 → 8000 le 2026-05-14 : avec scoring_prompt 320-450 mots +
+        // criteria + disqualifiers + soft_boosts + calibration_examples,
+        // DeepSeek-v4-flash hit le max_tokens et retournait un content vide
+        // (cf. session 2a68871c : dispatch_failed / detail=unknown en 33s).
+        // 8000 tokens ≈ 6000 mots ≈ marge x3 sur la cible.
+        max_tokens: 8000,
       },
     }),
   })
