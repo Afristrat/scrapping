@@ -44,12 +44,34 @@ export type Stage = keyof typeof STAGE_TIMEOUTS_MS
 export const SUPPORTED_LANGS = ['fr', 'en', 'ar'] as const
 export type Lang = (typeof SUPPORTED_LANGS)[number]
 
+/**
+ * F-Hints-Override 2026-05-15 — hints fournis directement par le caller
+ * (Bassira) pour bypass / compléter la stratégie auto. Mergés AVEC les
+ * hints émis par research-strategist : on agrège, on ne remplace pas.
+ * Permet à Bassira d'imposer des sources niches (Maroc, MENA, etc.) que
+ * DeepSeek-v4-flash ne génère pas spontanément. Borne : ≤ 20 entrées
+ * par catégorie pour limiter l'amplification scrape.
+ */
+export interface HintsOverride {
+  x_handles?: string[]
+  reddit_subs?: string[]
+  arxiv_categories?: string[]
+  rss_keywords?: string[]
+}
+
 export interface RequestBody {
   seed: string
   lang: Lang
   sector_hint?: string
   depth_hint?: 0 | 1 | 2
   output_profile?: string
+  hints_override?: HintsOverride
+  /**
+   * F-Profile 2026-05-15 — nom OU uuid d'un scope_profile pré-curated
+   * stocké en DB (table scope_profiles). Fetched + mergé après hints_override.
+   * Permet à Bassira de référencer un profil de coverage Maroc/MENA réutilisable.
+   */
+  scope_profile?: string
 }
 
 export interface ApiKeyRow {
@@ -142,6 +164,55 @@ export function validateRequestBody(raw: unknown): BodyValidationResult {
     output_profile = obj.output_profile.slice(0, 32)
   }
 
+  // F-Hints-Override 2026-05-15 : validation du hints_override optionnel.
+  // Chaque catégorie : array de strings ≤ 20 items, chaque item ≤ 80 chars.
+  // Strip @ / r/ prefix sur les handles/subs pour normaliser.
+  let hints_override: HintsOverride | undefined
+  if (obj.hints_override !== undefined && obj.hints_override !== null) {
+    if (typeof obj.hints_override !== 'object' || Array.isArray(obj.hints_override)) {
+      return { ok: false, error: 'hints_override_must_be_object' }
+    }
+    const ho = obj.hints_override as Record<string, unknown>
+    const normalized: HintsOverride = {}
+    const fields: Array<keyof HintsOverride> = [
+      'x_handles',
+      'reddit_subs',
+      'arxiv_categories',
+      'rss_keywords',
+    ]
+    for (const f of fields) {
+      const v = ho[f]
+      if (v === undefined || v === null) continue
+      if (!Array.isArray(v)) {
+        return { ok: false, error: `hints_override.${f}_must_be_array` }
+      }
+      const clean = (v as unknown[])
+        .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+        .map((x) => x.trim().replace(/^@/, '').replace(/^r\//i, '').slice(0, 80))
+        .slice(0, 20)
+      if (clean.length > 0) normalized[f] = clean
+    }
+    if (Object.keys(normalized).length > 0) hints_override = normalized
+  }
+
+  // F-Profile : scope_profile name ou uuid — validation surface seulement
+  // (lookup DB fait dans l'orchestrateur, qui retournera 400 scope_profile_not_found
+  // si invalide).
+  let scope_profile: string | undefined
+  if (obj.scope_profile !== undefined && obj.scope_profile !== null) {
+    if (typeof obj.scope_profile !== 'string') {
+      return { ok: false, error: 'scope_profile_must_be_string' }
+    }
+    const sp = obj.scope_profile.trim()
+    if (sp.length === 0 || sp.length > 80) {
+      return { ok: false, error: 'scope_profile_invalid' }
+    }
+    if (!/^[a-zA-Z0-9_\-]+$/.test(sp)) {
+      return { ok: false, error: 'scope_profile_invalid_chars' }
+    }
+    scope_profile = sp
+  }
+
   return {
     ok: true,
     body: {
@@ -150,6 +221,8 @@ export function validateRequestBody(raw: unknown): BodyValidationResult {
       ...(sector_hint !== undefined ? { sector_hint } : {}),
       ...(depth_hint !== undefined ? { depth_hint } : {}),
       ...(output_profile !== undefined ? { output_profile } : {}),
+      ...(hints_override !== undefined ? { hints_override } : {}),
+      ...(scope_profile !== undefined ? { scope_profile } : {}),
     },
   }
 }
@@ -513,6 +586,118 @@ export function buildScrapeJobs(strategy: Record<string, unknown>): ScrapeJob[] 
   }
 
   return jobs
+}
+
+// ---------------------------------------------------------------------------
+// F-Hints-Override + F-Profile + F7b helpers (coverage augmentation)
+// ---------------------------------------------------------------------------
+
+/**
+ * Convertit un HintsOverride en ScrapeJob[]. Format identique à
+ * buildScrapeJobs sortie : un job par scraper avec body adapté.
+ * RSS skip (V1, cf. note dans buildScrapeJobs).
+ */
+export function hintsOverrideToJobs(h: HintsOverride): ScrapeJob[] {
+  const jobs: ScrapeJob[] = []
+  if (Array.isArray(h.x_handles) && h.x_handles.length > 0) {
+    jobs.push({ scraper: 'x', body: { listIds: h.x_handles.slice(0, 10) } })
+  }
+  if (Array.isArray(h.reddit_subs) && h.reddit_subs.length > 0) {
+    jobs.push({ scraper: 'reddit', body: { subs: h.reddit_subs.slice(0, 12) } })
+  }
+  if (Array.isArray(h.arxiv_categories) && h.arxiv_categories.length > 0) {
+    jobs.push({ scraper: 'arxiv', body: { categories: h.arxiv_categories.slice(0, 5) } })
+  }
+  return jobs
+}
+
+/**
+ * Merge deux ScrapeJob[] par scraper name. Pour chaque scraper, dédupe
+ * et union les listes (listIds / subs / categories). Préserve l'ordre
+ * des items du premier arg, puis ajoute les nouveaux du second.
+ * Cap aux mêmes limites que buildScrapeJobs (10 x_handles / 12 subs / 5 cats).
+ */
+export function mergeScrapeJobs(a: ScrapeJob[], b: ScrapeJob[]): ScrapeJob[] {
+  const byScraper = new Map<ScraperName, Record<string, unknown>>()
+  for (const j of [...a, ...b]) {
+    const existing = byScraper.get(j.scraper)
+    if (!existing) {
+      byScraper.set(j.scraper, { ...j.body })
+      continue
+    }
+    // Merge arrays présents dans body. On connaît les clés : listIds, subs, categories.
+    for (const key of ['listIds', 'subs', 'categories'] as const) {
+      const av = (existing[key] as unknown[] | undefined) ?? []
+      const bv = (j.body[key] as unknown[] | undefined) ?? []
+      if (av.length === 0 && bv.length === 0) continue
+      const set = new Set<string>()
+      for (const x of [...av, ...bv]) {
+        if (typeof x === 'string' && x.trim().length > 0) set.add(x.trim())
+      }
+      const cap = key === 'listIds' ? 10 : key === 'subs' ? 12 : 5
+      existing[key] = Array.from(set).slice(0, cap)
+    }
+  }
+  const out: ScrapeJob[] = []
+  for (const [scraper, body] of byScraper.entries()) {
+    out.push({ scraper, body })
+  }
+  return out
+}
+
+/**
+ * F-Profile 2026-05-15 — résout un nom OU uuid de scope_profile vers
+ * son HintsOverride. Lookup par name d'abord (more user-friendly), uuid
+ * sinon. Retourne null si introuvable.
+ */
+export async function fetchScopeProfile(
+  supabase: SupabaseClient,
+  profileRef: string,
+): Promise<HintsOverride | null> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileRef)
+  const column = isUuid ? 'id' : 'name'
+  const { data, error } = await supabase
+    .from('scope_profiles')
+    .select('x_handles, reddit_subs, arxiv_categories, rss_keywords, active')
+    .eq(column, profileRef)
+    .eq('active', true)
+    .maybeSingle()
+  if (error || !data) return null
+  const out: HintsOverride = {}
+  if (Array.isArray(data.x_handles) && data.x_handles.length > 0) out.x_handles = data.x_handles
+  if (Array.isArray(data.reddit_subs) && data.reddit_subs.length > 0)
+    out.reddit_subs = data.reddit_subs
+  if (Array.isArray(data.arxiv_categories) && data.arxiv_categories.length > 0)
+    out.arxiv_categories = data.arxiv_categories
+  if (Array.isArray(data.rss_keywords) && data.rss_keywords.length > 0)
+    out.rss_keywords = data.rss_keywords
+  return Object.keys(out).length > 0 ? out : null
+}
+
+/**
+ * F7b 2026-05-15 — fetch les configs scraping par défaut du proxy_user
+ * (Amine), à utiliser quand la stratégie + override + profile produisent 0 jobs.
+ * Garantit qu'on lance toujours AU MOINS quelques scrapers en pire cas.
+ */
+export async function fetchProxyUserSettings(
+  supabase: SupabaseClient,
+  proxyUserId: string,
+): Promise<HintsOverride | null> {
+  const { data, error } = await supabase
+    .from('settings')
+    .select('x_queries, reddit_subs, arxiv_categories')
+    .eq('user_id', proxyUserId)
+    .maybeSingle()
+  if (error || !data) return null
+  const out: HintsOverride = {}
+  // x_queries côté settings sont des queries de recherche, pas des list_ids.
+  // Le scraper-x les accepte via le même paramètre listIds (cf. UI Settings).
+  if (Array.isArray(data.x_queries) && data.x_queries.length > 0) out.x_handles = data.x_queries
+  if (Array.isArray(data.reddit_subs) && data.reddit_subs.length > 0)
+    out.reddit_subs = data.reddit_subs
+  if (Array.isArray(data.arxiv_categories) && data.arxiv_categories.length > 0)
+    out.arxiv_categories = data.arxiv_categories
+  return Object.keys(out).length > 0 ? out : null
 }
 
 // ---------------------------------------------------------------------------

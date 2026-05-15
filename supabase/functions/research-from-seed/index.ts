@@ -41,7 +41,11 @@ import {
   buildScrapeJobs,
   callInternal,
   checkRateLimit,
+  fetchProxyUserSettings,
+  fetchScopeProfile,
+  hintsOverrideToJobs,
   type Lang,
+  mergeScrapeJobs,
   type RequestBody,
   resolveCorsOrigin,
   type ScrapeJob,
@@ -404,7 +408,45 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
   telemetry.total_cost_usd += rubricRes.data.telemetry?.usage?.cost ?? 0
 
   // ─── Stage 3 : PARALLEL scrape ───────────────────────────────────────
-  const jobs: ScrapeJob[] = buildScrapeJobs(researchStrategy)
+  // Coverage assembly :
+  //   1. jobs = hints émis par research-strategist (research_strategy.subjects)
+  //   2. + body.hints_override (Bassira pousse des sources directes)
+  //   3. + body.scope_profile (référence à un set pré-curé en DB)
+  //   4. fallback settings du proxy_user si jobs encore vides
+  // Tracé dans scrape_augmentations[] : transparence sur ce qui a complété.
+  let jobs: ScrapeJob[] = buildScrapeJobs(researchStrategy)
+  const scrapeAugmentations: string[] = []
+
+  if (body.hints_override) {
+    const overrideJobs = hintsOverrideToJobs(body.hints_override)
+    if (overrideJobs.length > 0) {
+      jobs = mergeScrapeJobs(jobs, overrideJobs)
+      scrapeAugmentations.push('hints_override')
+    }
+  }
+
+  if (body.scope_profile) {
+    const profileHints = await fetchScopeProfile(supabase, body.scope_profile)
+    if (profileHints) {
+      jobs = mergeScrapeJobs(jobs, hintsOverrideToJobs(profileHints))
+      scrapeAugmentations.push(`scope_profile:${body.scope_profile}`)
+    } else {
+      console.warn(
+        `[research-from-seed] session=${sessionId} scope_profile=${body.scope_profile} not found, ignored.`,
+      )
+    }
+  }
+
+  // F7b — fallback settings si TOUT a échoué (strategy hints vides +
+  // pas d'override + pas de scope_profile valide).
+  if (jobs.length === 0) {
+    const settingsFallback = await fetchProxyUserSettings(supabase, proxyUserId)
+    if (settingsFallback) {
+      jobs = hintsOverrideToJobs(settingsFallback)
+      if (jobs.length > 0) scrapeAugmentations.push('settings_fallback')
+    }
+  }
+
   const scrapeStart = Date.now()
   if (jobs.length === 0) {
     pushStage(telemetry, 'scrape', scrapeStart, {
@@ -434,6 +476,7 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
     pushStage(telemetry, 'scrape', scrapeStart, {
       ok: successCount > 0,
       durationMs: Date.now() - scrapeStart,
+      fallback_engaged: scrapeAugmentations.includes('settings_fallback') ? true : undefined,
     })
 
     if (successCount === 0) {
