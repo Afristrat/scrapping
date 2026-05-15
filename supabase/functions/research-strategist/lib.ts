@@ -45,10 +45,7 @@ export function validateRequestBody(raw: unknown): ValidationResult {
   if (trimmed.length > SEED_MAX) return { ok: false, error: 'seed_too_long' }
 
   const lang = obj.lang
-  if (
-    typeof lang !== 'string' ||
-    !(SUPPORTED_LANGS as readonly string[]).includes(lang)
-  ) {
+  if (typeof lang !== 'string' || !(SUPPORTED_LANGS as readonly string[]).includes(lang)) {
     return { ok: false, error: 'lang_unsupported' }
   }
 
@@ -245,6 +242,34 @@ export function validateResearchStrategy(parsed: unknown): SchemaResult {
   }
 
   return { ok: true, strategy: obj }
+}
+
+/**
+ * F7a 2026-05-15 — compte les subjects qui ont AU MOINS UN hint
+ * exploitable parmi (x_handles_hint, reddit_subs_hint, arxiv_categories_hint,
+ * rss_keywords). Sert à détecter le cas où DeepSeek-v4-flash passe la
+ * validation schema mais émet des hints vides (observé sur sessions
+ * 2ea72654 etc. — hints:{} sur 5/5 subjects).
+ *
+ * Retourne { withHints, total }. Le caller décide si retry est nécessaire.
+ */
+export function countSubjectsWithHints(strategy: Record<string, unknown>): {
+  withHints: number
+  total: number
+} {
+  const subjects = Array.isArray(strategy.subjects)
+    ? (strategy.subjects as Array<Record<string, unknown>>)
+    : []
+  let withHints = 0
+  for (const s of subjects) {
+    if (!s || typeof s !== 'object') continue
+    const x = Array.isArray(s.x_handles_hint) ? s.x_handles_hint.length : 0
+    const r = Array.isArray(s.reddit_subs_hint) ? s.reddit_subs_hint.length : 0
+    const a = Array.isArray(s.arxiv_categories_hint) ? s.arxiv_categories_hint.length : 0
+    const k = Array.isArray(s.rss_keywords) ? s.rss_keywords.length : 0
+    if (x + r + a + k > 0) withHints++
+  }
+  return { withHints, total: subjects.length }
 }
 
 // ---------------------------------------------------------------------------
