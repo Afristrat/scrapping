@@ -24,6 +24,7 @@ import { formatError } from '../_shared/errors.ts'
 import {
   buildSystemPrompt,
   buildUserMessage,
+  countSubjectsWithHints,
   extractJsonObject,
   type RequestBody,
   sanitizeLlmJsonContent,
@@ -58,6 +59,7 @@ interface CallResult {
     provider_used: string | null
     cost: number
     attempts: number
+    hints_coverage?: { withHints: number; total: number }
   }
   error?: string
   detail?: string
@@ -170,6 +172,24 @@ async function runResearchStrategist(
       continue
     }
 
+    // F7a 2026-05-15 — détecte le cas où le LLM passe le schema mais émet
+    // des subjects sans aucun hint exploitable (x_handles_hint /
+    // reddit_subs_hint / arxiv_categories_hint / rss_keywords tous vides).
+    // Ce cas fait que research-from-seed lance 0 scraper (= 0 signal).
+    // On retry une fois max avec correction explicite ciblant les hints.
+    const hintsCoverage = countSubjectsWithHints(schema.strategy)
+    if (i === 0 && hintsCoverage.total > 0 && hintsCoverage.withHints / hintsCoverage.total < 0.5) {
+      correctionHint =
+        `Votre research_strategy précédente a ${hintsCoverage.withHints}/${hintsCoverage.total} subjects avec des hints exploitables — ` +
+        `c'est INSUFFISANT. Pour CHAQUE subject de la prochaine sortie, fournis au moins UNE source concrète dans : ` +
+        `reddit_subs_hint (ex: [{"sub":"Morocco","confident":true}, {"sub":"AfricanTech"}]) ` +
+        `OU x_handles_hint (ex: [{"handle":"@MAP_Information","lang":"fr"}]) ` +
+        `OU arxiv_categories_hint (ex: ["cs.AI","cs.CY"]) ` +
+        `OU rss_keywords (ex: ["IA Maroc","fintech MENA"]). ` +
+        `Pas de hints={} vides. Si tu ne connais pas de source spécifique au sujet, propose une source LARGE pertinente (ex: r/artificial pour tout sujet IA, ou rss_keywords génériques). Re-émet le research_strategy COMPLET (pas un diff).`
+      continue
+    }
+
     return {
       ok: true,
       status: 200,
@@ -180,6 +200,7 @@ async function runResearchStrategist(
         provider_used: lastDispatch.provider_used ?? null,
         cost: lastDispatch.usage?.cost ?? 0,
         attempts,
+        hints_coverage: hintsCoverage,
       },
     }
   }
