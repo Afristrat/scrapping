@@ -102,10 +102,19 @@ interface PipelineTelemetry {
 export function classifyFailure(input: {
   status?: number
   error?: string
-  detail?: string
+  detail?: unknown
 }): FailureType {
-  const err = (input.error ?? '').toLowerCase()
-  const detail = (input.detail ?? '').toLowerCase()
+  const err = typeof input.error === 'string' ? input.error.toLowerCase() : ''
+  // Bug 2026-05-16 : `input.detail` peut être un objet (cf. session 84f31a3b où
+  // research_sessions.error_detail = { stage, message }). On stringify
+  // defensively pour éviter `.toLowerCase is not a function`.
+  const detailRaw =
+    typeof input.detail === 'string'
+      ? input.detail
+      : input.detail !== undefined && input.detail !== null
+        ? JSON.stringify(input.detail)
+        : ''
+  const detail = detailRaw.toLowerCase()
   if (input.status === 504 || err === 'timeout' || err.includes('timed_out')) return 'timeout'
   if (input.status === 429 || err === 'rate_limited') return 'rate_limited'
   if (input.status === 401 || input.status === 403 || err === 'missing_authorization')

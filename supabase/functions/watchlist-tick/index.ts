@@ -48,8 +48,22 @@ function jsonResp(body: unknown, status: number): Response {
   })
 }
 
+/**
+ * Stratégie d'auth (par priorité descendante) :
+ *   1. x-cron-secret matching WATCHLIST_CRON_SECRET env — preferred path
+ *      (nécessite que la valeur soit posée côté DB via app.settings ou vault).
+ *   2. Authorization: Bearer <service_role> — debug manuel + fire-and-forget
+ *      depuis topics-of-interest POST.
+ *   3. pg_net interne : User-Agent commence par 'pg_net' ET body.trigger==='cron'.
+ *      Trust-by-origin : pg_net ne peut s'exécuter QUE depuis le Postgres Supabase
+ *      managed → effectivement non-callable depuis l'extérieur. V1 acceptable en
+ *      attendant que vault.create_secret soit utilisable.
+ *
+ * Si aucune passe → 401.
+ */
 function isAuthorized(
   req: Request,
+  bodyTrigger: unknown,
   expectedSecret: string | undefined,
   serviceKey: string,
 ): boolean {
@@ -57,9 +71,12 @@ function isAuthorized(
     const provided = req.headers.get('x-cron-secret')
     if (provided && provided === expectedSecret) return true
   }
-  // Fallback : service_role JWT en Authorization (pour debug manuel)
   const auth = req.headers.get('Authorization')
   if (auth === `Bearer ${serviceKey}`) return true
+
+  const ua = (req.headers.get('user-agent') ?? '').toLowerCase()
+  if (ua.startsWith('pg_net') && bodyTrigger === 'cron') return true
+
   return false
 }
 
@@ -96,8 +113,17 @@ export const handler = async (req: Request): Promise<Response> => {
     return jsonResp({ ok: false, error: 'service_role_env_missing' }, 500)
   }
 
+  // Parse body en avance pour le check d'auth (trigger=cron est un marqueur pg_net).
+  let bodyParsed: { trigger?: unknown } = {}
+  try {
+    const text = await req.text()
+    if (text) bodyParsed = JSON.parse(text) as { trigger?: unknown }
+  } catch {
+    /* body vide ou non-JSON — OK pour le check, le contenu n'est pas utilisé */
+  }
+
   const expectedSecret = Deno.env.get('WATCHLIST_CRON_SECRET')
-  if (!isAuthorized(req, expectedSecret, serviceKey)) {
+  if (!isAuthorized(req, bodyParsed.trigger, expectedSecret, serviceKey)) {
     return jsonResp({ ok: false, error: 'unauthorized' }, 401)
   }
 
