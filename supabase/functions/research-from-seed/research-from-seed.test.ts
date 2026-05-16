@@ -25,11 +25,14 @@ import {
   checkRateLimit,
   constantTimeEquals,
   hashApiKey,
+  hintsOverrideToJobs,
+  mergeScrapeJobs,
   resolveCorsOrigin,
   selectTopSignals,
   validateApiKey,
   validateRequestBody,
 } from './lib.ts'
+import { classifyFailure } from './index.ts'
 
 // ============================================================================
 // Helpers — mock SupabaseClient minimal pour les tests purs
@@ -794,4 +797,133 @@ Deno.test('Pipeline mock: ordre des appels chaînés respecté', async () => {
   assert(calls[3].url.endsWith('/llm-score-batch'))
   assert(calls[4].url.endsWith('/signal-synthesizer'))
   assert(calls[5].url.endsWith('/quality-auditor'))
+})
+
+// ============================================================================
+// F-Hints-Override : hintsOverrideToJobs + mergeScrapeJobs
+// ============================================================================
+
+Deno.test('hintsOverrideToJobs : input vide → []', () => {
+  assertEquals(hintsOverrideToJobs({}), [])
+})
+
+Deno.test('hintsOverrideToJobs : reddit_subs → 1 job', () => {
+  const jobs = hintsOverrideToJobs({ reddit_subs: ['Morocco', 'AfricanTech'] })
+  assertEquals(jobs.length, 1)
+  assertEquals(jobs[0].scraper, 'reddit')
+  assertEquals(jobs[0].body.subs, ['Morocco', 'AfricanTech'])
+})
+
+Deno.test('hintsOverrideToJobs : x_handles + arxiv_categories → 2 jobs', () => {
+  const jobs = hintsOverrideToJobs({
+    x_handles: ['@MAP_Information'],
+    arxiv_categories: ['cs.AI', 'cs.CY'],
+  })
+  assertEquals(jobs.length, 2)
+  const scrapers = jobs.map((j) => j.scraper).sort()
+  assertEquals(scrapers, ['arxiv', 'x'])
+})
+
+Deno.test('hintsOverrideToJobs : cap x_handles à 10', () => {
+  const handles = Array.from({ length: 20 }, (_, i) => `@h${i}`)
+  const jobs = hintsOverrideToJobs({ x_handles: handles })
+  assertEquals((jobs[0].body.listIds as string[]).length, 10)
+})
+
+Deno.test('mergeScrapeJobs : merge reddit subs avec dédup', () => {
+  const a = [{ scraper: 'reddit' as const, body: { subs: ['Morocco', 'AfricanTech'] } }]
+  const b = [{ scraper: 'reddit' as const, body: { subs: ['Morocco', 'StartUps'] } }]
+  const out = mergeScrapeJobs(a, b)
+  assertEquals(out.length, 1)
+  const subs = (out[0].body.subs as string[]).sort()
+  assertEquals(subs, ['AfricanTech', 'Morocco', 'StartUps'])
+})
+
+Deno.test('mergeScrapeJobs : 2 scrapers différents → 2 jobs préservés', () => {
+  const a = [{ scraper: 'reddit' as const, body: { subs: ['Morocco'] } }]
+  const b = [{ scraper: 'arxiv' as const, body: { categories: ['cs.AI'] } }]
+  const out = mergeScrapeJobs(a, b)
+  assertEquals(out.length, 2)
+})
+
+Deno.test("mergeScrapeJobs : input vide → préserve l'autre", () => {
+  const a = [{ scraper: 'reddit' as const, body: { subs: ['Morocco'] } }]
+  const out = mergeScrapeJobs(a, [])
+  assertEquals(out.length, 1)
+  assertEquals(out[0].body.subs, ['Morocco'])
+})
+
+// ============================================================================
+// F6 — classifyFailure
+// ============================================================================
+
+Deno.test('classifyFailure : status 504 → timeout', () => {
+  assertEquals(classifyFailure({ status: 504 }), 'timeout')
+})
+
+Deno.test('classifyFailure : error=timeout → timeout (sans status)', () => {
+  assertEquals(classifyFailure({ error: 'timeout' }), 'timeout')
+})
+
+Deno.test('classifyFailure : status 429 → rate_limited', () => {
+  assertEquals(classifyFailure({ status: 429 }), 'rate_limited')
+})
+
+Deno.test('classifyFailure : status 401 → auth_failed', () => {
+  assertEquals(classifyFailure({ status: 401 }), 'auth_failed')
+})
+
+Deno.test('classifyFailure : error=INSUFFICIENT_SIGNALS → insufficient_signals', () => {
+  assertEquals(classifyFailure({ error: 'INSUFFICIENT_SIGNALS' }), 'insufficient_signals')
+})
+
+Deno.test('classifyFailure : error=validation_failed_after_retry → validation_failed', () => {
+  assertEquals(classifyFailure({ error: 'validation_failed_after_retry' }), 'validation_failed')
+})
+
+Deno.test('classifyFailure : error=dispatch_failed → dispatch_failed', () => {
+  assertEquals(classifyFailure({ error: 'dispatch_failed' }), 'dispatch_failed')
+})
+
+Deno.test(
+  'classifyFailure : error=invalid_response detail=missing topics → invalid_response',
+  () => {
+    assertEquals(
+      classifyFailure({ error: 'invalid_response', detail: 'missing topics in response' }),
+      'invalid_response',
+    )
+  },
+)
+
+Deno.test('classifyFailure : error inconnu → unknown', () => {
+  assertEquals(classifyFailure({ error: 'mystery_error' }), 'unknown')
+})
+
+Deno.test('classifyFailure : aucun champ → unknown', () => {
+  assertEquals(classifyFailure({}), 'unknown')
+})
+
+Deno.test('classifyFailure : detail est un objet (bug fix 2026-05-16) → ne throw pas', () => {
+  // Avant fix : .toLowerCase() sur {stage, message} → TypeError
+  // Maintenant : JSON.stringify defensively
+  const r = classifyFailure({
+    error: 'background_unhandled',
+    detail: { stage: 'background_unhandled', message: 'something failed' },
+  })
+  assertEquals(r, 'unknown') // pas dans la mapping, mais surtout : pas de throw
+})
+
+Deno.test(
+  'classifyFailure : detail objet contenant "non-disqualified signals" → insufficient_signals',
+  () => {
+    const r = classifyFailure({
+      error: 'STAGE_FAILED',
+      detail: { reason: 'Need at least 5 non-disqualified signals, got 1.' },
+    })
+    assertEquals(r, 'insufficient_signals')
+  },
+)
+
+Deno.test('classifyFailure : detail null → unknown sans crash', () => {
+  assertEquals(classifyFailure({ detail: null }), 'unknown')
 })

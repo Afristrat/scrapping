@@ -13,6 +13,7 @@ import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@0.22
 import {
   buildSystemPrompt,
   buildUserMessage,
+  countSubjectsWithHints,
   extractJsonObject,
   sanitizeLlmJsonContent,
   stripControlChars,
@@ -219,9 +220,7 @@ function validStrategyFixture(): Record<string, unknown> {
     tensions: [
       { between: ['s_001', 's_002'], nature: 'Lectures opposées.', exploit_in_synthesis: true },
     ],
-    blind_spots: [
-      { description: 'Voix arabophones populaires.', mitigation_query: 'تعليقات' },
-    ],
+    blind_spots: [{ description: 'Voix arabophones populaires.', mitigation_query: 'تعليقات' }],
     recursion_budget: 1,
   }
 }
@@ -376,4 +375,61 @@ Deno.test('buildUserMessage : sector_hint absent → null', () => {
   const msg = buildUserMessage({ seed: 'graine', lang: 'fr' })
   const parsed = JSON.parse(msg)
   assertEquals(parsed.sector_hint, null)
+})
+
+// ===========================================================================
+// F7a — countSubjectsWithHints
+// ===========================================================================
+
+Deno.test('countSubjectsWithHints : subjects vides → 0/0', () => {
+  const r = countSubjectsWithHints({ subjects: [] })
+  assertEquals(r.withHints, 0)
+  assertEquals(r.total, 0)
+})
+
+Deno.test('countSubjectsWithHints : tous subjects sans hints → 0/N', () => {
+  const r = countSubjectsWithHints({
+    subjects: [
+      { id: 's1', x_handles_hint: [], reddit_subs_hint: [], arxiv_categories_hint: [] },
+      { id: 's2' }, // pas de hints du tout
+    ],
+  })
+  assertEquals(r.withHints, 0)
+  assertEquals(r.total, 2)
+})
+
+Deno.test('countSubjectsWithHints : mix → compte correctement', () => {
+  const r = countSubjectsWithHints({
+    subjects: [
+      { id: 's1', x_handles_hint: [{ handle: '@foo' }] }, // 1 hint
+      { id: 's2', reddit_subs_hint: [], arxiv_categories_hint: [] }, // 0
+      { id: 's3', arxiv_categories_hint: ['cs.AI'] }, // 1
+      { id: 's4', rss_keywords: ['Maroc IA'] }, // 1
+      { id: 's5' }, // 0
+    ],
+  })
+  assertEquals(r.withHints, 3)
+  assertEquals(r.total, 5)
+})
+
+Deno.test('countSubjectsWithHints : strategy sans subjects → 0/0', () => {
+  const r = countSubjectsWithHints({})
+  assertEquals(r.withHints, 0)
+  assertEquals(r.total, 0)
+})
+
+Deno.test('countSubjectsWithHints : subject avec UN hint dans chaque catégorie → compte 1', () => {
+  const r = countSubjectsWithHints({
+    subjects: [
+      {
+        id: 's1',
+        x_handles_hint: [{ handle: '@a' }],
+        reddit_subs_hint: [{ sub: 'Maroc' }],
+        arxiv_categories_hint: ['cs.CY'],
+        rss_keywords: ['IA Maroc'],
+      },
+    ],
+  })
+  assertEquals(r.withHints, 1)
+  assertEquals(r.total, 1)
 })
