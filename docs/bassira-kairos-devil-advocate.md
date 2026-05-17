@@ -420,6 +420,54 @@ Configuration : Settings UI Kairos → `model_config.scoring.model = "deepseek-c
 
 ---
 
+## 8b. Cascade fix : `logs.org_id NOT NULL` (FIX #9)
+
+**Découvert au smoke test #2** : aucune des actions `logs` des hardenings antifragiles ne s'écrivait. Investigation par insert direct via service_role :
+
+```
+{"code":"23502","message":"null value in column \"org_id\" of relation \"logs\" violates not-null constraint"}
+```
+
+La table `logs` exigeait `org_id NOT NULL`. Tous les `supabase.from('logs').insert(...)` depuis les edge fns en mode ad_hoc (research-from-seed → rubric-architect/llm-score-batch/dispatch-llm) ne fournissent pas d'org_id (pas de DB read disponible naturellement pour le lookup) et étaient `catch{}` silently dans des try-catch best-effort.
+
+**Conséquence avant fix** : tous les logs antifragiles invisibles :
+
+- `rubric-architect:auto_normalized` (FIX #4)
+- `dispatch-llm:reasoning_fallback` (FIX #8)
+- `llm:score-rubric-override` (FIX #6)
+- `research_pipeline:failure_spike_alert` (FIX #7, cron interne)
+
+**Fix** : migration `20260518000002_logs_org_id_nullable.sql`
+
+```sql
+ALTER TABLE logs ALTER COLUMN org_id DROP NOT NULL;
+```
+
+Compatible 100% rétrocompat : les inserts qui fournissent org_id continuent à fonctionner ; ceux qui ne le fournissent pas sont désormais autorisés. Le filtrage par org reste possible via user_id.
+
+**Vérification post-fix** : insert manuel `{user_id, action, status, payload}` sans org_id → succès (id=503, org_id=null), lecture immédiate confirme.
+
+**Smoke test #3 final (session `22f5e86a`)** :
+
+- Status: **completed**
+- Topics produits: **2**
+- scoring_quality: **partial** (entre 0-50% soft fails — reasoning compat efficace)
+- quality_warning: `deepening_recommended` (auditor V1)
+- Stages: TOUS OK (123s total, sous le ceiling)
+
+Comparaison runs successifs :
+| Session | Status | Score stage | Quality | Topics |
+|---|---|---|---|---|
+| `777f6c28` (pré-fix) | failed | timeout 90s | n/a | 0 |
+| `fec78bae` (pré-fix) | failed | n/a (rubric fail) | n/a | 0 |
+| `30257bfb` (FIX #1-7) | completed | 6.8s ✓ | poor | 0 (insufficient) |
+| `787362ea` (FIX #8) | failed | 8.2s ✓ | n/a | 0 (synth INSUFFICIENT) |
+| `22f5e86a` (FIX #8+#9) | **completed** | **15.5s ✓** | **partial** | **2** |
+
+Progression mesurable, root causes adressées en cascade.
+
+---
+
 ## 9. Références
 
 - Memory : `bassira_pipeline_definitif.md` (état architectural)
