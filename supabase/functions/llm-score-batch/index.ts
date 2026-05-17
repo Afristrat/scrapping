@@ -721,20 +721,34 @@ async function handleAdHocOrHybridScoring(args: {
     )
     .map((r) => r.value)
 
-  const failedCount = settled.length - results.length
+  const hardFailedCount = settled.length - results.length // Promise rejections
+  const softFailedCount = results.filter((r) => r.scoring_failed).length
+  const totalUntrustedCount = hardFailedCount + softFailedCount
   const totalCost = results.reduce((acc, r) => acc + (r.cost ?? 0), 0)
   const disqualifiedCount = results.filter((r) => r.disqualified).length
+
+  // scoring_quality — observabilité explicite pour le caller (research-from-seed).
+  // Hotfix 2026-05-17 : avant, les scoring_failed étaient silently dégradés en
+  // score=0 indistinguable d'un signal légitimement mauvais, masquant les
+  // problèmes de quota OpenRouter / timeout dispatch / parse JSON cassé.
+  const denominator = settled.length || 1
+  const untrustedRatio = totalUntrustedCount / denominator
+  const scoringQuality: 'full' | 'partial' | 'poor' =
+    untrustedRatio === 0 ? 'full' : untrustedRatio <= 0.5 ? 'partial' : 'poor'
 
   await supabase.from('logs').insert({
     user_id: userId,
     action: 'llm:score-rubric-override',
-    status: 'ok',
+    status: scoringQuality === 'poor' ? 'warn' : 'ok',
     payload: {
       mode: signals.length === limited.length ? 'no_truncation' : 'truncated_to_30',
       count: limited.length,
       scored: results.length,
-      failed: failedCount,
+      hard_failed: hardFailedCount,
+      soft_failed: softFailedCount,
       disqualified: disqualifiedCount,
+      scoring_quality: scoringQuality,
+      untrusted_ratio: Math.round(untrustedRatio * 1000) / 1000,
       cost: totalCost,
       duration_ms: Date.now() - startedAt,
     },
@@ -744,8 +758,12 @@ async function handleAdHocOrHybridScoring(args: {
     {
       batch_size: limited.length,
       scored: results.length,
-      failed: failedCount,
+      // `failed` reste pour rétrocompat consommateurs externes (Bassira)
+      failed: hardFailedCount,
+      hard_failed: hardFailedCount,
+      soft_failed: softFailedCount,
       disqualified: disqualifiedCount,
+      scoring_quality: scoringQuality,
       cost: totalCost,
       results,
     },

@@ -68,6 +68,13 @@ export interface ScoredSignalOutput {
   applied_boosts: string[]
   cost: number
   model_used: string
+  /**
+   * True si le scoring criteria a échoué (dispatch LLM ok=false OU parse JSON
+   * vide). Le score=0 est alors par défaut, pas par vrai jugement. Caller
+   * doit décider d'agir (warning, fallback). Avant 2026-05-17 ces cas étaient
+   * silently dégradés et indistinguables d'un signal légitimement mauvais.
+   */
+  scoring_failed: boolean
 }
 
 export interface ValidationError {

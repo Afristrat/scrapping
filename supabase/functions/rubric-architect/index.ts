@@ -326,6 +326,49 @@ export function normalizeCriteriaWeights(criteria: unknown): void {
   }
 }
 
+/**
+ * Auto-clip le nombre de criteria à [4, 8] quand le LLM en produit plus.
+ *
+ * Hotfix 2026-05-17 (defense in depth) : DeepSeek-v4-flash peut produire 10+
+ * criteria sur graines politico-sociales très riches. Plutôt que de fail le
+ * schema, on garde les 8 critères les plus pondérés (les plus discriminants
+ * pour le scoring downstream) et on laisse normalizeCriteriaWeights renormaliser
+ * la somme à 100.
+ *
+ * Si la longueur initiale est < 4, on laisse passer pour que la validation
+ * normale signale l'erreur — on ne peut pas inventer des criteria sans contexte.
+ *
+ * Mute le tableau en place. Retourne true si une transformation a été appliquée.
+ */
+export function normalizeCriteriaCount(rubric: Partial<Rubric>): boolean {
+  if (!Array.isArray(rubric.criteria)) return false
+  // Filtre les entrées mal formées AVANT de compter — sinon on garderait du bruit.
+  const valid = rubric.criteria.filter(
+    (c): c is [string, number] =>
+      Array.isArray(c) &&
+      c.length === 2 &&
+      typeof c[0] === 'string' &&
+      c[0].trim().length > 0 &&
+      typeof c[1] === 'number' &&
+      Number.isFinite(c[1]) &&
+      c[1] > 0,
+  )
+
+  const originalLength = rubric.criteria.length
+  if (valid.length > 8) {
+    // Sort by weight desc — garde les criteria avec le plus de poids.
+    valid.sort((a, b) => b[1] - a[1])
+    rubric.criteria = valid.slice(0, 8)
+    return true
+  }
+  if (valid.length !== originalLength) {
+    // Du bruit a été filtré.
+    rubric.criteria = valid
+    return true
+  }
+  return false
+}
+
 export function validateWeightSum(criteria: Array<[string, number]>): ValidationResult {
   const errors: ValidationError[] = []
   if (!Array.isArray(criteria) || criteria.length < 4 || criteria.length > 8) {
@@ -375,6 +418,41 @@ export function validateWeightSum(criteria: Array<[string, number]>): Validation
   return { valid: errors.length === 0, errors }
 }
 
+/**
+ * Auto-clip disqualifiers à [3, 6]. Filtre les entrées mal formées + cap à 6
+ * en gardant les premiers (LLM les émet généralement par ordre de priorité).
+ *
+ * Si la longueur valide est < 3, ne touche pas — pas récupérable sans
+ * contexte. Hotfix 2026-05-17.
+ *
+ * Retourne true si une transformation a été appliquée.
+ */
+export function normalizeDisqualifiersCount(rubric: Partial<Rubric>): boolean {
+  if (!Array.isArray(rubric.disqualifiers)) return false
+  const original = rubric.disqualifiers
+  const valid = original.filter(
+    (d: unknown): d is Disqualifier =>
+      !!d &&
+      typeof d === 'object' &&
+      typeof (d as Disqualifier).id === 'string' &&
+      (d as Disqualifier).id.length > 0 &&
+      typeof (d as Disqualifier).rule === 'string' &&
+      (d as Disqualifier).rule.trim().length >= 5 &&
+      typeof (d as Disqualifier).rationale === 'string' &&
+      (d as Disqualifier).rationale.trim().length >= 3,
+  )
+
+  if (valid.length > 6) {
+    rubric.disqualifiers = valid.slice(0, 6)
+    return true
+  }
+  if (valid.length !== original.length) {
+    rubric.disqualifiers = valid
+    return true
+  }
+  return false
+}
+
 export function validateDisqualifiers(disqualifiers: unknown): ValidationResult {
   const errors: ValidationError[] = []
   if (!Array.isArray(disqualifiers)) {
@@ -419,6 +497,95 @@ export function validateDisqualifiers(disqualifiers: unknown): ValidationResult 
     }
   }
   return { valid: errors.length === 0, errors }
+}
+
+/**
+ * Auto-normalise soft_boosts :
+ *   - filtre les entrées mal formées
+ *   - cap chaque boost individuel à 20 (au lieu de fail)
+ *   - garde max 5 boosts (sort par boost desc pour prioriser les plus impactants)
+ *   - si total ≥ 50, scale-down proportionnel pour viser total = 48
+ *
+ * Si la longueur valide est < 2, ne touche pas. Hotfix 2026-05-17.
+ *
+ * Retourne true si une transformation a été appliquée.
+ */
+export function normalizeSoftBoosts(rubric: Partial<Rubric>): boolean {
+  if (!Array.isArray(rubric.soft_boosts)) return false
+  const original = rubric.soft_boosts
+  const valid = original.filter(
+    (b: unknown): b is SoftBoost =>
+      !!b &&
+      typeof b === 'object' &&
+      typeof (b as SoftBoost).id === 'string' &&
+      (b as SoftBoost).id.length > 0 &&
+      typeof (b as SoftBoost).rule === 'string' &&
+      (b as SoftBoost).rule.trim().length >= 5 &&
+      typeof (b as SoftBoost).boost === 'number' &&
+      Number.isFinite((b as SoftBoost).boost) &&
+      (b as SoftBoost).boost > 0 &&
+      typeof (b as SoftBoost).rationale === 'string' &&
+      (b as SoftBoost).rationale.trim().length >= 3,
+  ) as SoftBoost[]
+
+  let mutated = valid.length !== original.length
+
+  // Cap individuel à 20.
+  for (const b of valid) {
+    if (b.boost > 20) {
+      b.boost = 20
+      mutated = true
+    }
+    // Floor & integer cast pour rester sur des entiers (validator exige int).
+    if (!Number.isInteger(b.boost)) {
+      b.boost = Math.max(1, Math.floor(b.boost))
+      mutated = true
+    }
+  }
+
+  // Garde 5 max, prioriser les boosts plus impactants.
+  let trimmed = valid
+  if (valid.length > 5) {
+    trimmed = [...valid].sort((a, b) => b.boost - a.boost).slice(0, 5)
+    mutated = true
+  }
+
+  // Cap total : strict < 50 (validator).
+  let total = trimmed.reduce((s, b) => s + b.boost, 0)
+  if (total >= 50) {
+    // Scale-down proportionnel pour viser 48.
+    const target = 48
+    const scale = target / total
+    for (const b of trimmed) {
+      const scaled = Math.max(1, Math.floor(b.boost * scale))
+      if (scaled !== b.boost) {
+        b.boost = scaled
+        mutated = true
+      }
+    }
+    // Recheck — arrondis peuvent encore donner total ≥ 50.
+    total = trimmed.reduce((s, b) => s + b.boost, 0)
+    if (total >= 50) {
+      // Réduction itérative depuis les boosts les plus hauts.
+      const sorted = [...trimmed].sort((a, b) => b.boost - a.boost)
+      let i = 0
+      let safety = 100
+      while (total >= 50 && safety > 0) {
+        if (sorted[i].boost > 1) {
+          sorted[i].boost -= 1
+          total -= 1
+          mutated = true
+        }
+        i = (i + 1) % sorted.length
+        safety--
+      }
+    }
+  }
+
+  if (mutated) {
+    rubric.soft_boosts = trimmed
+  }
+  return mutated
 }
 
 export function validateSoftBoosts(soft_boosts: unknown): ValidationResult {
@@ -486,6 +653,47 @@ export function validateSoftBoosts(soft_boosts: unknown): ValidationResult {
     })
   }
   return { valid: errors.length === 0, errors }
+}
+
+/**
+ * Auto-normalise calibration_examples :
+ *   - filtre les entrées mal formées (score hors [0,100], archetype trop court)
+ *   - si > 3 examples : garde min/median/max pour préserver la diversité tier
+ *   - si < 3 : ne touche pas, laisse fail (pas inventable sans contexte)
+ *
+ * Hotfix 2026-05-17. Retourne true si une transformation a été appliquée.
+ */
+export function normalizeCalibrationExamples(rubric: Partial<Rubric>): boolean {
+  if (!Array.isArray(rubric.calibration_examples)) return false
+  const original = rubric.calibration_examples
+  const valid = original.filter(
+    (e: unknown): e is CalibrationExample =>
+      !!e &&
+      typeof e === 'object' &&
+      typeof (e as CalibrationExample).expected_score === 'number' &&
+      (e as CalibrationExample).expected_score >= 0 &&
+      (e as CalibrationExample).expected_score <= 100 &&
+      typeof (e as CalibrationExample).signal_archetype === 'string' &&
+      (e as CalibrationExample).signal_archetype.trim().length >= 10,
+  )
+
+  if (valid.length === original.length && valid.length === 3) return false
+
+  if (valid.length > 3) {
+    // Garde tier diversity : score le plus bas, le plus haut, et le median.
+    valid.sort((a, b) => a.expected_score - b.expected_score)
+    const low = valid[0]
+    const high = valid[valid.length - 1]
+    const mid = valid[Math.floor(valid.length / 2)]
+    rubric.calibration_examples = [low, mid, high]
+    return true
+  }
+
+  if (valid.length !== original.length) {
+    rubric.calibration_examples = valid
+    return true
+  }
+  return false
 }
 
 export function validateCalibrationExamples(examples: unknown): ValidationResult {
@@ -557,6 +765,129 @@ export function validateCalibrationExamples(examples: unknown): ValidationResult
   return { valid: errors.length === 0, errors }
 }
 
+/**
+ * Auto-normalise la longueur du scoring_prompt à [200, 500] mots.
+ *
+ * Hotfix 2026-05-17 (root cause de la session fec78bae) : DeepSeek-v4-flash
+ * sur task=enrichment hallucine régulièrement la longueur cible et produit
+ * des scoring_prompts de 20-50 mots malgré l'instruction explicite et le
+ * retry avec correction. Le retry LLM coûte 30-40s et ne corrige pas le bug
+ * de manière fiable.
+ *
+ * Stratégie déterministe :
+ *   - si > 500 mots : truncate à 450 mots (garde le début, plus pertinent)
+ *   - si < 200 mots : pad à partir du contenu déjà présent dans la rubric
+ *     (criteria + disqualifiers + soft_boosts + calibration_examples), ce qui
+ *     produit naturellement un texte de 250-450 mots couvrant exactement
+ *     les instructions dont le scoreur a besoin
+ *
+ * Aligné philosophiquement avec normalizeCriteriaWeights : on ne re-prompt
+ * pas le LLM pour corriger une mauvaise arithmétique / une longueur, on
+ * corrige côté serveur de manière déterministe et auditable.
+ *
+ * PRÉREQUIS : doit être appelé APRÈS les autres normalizers, car son
+ * algorithme utilise rubric.criteria/disqualifiers/soft_boosts/calibration_examples
+ * comme matière première pour la génération du complément.
+ *
+ * Mute en place. Retourne true si une transformation a été appliquée.
+ */
+export function normalizeScoringPromptLength(rubric: Partial<Rubric>): boolean {
+  if (typeof rubric.scoring_prompt !== 'string') return false
+  const current = rubric.scoring_prompt.trim()
+  if (current.length === 0) return false
+
+  const wordCount = (s: string): number => s.split(/\s+/).filter((w) => w.length > 0).length
+  const initial = wordCount(current)
+  if (initial >= 200 && initial <= 500) return false
+
+  if (initial > 500) {
+    // Truncate proprement à 450 mots — le début d'un scoring_prompt est plus
+    // important que la fin (résumé de la rubric en tête, exemples en queue).
+    const words = current.split(/\s+/).filter((w) => w.length > 0)
+    rubric.scoring_prompt = `${words.slice(0, 450).join(' ')}…`
+    return true
+  }
+
+  // initial < 200 : on pad à partir des autres champs de la rubric.
+  const parts: string[] = [current]
+
+  if (Array.isArray(rubric.criteria) && rubric.criteria.length > 0) {
+    parts.push('\nRappel des critères pondérés (somme = 100) :')
+    for (const c of rubric.criteria) {
+      if (Array.isArray(c) && c.length === 2) {
+        parts.push(
+          `- ${c[0]} (poids ${c[1]}/100) : évalue ce critère de manière indépendante des autres, ` +
+            `en t'appuyant sur des éléments concrets et observables du signal.`,
+        )
+      }
+    }
+  }
+
+  if (Array.isArray(rubric.disqualifiers) && rubric.disqualifiers.length > 0) {
+    parts.push("\nRègles de disqualification (signal noté 0 si l'une matche) :")
+    for (const d of rubric.disqualifiers as Disqualifier[]) {
+      if (typeof d?.rule === 'string') {
+        parts.push(`- ${d.id}: ${d.rule.trim()} — ${d.rationale ?? 'pas de rationale fourni'}.`)
+      }
+    }
+  }
+
+  if (Array.isArray(rubric.soft_boosts) && rubric.soft_boosts.length > 0) {
+    parts.push('\nSoft boosts (bonus additif après les critères, plafond +20 chacun, total < 50) :')
+    for (const b of rubric.soft_boosts as SoftBoost[]) {
+      if (typeof b?.rule === 'string') {
+        parts.push(
+          `- ${b.id}: ${b.rule.trim()} (boost +${b.boost ?? '?'}) — ${b.rationale ?? 'pas de rationale fourni'}.`,
+        )
+      }
+    }
+  }
+
+  if (Array.isArray(rubric.calibration_examples) && rubric.calibration_examples.length > 0) {
+    parts.push('\nExemples calibrés (ajuste ton scoring sur ces archétypes) :')
+    for (const e of rubric.calibration_examples as CalibrationExample[]) {
+      if (typeof e?.signal_archetype === 'string') {
+        parts.push(`- Score attendu ~${e.expected_score} : ${e.signal_archetype.trim()}`)
+      }
+    }
+  }
+
+  parts.push(
+    '\nFormat de réponse exigé : JSON strict { "score": entier 0-100, "reasoning": "1-2 phrases courtes citant le critère ou disqualifier décisif" }. ' +
+      'Ne mentionne pas la rubric dans le reasoning, justifie par le contenu du signal. ' +
+      'Si un disqualifier matche, retourne score=0 et cite son id. ' +
+      "Si un soft_boost s'applique, ajoute son rationale au reasoning. " +
+      'Sois objectif, méthodique, et privilégie le factuel sourcé.',
+  )
+
+  let result = parts.join('\n')
+  let padded = wordCount(result)
+
+  // Si la rubric est minimale (peu de criteria, peu de disqualifiers), le pad
+  // peut encore être sous 200 mots. On rallonge avec une instruction générique.
+  const filler =
+    ' Lorsque le signal est ambigu, hésite plutôt vers le bas pour ne pas surévaluer le bruit. ' +
+    'Lorsque le signal contredit la lecture dominante, ne le pénalise jamais pour cette raison — ' +
+    'le contradicteur a une valeur prospective particulière. Vérifie systématiquement la date, ' +
+    'la source primaire ou secondaire, et la dimension géographique avant de finaliser le score.'
+
+  let safety = 10
+  while (padded < 220 && safety > 0) {
+    result += filler
+    padded = wordCount(result)
+    safety--
+  }
+
+  // Si on a fait exploser au-delà de 500 par le pad, on tronque proprement.
+  if (padded > 500) {
+    const words = result.split(/\s+/).filter((w) => w.length > 0)
+    result = `${words.slice(0, 450).join(' ')}…`
+  }
+
+  rubric.scoring_prompt = result.trim()
+  return true
+}
+
 export function validateScoringPrompt(scoring_prompt: unknown): ValidationResult {
   const errors: ValidationError[] = []
   if (typeof scoring_prompt !== 'string') {
@@ -580,24 +911,62 @@ export function validateScoringPrompt(scoring_prompt: unknown): ValidationResult
   return { valid: errors.length === 0, errors }
 }
 
-export function validateRubricSchema(rubric: unknown): ValidationResult {
+/**
+ * Liste des normalisations appliquées lors de la validation (cf. validateRubricSchema).
+ * Émis en telemetry pour audit/observabilité — pas de re-prompt LLM masqué.
+ */
+export interface NormalizationLog {
+  criteria_count_clipped?: boolean
+  criteria_weights_normalized?: boolean
+  disqualifiers_count_clipped?: boolean
+  soft_boosts_normalized?: boolean
+  calibration_normalized?: boolean
+  scoring_prompt_length_normalized?: boolean
+}
+
+export interface ValidationResultWithNormalizations extends ValidationResult {
+  normalizations: NormalizationLog
+}
+
+export function validateRubricSchema(rubric: unknown): ValidationResultWithNormalizations {
   const errors: ValidationError[] = []
+  const normalizations: NormalizationLog = {}
   if (!rubric || typeof rubric !== 'object') {
     return {
       valid: false,
       errors: [{ code: 'rubric_type', message: 'rubric must be object' }],
+      normalizations,
     }
   }
   const r = rubric as Partial<Rubric>
 
+  // ──────────────────────────────────────────────────────────────────────
+  // Normalizations déterministes (hotfix 2026-05-14 + 2026-05-17 defense-in-depth)
+  // Ordre important : structure d'abord (counts), puis valeurs (weights/boosts),
+  // puis scoring_prompt qui dépend des champs déjà normalisés pour son auto-pad.
+  // ──────────────────────────────────────────────────────────────────────
+
+  if (normalizeCriteriaCount(r)) normalizations.criteria_count_clipped = true
+
+  // normalizeCriteriaWeights conserve sa signature historique (mutation in-place
+  // sur l'array, pas sur le wrapper rubric). Le retour est volontairement void.
+  const criteriaBefore = JSON.stringify(r.criteria)
+  normalizeCriteriaWeights(r.criteria as unknown)
+  if (criteriaBefore !== JSON.stringify(r.criteria)) {
+    normalizations.criteria_weights_normalized = true
+  }
+
+  if (normalizeDisqualifiersCount(r)) normalizations.disqualifiers_count_clipped = true
+  if (normalizeSoftBoosts(r)) normalizations.soft_boosts_normalized = true
+  if (normalizeCalibrationExamples(r)) normalizations.calibration_normalized = true
+  if (normalizeScoringPromptLength(r)) normalizations.scoring_prompt_length_normalized = true
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Validations strictes (post-normalization)
+  // ──────────────────────────────────────────────────────────────────────
+
   const sp = validateScoringPrompt(r.scoring_prompt)
   errors.push(...sp.errors)
-
-  // Hotfix 2026-05-14 : auto-normalise les poids avant la validation.
-  // DeepSeek-v4-flash échoue régulièrement l'arithmétique exacte sum=100
-  // (cf. session f82084e4 : sum=110). On normalise déterministiquement
-  // dans la marge [50, 200] plutôt que de retry au LLM.
-  normalizeCriteriaWeights(r.criteria as unknown)
 
   const ws = validateWeightSum(r.criteria as Array<[string, number]>)
   errors.push(...ws.errors)
@@ -611,7 +980,7 @@ export function validateRubricSchema(rubric: unknown): ValidationResult {
   const ce = validateCalibrationExamples(r.calibration_examples)
   errors.push(...ce.errors)
 
-  return { valid: errors.length === 0, errors }
+  return { valid: errors.length === 0, errors, normalizations }
 }
 
 // =============================================================================
@@ -769,7 +1138,7 @@ export const handler = async (req: Request): Promise<Response> => {
     }
   }
 
-  let validation =
+  let validation: ValidationResultWithNormalizations =
     parsed === null
       ? {
           valid: false,
@@ -779,6 +1148,7 @@ export const handler = async (req: Request): Promise<Response> => {
               message: 'Failed to parse LLM JSON',
             },
           ] as ValidationError[],
+          normalizations: {},
         }
       : validateRubricSchema(parsed)
   let usedRetry = false
@@ -830,6 +1200,7 @@ export const handler = async (req: Request): Promise<Response> => {
                 message: 'Failed to parse LLM JSON on retry',
               },
             ],
+            normalizations: {},
           }
         : validateRubricSchema(parsed)
 
@@ -890,6 +1261,25 @@ export const handler = async (req: Request): Promise<Response> => {
     // best-effort log
   }
 
+  // Log audit-friendly si des normalizations server-side ont été appliquées
+  // (auto-pad scoring_prompt, clip criteria count, etc.). Best-effort.
+  const hasNormalizations = Object.keys(validation.normalizations).length > 0
+  if (hasNormalizations) {
+    try {
+      await supabase.from('logs').insert({
+        user_id: callerUserId,
+        action: 'rubric-architect:auto_normalized',
+        status: 'ok',
+        payload: {
+          normalizations: validation.normalizations,
+          retried: usedRetry,
+        },
+      })
+    } catch {
+      // best-effort log
+    }
+  }
+
   return json(
     {
       ok: true,
@@ -900,6 +1290,7 @@ export const handler = async (req: Request): Promise<Response> => {
         usage: dispatch.usage ?? null,
         model_used: dispatch.model_used ?? null,
         provider_used: dispatch.provider_used ?? null,
+        auto_normalizations: hasNormalizations ? validation.normalizations : null,
       },
     },
     200,
