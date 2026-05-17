@@ -102,6 +102,12 @@ export async function scoreSignalWithRubric(args: {
   let lastModel = 'unknown'
 
   // ─── Lance les appels LLM en parallèle ───────────────────────────────────
+  // Hotfix 2026-05-18 : max_tokens bumpés pour absorber le reasoning des
+  // models comme deepseek-v4-flash / o1 qui consomment 500-1500 tokens
+  // en chain-of-thought AVANT de produire le content final. Avec max_tokens
+  // trop bas, finish_reason='length' déclenchait dispatch-llm reasoning
+  // fallback systématique → parse fails downstream → scoring_quality=poor.
+  // Tailles calibrées avec marge x3 sur la cible de réponse réelle.
   const criteriaPrompt = buildCriteriaPrompt({
     scoringPrompt: rubric.scoring_prompt,
     criteria: rubric.criteria,
@@ -110,7 +116,7 @@ export async function scoreSignalWithRubric(args: {
   const criteriaPromise = dispatch({
     task: 'scoring',
     prompt: criteriaPrompt,
-    maxTokens: 600,
+    maxTokens: 2000,
   })
 
   let disqualifiedId: string | null = null
@@ -123,7 +129,7 @@ export async function scoreSignalWithRubric(args: {
       softBoosts: rubric.soft_boosts,
       signal,
     })
-    const gatePromise = dispatch({ task: 'enrichment', prompt: gatePrompt, maxTokens: 200 })
+    const gatePromise = dispatch({ task: 'enrichment', prompt: gatePrompt, maxTokens: 1000 })
 
     const [criteriaRes, gateRes] = await Promise.all([criteriaPromise, gatePromise])
 
@@ -147,13 +153,14 @@ export async function scoreSignalWithRubric(args: {
   }
 
   // ─── Mode split : 2 appels gates séparés ─────────────────────────────────
+  // Hotfix 2026-05-18 : max_tokens bumpés (100→500, 150→600) pour reasoning models.
   let dqPromise: Promise<DispatchResponse> | null = null
   if (rubric.disqualifiers.length > 0) {
     const dqPrompt = buildDisqualifierPrompt({
       disqualifiers: rubric.disqualifiers,
       signal,
     })
-    dqPromise = dispatch({ task: 'enrichment', prompt: dqPrompt, maxTokens: 100 })
+    dqPromise = dispatch({ task: 'enrichment', prompt: dqPrompt, maxTokens: 500 })
   }
 
   let sbPromise: Promise<DispatchResponse> | null = null
@@ -162,7 +169,7 @@ export async function scoreSignalWithRubric(args: {
       softBoosts: rubric.soft_boosts,
       signal,
     })
-    sbPromise = dispatch({ task: 'enrichment', prompt: sbPrompt, maxTokens: 150 })
+    sbPromise = dispatch({ task: 'enrichment', prompt: sbPrompt, maxTokens: 600 })
   }
 
   const [criteriaRes, dqRes, sbRes] = await Promise.all([
