@@ -377,7 +377,50 @@ Pipeline lancé 2026-05-17T23:17:08 UTC, terminé 23:18:28 UTC (80 secondes tota
 
 ---
 
-## 8. Références
+## 8. Reasoning models compatibility (FIX #8, 2026-05-18 post-smoke)
+
+**Discovery** : Le smoke test session `30257bfb` a retourné `scoring_quality='poor'` malgré tous les fixes précédents. Investigation user_api_keys + model_config a révélé :
+
+- L'utilisateur n'utilise PAS OpenRouter (jamais configuré).
+- Son `settings.model_config` route `scoring`/`enrichment` vers provider `deepseek` + modèle `deepseek-v4-flash`.
+- Sa clé deepseek `sk-85bad34472ff47baaad27efa65943fbc` est `validation_status='valid'`, testée OK directement contre `api.deepseek.com/v1/chat/completions`.
+
+**Root cause** : DeepSeek-V4-flash est un **reasoning model** (génère un champ `reasoning_content` séparé du `content` final). Quand `max_tokens` est consommé pendant le raisonnement (`finish_reason='length'`), `content` reste vide mais `reasoning_content` contient toute la chain-of-thought (souvent en chinois pour DeepSeek-V4).
+
+Avant FIX #8 :
+
+- `dispatch-llm` extrayait `choices[0].message.content` → vide
+- Tous les parsers downstream (parseLLMScoreResponse, parseGateResponse) échouaient
+- `scoring_failed=true` propagé → `scoring_quality='poor'` faux positif
+
+### Fix appliqué
+
+1. **`dispatch-llm/index.ts`** : si `content` vide ET `reasoning_content` présent → fallback sur `reasoning_content`. Loggé en `logs` action='dispatch-llm:reasoning_fallback'. Nouveaux champs réponse :
+   - `truncated_from_reasoning: boolean`
+   - `finish_reason: string | null`
+
+2. **`llm-score-batch/scoring-engine.ts`** : `max_tokens` bumpés pour donner la marge nécessaire au reasoning :
+   | Phase | Avant | Après |
+   |---|---|---|
+   | criteria (par signal) | 600 | **2000** |
+   | gate combiné disqualif+boost | 200 | **1000** |
+   | disqualifier seul | 100 | **500** |
+   | soft_boost seul | 150 | **600** |
+
+3. **Limite reconnue** : `reasoning_content` peut être en langue native du modèle (chinois pour DeepSeek-V4). Les parsers JSON acceptent le JSON dans n'importe quel script ; les `reasoning` extraits dans les scores peuvent toutefois être affichés en chinois côté Bassira. À documenter pour l'user.
+
+### Recommandation user (option, hors BYOK supreme)
+
+Pour des tâches `scoring`/`enrichment` ultra-structurées, un **modèle non-reasoning** est plus rapide ET produit un `content` directement parsable :
+
+- `deepseek-chat` (vs `deepseek-v4-flash`) — même clé API, latence ~3-5× moindre
+- Garder `deepseek-v4-flash` pour des tâches qui bénéficient du raisonnement (`monitoring`, deep synthesis)
+
+Configuration : Settings UI Kairos → `model_config.scoring.model = "deepseek-chat"`.
+
+---
+
+## 9. Références
 
 - Memory : `bassira_pipeline_definitif.md` (état architectural)
 - Memory : `feedback_supabase_no_verify_jwt.md` (règle deploy)
