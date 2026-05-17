@@ -217,7 +217,50 @@ async function handleRequest(req: Request): Promise<Response> {
     )
   }
 
-  const content = completion.choices[0]?.message?.content ?? ''
+  // Hotfix 2026-05-18 : compat reasoning models (DeepSeek-V4, OpenAI o1, etc.)
+  // Ces modèles retournent un champ `reasoning_content` (la chain-of-thought)
+  // ET un `content` qui contient la réponse finale. Quand `finish_reason='length'`
+  // (max_tokens atteint pendant le raisonnement), `content` reste vide même si
+  // le modèle a généré du texte utile dans reasoning_content. Sans ce fallback,
+  // dispatch-llm retournait silencieusement '' → tous les parsers downstream
+  // fail → scoring_quality=poor sans cause technique réelle.
+  //
+  // Comportement choisi :
+  //   1. content non vide → utiliser content (cas standard)
+  //   2. content vide + reasoning_content présent → utiliser reasoning_content
+  //      ET retourner truncated=true pour que le caller sache que c'est un
+  //      fallback (peut décider de retry avec max_tokens plus élevé, OU
+  //      accepter en sachant que le contenu peut être en langue native du modèle)
+  //   3. content vide + reasoning vide → vraiment rien, return ok mais empty
+  const msg = completion.choices[0]?.message as
+    | { content?: string | null; reasoning_content?: string | null }
+    | undefined
+  const rawContent = msg?.content ?? ''
+  const reasoningContent = msg?.reasoning_content ?? ''
+  const finishReason = completion.choices[0]?.finish_reason ?? null
+  let content = rawContent
+  let truncatedFromReasoning = false
+  if ((!rawContent || rawContent.trim().length === 0) && reasoningContent.trim().length > 0) {
+    content = reasoningContent
+    truncatedFromReasoning = true
+    try {
+      await supabase.from('logs').insert({
+        user_id: callerUserId,
+        action: 'dispatch-llm:reasoning_fallback',
+        status: 'warn',
+        payload: {
+          task: body.task,
+          provider: providerId,
+          model: modelId,
+          finish_reason: finishReason,
+          reasoning_chars: reasoningContent.length,
+          requested_max_tokens: opts.max_tokens ?? null,
+        },
+      })
+    } catch {
+      // best-effort log
+    }
+  }
 
   const rawUsage = completion.usage as
     | { prompt_tokens?: number; completion_tokens?: number; cost?: number }
@@ -251,6 +294,11 @@ async function handleRequest(req: Request): Promise<Response> {
       },
       model_used: modelId,
       provider_used: providerId,
+      // Flag pour les callers : la réponse vient du fallback reasoning_content
+      // (cas reasoning models truncated). Le caller peut décider de l'accepter
+      // ou retry avec un max_tokens supérieur. Toujours présent pour clarté.
+      truncated_from_reasoning: truncatedFromReasoning,
+      finish_reason: finishReason,
     },
     200,
   )
