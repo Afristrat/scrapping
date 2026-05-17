@@ -228,6 +228,7 @@ function finalize(args: {
         applied_boosts: [],
         cost: totalCost,
         model_used: modelUsed,
+        scoring_failed: false,
       }
     }
   }
@@ -235,11 +236,13 @@ function finalize(args: {
   // CAS 2 — non disqualifié : score criteria + boosts.
   let rawScore = 0
   let reasoning = ''
+  let criteriaParseOk = false
   if (criteriaRes.ok && criteriaRes.content) {
     const parsed = parseLLMScoreResponse(criteriaRes.content)
     if (parsed) {
       rawScore = parsed.score
       reasoning = parsed.reasoning
+      criteriaParseOk = true
     }
   }
 
@@ -259,5 +262,6 @@ function finalize(args: {
     applied_boosts: knownAppliedBoosts,
     cost: totalCost,
     model_used: modelUsed,
+    scoring_failed: !criteriaParseOk,
   }
 }

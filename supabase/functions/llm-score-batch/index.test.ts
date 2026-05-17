@@ -422,75 +422,84 @@ function makeMockDispatch(handlers: {
 
 // ─── Test K04-1 : body validation — signals_input sans rubric_override → 400 ─
 
-Deno.test('K04: validateBody → signals_input sans rubric_override → RUBRIC_REQUIRED_FOR_AD_HOC', () => {
-  const result = validateBody({
-    signals_input: [{ id: 'sig-1', source: 'arxiv' }],
-  })
-  assertEquals(result.ok, false)
-  assertEquals(result.error, 'RUBRIC_REQUIRED_FOR_AD_HOC')
-})
+Deno.test(
+  'K04: validateBody → signals_input sans rubric_override → RUBRIC_REQUIRED_FOR_AD_HOC',
+  () => {
+    const result = validateBody({
+      signals_input: [{ id: 'sig-1', source: 'arxiv' }],
+    })
+    assertEquals(result.ok, false)
+    assertEquals(result.error, 'RUBRIC_REQUIRED_FOR_AD_HOC')
+  },
+)
 
 // ─── Test K04-2 : disqualifier match → score=0 ──────────────────────────────
 
-Deno.test('K04: disqualifier match → score=0, disqualified=true, applied_disqualifier', async () => {
-  const rubric = makeRubric()
-  const { caller } = makeMockDispatch({
-    gate: () => ({
-      ok: true,
-      content: '{"disqualified_id": "dq_001", "applied": []}',
-      model_used: 'gate-model',
-    }),
-    criteria: () => ({
-      ok: true,
-      content: '{"score": 75, "reasoning": "Should be ignored"}',
-      model_used: 'crit-model',
-    }),
-  })
+Deno.test(
+  'K04: disqualifier match → score=0, disqualified=true, applied_disqualifier',
+  async () => {
+    const rubric = makeRubric()
+    const { caller } = makeMockDispatch({
+      gate: () => ({
+        ok: true,
+        content: '{"disqualified_id": "dq_001", "applied": []}',
+        model_used: 'gate-model',
+      }),
+      criteria: () => ({
+        ok: true,
+        content: '{"score": 75, "reasoning": "Should be ignored"}',
+        model_used: 'crit-model',
+      }),
+    })
 
-  const result = await scoreSignalWithRubric({
-    signal: { id: 'sig-x', source: 'reddit', title: 'Promo article' },
-    rubric,
-    dispatch: caller,
-  })
+    const result = await scoreSignalWithRubric({
+      signal: { id: 'sig-x', source: 'reddit', title: 'Promo article' },
+      rubric,
+      dispatch: caller,
+    })
 
-  assertEquals(result.score, 0)
-  assertEquals(result.raw_score, 0)
-  assertEquals(result.disqualified, true)
-  assertEquals(result.applied_disqualifier, 'dq_001')
-  assertEquals(result.applied_boosts, [])
-})
+    assertEquals(result.score, 0)
+    assertEquals(result.raw_score, 0)
+    assertEquals(result.disqualified, true)
+    assertEquals(result.applied_disqualifier, 'dq_001')
+    assertEquals(result.applied_boosts, [])
+  },
+)
 
 // ─── Test K04-3 : criteria scoring nominal ──────────────────────────────────
 
-Deno.test('K04: criteria scoring nominal (no disqualifier, no boost match) → raw_score', async () => {
-  const rubric = makeRubric()
-  const { caller } = makeMockDispatch({
-    gate: () => ({
-      ok: true,
-      content: '{"disqualified_id": null, "applied": []}',
-      model_used: 'gate-model',
-    }),
-    criteria: () => ({
-      ok: true,
-      content: '{"score": 67, "reasoning": "Bon signal"}',
-      model_used: 'crit-model',
-      usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 },
-    }),
-  })
+Deno.test(
+  'K04: criteria scoring nominal (no disqualifier, no boost match) → raw_score',
+  async () => {
+    const rubric = makeRubric()
+    const { caller } = makeMockDispatch({
+      gate: () => ({
+        ok: true,
+        content: '{"disqualified_id": null, "applied": []}',
+        model_used: 'gate-model',
+      }),
+      criteria: () => ({
+        ok: true,
+        content: '{"score": 67, "reasoning": "Bon signal"}',
+        model_used: 'crit-model',
+        usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 },
+      }),
+    })
 
-  const result = await scoreSignalWithRubric({
-    signal: { id: 'sig-y', source: 'rss', title: 'Article' },
-    rubric,
-    dispatch: caller,
-  })
+    const result = await scoreSignalWithRubric({
+      signal: { id: 'sig-y', source: 'rss', title: 'Article' },
+      rubric,
+      dispatch: caller,
+    })
 
-  assertEquals(result.score, 67)
-  assertEquals(result.raw_score, 67)
-  assertEquals(result.disqualified, false)
-  assertEquals(result.applied_disqualifier, null)
-  assertEquals(result.applied_boosts, [])
-  assertEquals(result.reasoning, 'Bon signal')
-})
+    assertEquals(result.score, 67)
+    assertEquals(result.raw_score, 67)
+    assertEquals(result.disqualified, false)
+    assertEquals(result.applied_disqualifier, null)
+    assertEquals(result.applied_boosts, [])
+    assertEquals(result.reasoning, 'Bon signal')
+  },
+)
 
 // ─── Test K04-4 : soft_boost application ────────────────────────────────────
 
@@ -674,20 +683,23 @@ Deno.test('K04: shouldCombineGates → > 12 règles total → false (split)', ()
   assertEquals(shouldCombineGates(dq, sb), false)
 })
 
-Deno.test('K04: scoring 1 signal en mode combined → 2 appels dispatch (criteria + gate combiné)', async () => {
-  const rubric = makeRubric() // 5 règles → combined
-  const { caller, calls } = makeMockDispatch({})
+Deno.test(
+  'K04: scoring 1 signal en mode combined → 2 appels dispatch (criteria + gate combiné)',
+  async () => {
+    const rubric = makeRubric() // 5 règles → combined
+    const { caller, calls } = makeMockDispatch({})
 
-  await scoreSignalWithRubric({
-    signal: { id: 'sig-comb', source: 'rss' },
-    rubric,
-    dispatch: caller,
-  })
+    await scoreSignalWithRubric({
+      signal: { id: 'sig-comb', source: 'rss' },
+      rubric,
+      dispatch: caller,
+    })
 
-  assertEquals(calls.length, 2, 'Mode combiné = 2 appels (criteria + gate combiné)')
-  const tasks = calls.map((c) => c.task).sort()
-  assertEquals(tasks, ['enrichment', 'scoring'])
-})
+    assertEquals(calls.length, 2, 'Mode combiné = 2 appels (criteria + gate combiné)')
+    const tasks = calls.map((c) => c.task).sort()
+    assertEquals(tasks, ['enrichment', 'scoring'])
+  },
+)
 
 Deno.test('K04: scoring 1 signal en mode split (>12 règles) → 3 appels dispatch', async () => {
   const dq = Array.from({ length: 7 }, (_, i) => ({
@@ -866,3 +878,107 @@ Deno.test('K04: validateBody → no inputs → signal_ids_or_signals_input_requi
   assertEquals(result.ok, false)
   assertEquals(result.error, 'signal_ids_or_signals_input_required')
 })
+
+// ─── Hotfix 2026-05-17 : scoring_failed flag pour partial failure handling ───
+
+Deno.test('Hotfix 2026-05-17: criteria LLM ok=false → scoring_failed=true', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      content: '{"disqualified_id": null, "applied": []}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: false,
+      error: 'dispatch_unreachable',
+      detail: 'mock timeout',
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-fail', source: 'rss', title: 'Article' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(result.scoring_failed, true)
+  assertEquals(result.score, 0) // par défaut
+  assertEquals(result.raw_score, 0)
+  assertEquals(result.disqualified, false)
+})
+
+Deno.test('Hotfix 2026-05-17: criteria parse JSON cassé → scoring_failed=true', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      content: '{"disqualified_id": null, "applied": []}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: true,
+      content: 'not valid json at all',
+      model_used: 'crit-model',
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-parse', source: 'reddit' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(result.scoring_failed, true)
+})
+
+Deno.test('Hotfix 2026-05-17: criteria nominal → scoring_failed=false', async () => {
+  const rubric = makeRubric()
+  const { caller } = makeMockDispatch({
+    gate: () => ({
+      ok: true,
+      content: '{"disqualified_id": null, "applied": []}',
+      model_used: 'gate-model',
+    }),
+    criteria: () => ({
+      ok: true,
+      content: '{"score": 67, "reasoning": "ok"}',
+      model_used: 'crit-model',
+    }),
+  })
+
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-ok', source: 'arxiv' },
+    rubric,
+    dispatch: caller,
+  })
+
+  assertEquals(result.scoring_failed, false)
+})
+
+Deno.test(
+  'Hotfix 2026-05-17: disqualifier match → scoring_failed=false (legit disqualif)',
+  async () => {
+    const rubric = makeRubric()
+    const { caller } = makeMockDispatch({
+      gate: () => ({
+        ok: true,
+        content: '{"disqualified_id": "dq_001", "applied": []}',
+        model_used: 'gate-model',
+      }),
+      criteria: () => ({
+        ok: false, // même si criteria fail, le disqualif a priorité
+        error: 'should_not_matter',
+      }),
+    })
+
+    const result = await scoreSignalWithRubric({
+      signal: { id: 'sig-dq', source: 'reddit' },
+      rubric,
+      dispatch: caller,
+    })
+
+    assertEquals(result.disqualified, true)
+    assertEquals(result.scoring_failed, false) // disqualif legit, pas un fail
+  },
+)

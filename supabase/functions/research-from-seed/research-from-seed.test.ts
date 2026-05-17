@@ -25,14 +25,12 @@ import {
   checkRateLimit,
   constantTimeEquals,
   hashApiKey,
-  hintsOverrideToJobs,
-  mergeScrapeJobs,
+  hashSeed,
   resolveCorsOrigin,
   selectTopSignals,
   validateApiKey,
   validateRequestBody,
 } from './lib.ts'
-import { classifyFailure } from './index.ts'
 
 // ============================================================================
 // Helpers — mock SupabaseClient minimal pour les tests purs
@@ -800,130 +798,115 @@ Deno.test('Pipeline mock: ordre des appels chaînés respecté', async () => {
 })
 
 // ============================================================================
-// F-Hints-Override : hintsOverrideToJobs + mergeScrapeJobs
+// Hotfix 2026-05-17 — devil-advocate hardening
 // ============================================================================
 
-Deno.test('hintsOverrideToJobs : input vide → []', () => {
-  assertEquals(hintsOverrideToJobs({}), [])
+// ─── hashSeed : SHA-256 first 16 hex chars ──────────────────────────────────
+
+Deno.test('hashSeed: identical seeds produce identical hashes', async () => {
+  const seed = 'Pivoter Export Ready vers SaaS commissionnaires marocains'
+  const h1 = await hashSeed(seed)
+  const h2 = await hashSeed(seed)
+  assertEquals(h1, h2)
 })
 
-Deno.test('hintsOverrideToJobs : reddit_subs → 1 job', () => {
-  const jobs = hintsOverrideToJobs({ reddit_subs: ['Morocco', 'AfricanTech'] })
-  assertEquals(jobs.length, 1)
-  assertEquals(jobs[0].scraper, 'reddit')
-  assertEquals(jobs[0].body.subs, ['Morocco', 'AfricanTech'])
+Deno.test('hashSeed: differs by one char → different hash', async () => {
+  const h1 = await hashSeed('seed-original')
+  const h2 = await hashSeed('seed-Original')
+  assertEquals(h1.length, 16)
+  assertEquals(h2.length, 16)
+  assert(h1 !== h2, 'hashes should differ on case change')
 })
 
-Deno.test('hintsOverrideToJobs : x_handles + arxiv_categories → 2 jobs', () => {
-  const jobs = hintsOverrideToJobs({
-    x_handles: ['@MAP_Information'],
-    arxiv_categories: ['cs.AI', 'cs.CY'],
+Deno.test('hashSeed: lowercase hex chars only', async () => {
+  const h = await hashSeed('foo bar baz')
+  assertEquals(h.length, 16)
+  assert(/^[a-f0-9]{16}$/.test(h), `expected 16 lowercase hex, got ${h}`)
+})
+
+Deno.test('hashSeed: empty string OK (no crash)', async () => {
+  const h = await hashSeed('')
+  assertEquals(h.length, 16)
+})
+
+// ─── validateRequestBody : idempotency_key support ──────────────────────────
+
+const SEED_OK_50 = 'a'.repeat(50) + ' ce seed minimal pour passer le check de longueur'
+
+Deno.test('validateRequestBody: idempotency_key alphanumérique 32 chars accepté', () => {
+  const r = validateRequestBody({
+    seed: SEED_OK_50,
+    lang: 'fr',
+    idempotency_key: 'abc123_xyz-789-DEF_ghi-098765432',
   })
-  assertEquals(jobs.length, 2)
-  const scrapers = jobs.map((j) => j.scraper).sort()
-  assertEquals(scrapers, ['arxiv', 'x'])
+  assertEquals(r.ok, true)
+  if (r.ok) assertEquals(r.body.idempotency_key, 'abc123_xyz-789-DEF_ghi-098765432')
 })
 
-Deno.test('hintsOverrideToJobs : cap x_handles à 10', () => {
-  const handles = Array.from({ length: 20 }, (_, i) => `@h${i}`)
-  const jobs = hintsOverrideToJobs({ x_handles: handles })
-  assertEquals((jobs[0].body.listIds as string[]).length, 10)
-})
-
-Deno.test('mergeScrapeJobs : merge reddit subs avec dédup', () => {
-  const a = [{ scraper: 'reddit' as const, body: { subs: ['Morocco', 'AfricanTech'] } }]
-  const b = [{ scraper: 'reddit' as const, body: { subs: ['Morocco', 'StartUps'] } }]
-  const out = mergeScrapeJobs(a, b)
-  assertEquals(out.length, 1)
-  const subs = (out[0].body.subs as string[]).sort()
-  assertEquals(subs, ['AfricanTech', 'Morocco', 'StartUps'])
-})
-
-Deno.test('mergeScrapeJobs : 2 scrapers différents → 2 jobs préservés', () => {
-  const a = [{ scraper: 'reddit' as const, body: { subs: ['Morocco'] } }]
-  const b = [{ scraper: 'arxiv' as const, body: { categories: ['cs.AI'] } }]
-  const out = mergeScrapeJobs(a, b)
-  assertEquals(out.length, 2)
-})
-
-Deno.test("mergeScrapeJobs : input vide → préserve l'autre", () => {
-  const a = [{ scraper: 'reddit' as const, body: { subs: ['Morocco'] } }]
-  const out = mergeScrapeJobs(a, [])
-  assertEquals(out.length, 1)
-  assertEquals(out[0].body.subs, ['Morocco'])
-})
-
-// ============================================================================
-// F6 — classifyFailure
-// ============================================================================
-
-Deno.test('classifyFailure : status 504 → timeout', () => {
-  assertEquals(classifyFailure({ status: 504 }), 'timeout')
-})
-
-Deno.test('classifyFailure : error=timeout → timeout (sans status)', () => {
-  assertEquals(classifyFailure({ error: 'timeout' }), 'timeout')
-})
-
-Deno.test('classifyFailure : status 429 → rate_limited', () => {
-  assertEquals(classifyFailure({ status: 429 }), 'rate_limited')
-})
-
-Deno.test('classifyFailure : status 401 → auth_failed', () => {
-  assertEquals(classifyFailure({ status: 401 }), 'auth_failed')
-})
-
-Deno.test('classifyFailure : error=INSUFFICIENT_SIGNALS → insufficient_signals', () => {
-  assertEquals(classifyFailure({ error: 'INSUFFICIENT_SIGNALS' }), 'insufficient_signals')
-})
-
-Deno.test('classifyFailure : error=validation_failed_after_retry → validation_failed', () => {
-  assertEquals(classifyFailure({ error: 'validation_failed_after_retry' }), 'validation_failed')
-})
-
-Deno.test('classifyFailure : error=dispatch_failed → dispatch_failed', () => {
-  assertEquals(classifyFailure({ error: 'dispatch_failed' }), 'dispatch_failed')
-})
-
-Deno.test(
-  'classifyFailure : error=invalid_response detail=missing topics → invalid_response',
-  () => {
-    assertEquals(
-      classifyFailure({ error: 'invalid_response', detail: 'missing topics in response' }),
-      'invalid_response',
-    )
-  },
-)
-
-Deno.test('classifyFailure : error inconnu → unknown', () => {
-  assertEquals(classifyFailure({ error: 'mystery_error' }), 'unknown')
-})
-
-Deno.test('classifyFailure : aucun champ → unknown', () => {
-  assertEquals(classifyFailure({}), 'unknown')
-})
-
-Deno.test('classifyFailure : detail est un objet (bug fix 2026-05-16) → ne throw pas', () => {
-  // Avant fix : .toLowerCase() sur {stage, message} → TypeError
-  // Maintenant : JSON.stringify defensively
-  const r = classifyFailure({
-    error: 'background_unhandled',
-    detail: { stage: 'background_unhandled', message: 'something failed' },
+Deno.test('validateRequestBody: idempotency_key UUID v4 accepté', () => {
+  const r = validateRequestBody({
+    seed: SEED_OK_50,
+    lang: 'fr',
+    idempotency_key: '550e8400-e29b-41d4-a716-446655440000',
   })
-  assertEquals(r, 'unknown') // pas dans la mapping, mais surtout : pas de throw
+  assertEquals(r.ok, true)
 })
 
-Deno.test(
-  'classifyFailure : detail objet contenant "non-disqualified signals" → insufficient_signals',
-  () => {
-    const r = classifyFailure({
-      error: 'STAGE_FAILED',
-      detail: { reason: 'Need at least 5 non-disqualified signals, got 1.' },
-    })
-    assertEquals(r, 'insufficient_signals')
-  },
-)
+Deno.test('validateRequestBody: idempotency_key avec espace rejeté', () => {
+  const r = validateRequestBody({
+    seed: SEED_OK_50,
+    lang: 'fr',
+    idempotency_key: 'has space',
+  })
+  assertEquals(r.ok, false)
+  if (!r.ok) assertEquals(r.error, 'idempotency_key_format_invalid')
+})
 
-Deno.test('classifyFailure : detail null → unknown sans crash', () => {
-  assertEquals(classifyFailure({ detail: null }), 'unknown')
+Deno.test('validateRequestBody: idempotency_key avec caractère spécial rejeté', () => {
+  const r = validateRequestBody({
+    seed: SEED_OK_50,
+    lang: 'fr',
+    idempotency_key: 'has@symbol!',
+  })
+  assertEquals(r.ok, false)
+  if (!r.ok) assertEquals(r.error, 'idempotency_key_format_invalid')
+})
+
+Deno.test('validateRequestBody: idempotency_key > 64 chars rejeté', () => {
+  const r = validateRequestBody({
+    seed: SEED_OK_50,
+    lang: 'fr',
+    idempotency_key: 'a'.repeat(65),
+  })
+  assertEquals(r.ok, false)
+  if (!r.ok) assertEquals(r.error, 'idempotency_key_format_invalid')
+})
+
+Deno.test('validateRequestBody: idempotency_key vide rejeté', () => {
+  const r = validateRequestBody({
+    seed: SEED_OK_50,
+    lang: 'fr',
+    idempotency_key: '',
+  })
+  assertEquals(r.ok, false)
+  if (!r.ok) assertEquals(r.error, 'idempotency_key_format_invalid')
+})
+
+Deno.test('validateRequestBody: idempotency_key non-string rejeté', () => {
+  const r = validateRequestBody({
+    seed: SEED_OK_50,
+    lang: 'fr',
+    idempotency_key: 12345,
+  })
+  assertEquals(r.ok, false)
+  if (!r.ok) assertEquals(r.error, 'idempotency_key_must_be_string')
+})
+
+Deno.test('validateRequestBody: idempotency_key omis → body OK sans champ', () => {
+  const r = validateRequestBody({
+    seed: SEED_OK_50,
+    lang: 'fr',
+  })
+  assertEquals(r.ok, true)
+  if (r.ok) assertEquals(r.body.idempotency_key, undefined)
 })

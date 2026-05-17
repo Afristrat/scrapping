@@ -41,11 +41,8 @@ import {
   buildScrapeJobs,
   callInternal,
   checkRateLimit,
-  fetchProxyUserSettings,
-  fetchScopeProfile,
-  hintsOverrideToJobs,
+  hashSeed,
   type Lang,
-  mergeScrapeJobs,
   type RequestBody,
   resolveCorsOrigin,
   type ScrapeJob,
@@ -59,31 +56,12 @@ import {
 // Telemetry helpers
 // ---------------------------------------------------------------------------
 
-// F6 2026-05-15 : classification structurée des modes de panne pour
-// permettre un dashboard agrégé (failure_type sur n sessions) sans avoir
-// à parser chaque error_detail. Énumérée, stable inter-stages.
-export type FailureType =
-  | 'timeout'
-  | 'parse_failed'
-  | 'validation_failed'
-  | 'insufficient_signals'
-  | 'all_scrapers_failed'
-  | 'dispatch_failed'
-  | 'service_setup_incomplete'
-  | 'invalid_response'
-  | 'rate_limited'
-  | 'auth_failed'
-  | 'unknown'
-
 interface StageTelemetry {
   stage: string
   duration_ms: number
   ok: boolean
   cost?: number
   error?: string
-  failure_type?: FailureType
-  /** Présent si la fn a engagé un fallback dégradé non-bloquant (cf. F3). */
-  fallback_engaged?: boolean
 }
 
 interface PipelineTelemetry {
@@ -92,59 +70,6 @@ interface PipelineTelemetry {
   stages: StageTelemetry[]
   total_cost_usd: number
   total_duration_ms: number
-}
-
-/**
- * F6 2026-05-15 — Classifie une réponse upstream en FailureType stable.
- * Inspecte status HTTP et string error pour déterminer la catégorie.
- * Fallback : 'unknown'. Pas de PII dans la valeur retournée.
- */
-export function classifyFailure(input: {
-  status?: number
-  error?: string
-  detail?: unknown
-}): FailureType {
-  const err = typeof input.error === 'string' ? input.error.toLowerCase() : ''
-  // Bug 2026-05-16 : `input.detail` peut être un objet (cf. session 84f31a3b où
-  // research_sessions.error_detail = { stage, message }). On stringify
-  // defensively pour éviter `.toLowerCase is not a function`.
-  const detailRaw =
-    typeof input.detail === 'string'
-      ? input.detail
-      : input.detail !== undefined && input.detail !== null
-        ? JSON.stringify(input.detail)
-        : ''
-  const detail = detailRaw.toLowerCase()
-  if (input.status === 504 || err === 'timeout' || err.includes('timed_out')) return 'timeout'
-  if (input.status === 429 || err === 'rate_limited') return 'rate_limited'
-  if (input.status === 401 || input.status === 403 || err === 'missing_authorization')
-    return 'auth_failed'
-  if (err === 'service_setup_incomplete') return 'service_setup_incomplete'
-  if (err === 'insufficient_signals' || detail.includes('non-disqualified signals'))
-    return 'insufficient_signals'
-  if (err.includes('parse') || detail.includes('parse_failed')) return 'parse_failed'
-  if (
-    err === 'validation_failed' ||
-    err === 'validation_failed_after_retry' ||
-    err === 'schema_validation_failed' ||
-    err === 'bad_body'
-  )
-    return 'validation_failed'
-  if (err === 'all_scrapers_failed' || detail.toLowerCase().includes('all scrapers failed'))
-    return 'all_scrapers_failed'
-  if (
-    err === 'dispatch_failed' ||
-    err === 'dispatch_fetch_failed' ||
-    err === 'dispatch_retry_failed'
-  )
-    return 'dispatch_failed'
-  if (
-    err === 'invalid_response' ||
-    detail.includes('missing topics') ||
-    detail.includes('missing rubric')
-  )
-    return 'invalid_response'
-  return 'unknown'
 }
 
 // ---------------------------------------------------------------------------
@@ -188,12 +113,23 @@ interface LlmScoreBatchResult {
   applied_boosts: string[]
   reasoning?: string
   cost?: number
+  /** True si la criteria LLM call a échoué — score=0 par défaut, non interprétable. */
+  scoring_failed?: boolean
 }
 
 interface LlmScoreBatchResp {
   batch_size?: number
   scored?: number
   failed?: number
+  hard_failed?: number
+  soft_failed?: number
+  disqualified?: number
+  /**
+   * Hotfix 2026-05-17 : 'full' (0 fail), 'partial' (≤50% fail), 'poor' (>50% fail).
+   * Permet à l'orchestrateur de surface un quality_warning au lieu de continuer
+   * silently sur une rubric inutilisable.
+   */
+  scoring_quality?: 'full' | 'partial' | 'poor'
   cost?: number
   results?: LlmScoreBatchResult[]
   error?: string
@@ -327,21 +263,7 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
   //
   // Pour les scrapers en mode signals_session, on garde aussi le serviceKey
   // direct (table service_role-only).
-  // F4 2026-05-15 : fail-fast si proxy_user_id NULL plutôt que propager
-  // "null" string via le header et fail opaque dans dispatch-llm.
-  if (!apiKeyRow.proxy_user_id) {
-    return jsonResp(
-      {
-        ok: false,
-        error: 'service_setup_incomplete',
-        detail:
-          'public_api_keys.proxy_user_id is NULL for this API key. Run scripts/setup-bassira-proxy.sql to designate a proxy user.',
-      },
-      500,
-      cors,
-    )
-  }
-  const proxyUserId = apiKeyRow.proxy_user_id
+  const proxyUserId = apiKeyRow.proxy_user_id!
 
   // ─── Stage 1+2 PARALLEL : research-strategist + rubric-architect ──────
   // research-strategist d'abord (rubric a besoin de research_strategy en
@@ -369,8 +291,6 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
     ok: stratRes.ok,
     durationMs: stratRes.durationMs,
     error: stratRes.ok ? undefined : stratRes.error,
-    status: stratRes.ok ? undefined : stratRes.status,
-    detail: stratRes.ok ? undefined : stratRes.detail,
   })
   if (!stratRes.ok) {
     return stageFail(telemetry, 'research-strategist', stratRes, cors)
@@ -399,8 +319,6 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
     ok: rubricRes.ok,
     durationMs: rubricRes.durationMs,
     error: rubricRes.ok ? undefined : rubricRes.error,
-    status: rubricRes.ok ? undefined : rubricRes.status,
-    detail: rubricRes.ok ? undefined : rubricRes.detail,
   })
   if (!rubricRes.ok) {
     return stageFail(telemetry, 'rubric-architect', rubricRes, cors)
@@ -417,45 +335,7 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
   telemetry.total_cost_usd += rubricRes.data.telemetry?.usage?.cost ?? 0
 
   // ─── Stage 3 : PARALLEL scrape ───────────────────────────────────────
-  // Coverage assembly :
-  //   1. jobs = hints émis par research-strategist (research_strategy.subjects)
-  //   2. + body.hints_override (Bassira pousse des sources directes)
-  //   3. + body.scope_profile (référence à un set pré-curé en DB)
-  //   4. fallback settings du proxy_user si jobs encore vides
-  // Tracé dans scrape_augmentations[] : transparence sur ce qui a complété.
-  let jobs: ScrapeJob[] = buildScrapeJobs(researchStrategy)
-  const scrapeAugmentations: string[] = []
-
-  if (body.hints_override) {
-    const overrideJobs = hintsOverrideToJobs(body.hints_override)
-    if (overrideJobs.length > 0) {
-      jobs = mergeScrapeJobs(jobs, overrideJobs)
-      scrapeAugmentations.push('hints_override')
-    }
-  }
-
-  if (body.scope_profile) {
-    const profileHints = await fetchScopeProfile(supabase, body.scope_profile)
-    if (profileHints) {
-      jobs = mergeScrapeJobs(jobs, hintsOverrideToJobs(profileHints))
-      scrapeAugmentations.push(`scope_profile:${body.scope_profile}`)
-    } else {
-      console.warn(
-        `[research-from-seed] session=${sessionId} scope_profile=${body.scope_profile} not found, ignored.`,
-      )
-    }
-  }
-
-  // F7b — fallback settings si TOUT a échoué (strategy hints vides +
-  // pas d'override + pas de scope_profile valide).
-  if (jobs.length === 0) {
-    const settingsFallback = await fetchProxyUserSettings(supabase, proxyUserId)
-    if (settingsFallback) {
-      jobs = hintsOverrideToJobs(settingsFallback)
-      if (jobs.length > 0) scrapeAugmentations.push('settings_fallback')
-    }
-  }
-
+  const jobs: ScrapeJob[] = buildScrapeJobs(researchStrategy)
   const scrapeStart = Date.now()
   if (jobs.length === 0) {
     pushStage(telemetry, 'scrape', scrapeStart, {
@@ -485,7 +365,6 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
     pushStage(telemetry, 'scrape', scrapeStart, {
       ok: successCount > 0,
       durationMs: Date.now() - scrapeStart,
-      fallback_engaged: scrapeAugmentations.includes('settings_fallback') ? true : undefined,
     })
 
     if (successCount === 0) {
@@ -569,8 +448,6 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
     ok: scoreRes.ok,
     durationMs: scoreRes.durationMs,
     error: scoreRes.ok ? undefined : scoreRes.error,
-    status: scoreRes.ok ? undefined : scoreRes.status,
-    detail: scoreRes.ok ? undefined : scoreRes.detail,
   })
   if (!scoreRes.ok) {
     return stageFail(telemetry, 'llm-score-batch', scoreRes, cors)
@@ -585,10 +462,19 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
   }
   telemetry.total_cost_usd += scoreRes.data.cost ?? 0
 
+  // Hotfix 2026-05-17 : capter scoring_quality pour décision warning final.
+  // 'poor' = >50% des signaux ont eu un soft-fail (criteria LLM ko). On le
+  // surface comme quality_warning au lieu de continuer silently.
+  const scoringQuality = scoreRes.data.scoring_quality ?? 'full'
+
   // Compose ScoredSignal[] pour synthesizer (signal_synthesizer attend
-  // { id, title, url, source, lang, score, excerpt, disqualified, applied_boosts })
+  // { id, title, url, source, lang, score, excerpt, disqualified, applied_boosts }).
+  // On EXCLUT les scoring_failed=true car leur score=0 est par défaut (LLM ko),
+  // pas par jugement — les inclure tromperait le synthesizer qui prendrait
+  // ce bruit pour des signaux légitimement mauvais.
   const signalsById = new Map(rawSignals.map((s) => [s.id, s]))
   const scoredSignals = (scoreRes.data.results ?? [])
+    .filter((r) => r.scoring_failed !== true)
     .map((r) => {
       const sig = signalsById.get(r.signal_id)
       if (!sig) return null
@@ -611,6 +497,26 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
       }
     })
     .filter((s): s is NonNullable<typeof s> => s !== null)
+
+  if (scoredSignals.length === 0) {
+    // 100% des signaux ont fail le scoring — le synthesizer ne peut rien
+    // produire. On retourne 422 dégradé avec contexte exploitable.
+    telemetry.total_duration_ms = Date.now() - pipelineStarted
+    return jsonResp(
+      {
+        ok: false,
+        error: 'SCORING_TOTAL_FAILURE',
+        stage: 'llm-score-batch',
+        detail:
+          'Tous les signaux scorés ont eu un échec criteria LLM (rate-limit OpenRouter / parse JSON). ' +
+          'Vérifier la clé BYOK + budget OpenRouter.',
+        scoring_quality: 'poor',
+        telemetry,
+      },
+      422,
+      cors,
+    )
+  }
 
   const topSignals = selectTopSignals(scoredSignals, 50)
 
@@ -637,159 +543,103 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
     fetch,
     proxyHeader,
   )
-
-  // F3 2026-05-15 : best-effort fallback. Si le synthesizer plante après
-  // retry interne (validation_failed_after_retry, insufficient_signals,
-  // dispatch_failed, timeout, hallucination irrécupérable...), on NE bloque
-  // PLUS le pipeline : on retourne 200 OK à Bassira avec topics=[],
-  // les scoredSignals top 30 bruts, et quality_warning='synthesizer_unavailable'.
-  // Bassira affiche alors les signaux scorés sans clustering — c'est dégradé
-  // mais ce n'est plus une page blanche. Couvre la cascade K05 (10 hotfixes
-  // qui tentent d'éviter ce fail au lieu de prévoir un mode dégradé).
-  let topics: unknown[] = []
-  let coverageMap: Record<string, unknown> = {}
-  let devilAdvocateId: string | null = null
-  let culturalWarnings: string[] = []
-  let synthesizerOk = false
-  let synthesizerFailureType: FailureType | null = null
-
-  if (synthRes.ok && synthRes.data?.topics) {
-    synthesizerOk = true
-    topics = synthRes.data.topics ?? []
-    coverageMap = (synthRes.data.coverage_map ?? {}) as Record<string, unknown>
-    devilAdvocateId = synthRes.data.devil_advocate_topic_id ?? null
-    culturalWarnings = synthRes.data.cultural_warnings ?? []
-    telemetry.total_cost_usd += synthRes.data.telemetry?.cost_usd ?? 0
-    pushStage(telemetry, 'signal-synthesizer', synthStart, {
-      ok: true,
-      durationMs: synthRes.durationMs,
-    })
-  } else {
-    const failStatus = synthRes.ok ? 502 : synthRes.status
-    const failError = synthRes.ok ? 'invalid_response' : synthRes.error
-    const failDetail = synthRes.ok ? 'missing_topics_in_response' : (synthRes.detail ?? '')
-    synthesizerFailureType = classifyFailure({
-      status: failStatus,
-      error: failError,
-      detail: failDetail,
-    })
-    pushStage(telemetry, 'signal-synthesizer', synthStart, {
-      ok: false,
-      durationMs: synthRes.durationMs,
-      error: failError,
-      status: failStatus,
-      detail: failDetail,
-      fallback_engaged: true,
-    })
-    console.warn(
-      `[research-from-seed] session=${sessionId} synthesizer fallback engaged: failure_type=${synthesizerFailureType}`,
+  pushStage(telemetry, 'signal-synthesizer', synthStart, {
+    ok: synthRes.ok,
+    durationMs: synthRes.durationMs,
+    error: synthRes.ok ? undefined : synthRes.error,
+  })
+  if (!synthRes.ok) {
+    return stageFail(telemetry, 'signal-synthesizer', synthRes, cors)
+  }
+  if (!synthRes.data?.topics) {
+    return stageFail(
+      telemetry,
+      'signal-synthesizer',
+      { status: 502, error: 'invalid_response', detail: 'missing topics' },
+      cors,
     )
   }
+  telemetry.total_cost_usd += synthRes.data.telemetry?.cost_usd ?? 0
+  const topics = synthRes.data.topics ?? []
+  const coverageMap = synthRes.data.coverage_map ?? {}
+  const devilAdvocateId = synthRes.data.devil_advocate_topic_id ?? null
 
   // ─── Stage 7 : quality-auditor ───────────────────────────────────────
-  // F3 2026-05-15 : ne run l'auditor QUE si le synthesizer a réussi (sinon
-  // il n'y a rien à auditer — l'auditor reçoit topics=[] et fail forcément).
-  let auditVerdict: 'pass' | 'warn' | 'fail' | 'deepen' | null = null
-  let auditIssues: unknown[] = []
-  let auditAutoCorrections: Record<string, string> = {}
-  let auditDeepeningTargets: unknown[] = []
-  let auditorOk = false
-  let auditorFailureType: FailureType | null = null
-
-  if (synthesizerOk) {
-    const auditStart = Date.now()
-    const auditRes = await callInternal<QualityAuditorResp>(
-      fnUrl('quality-auditor'),
+  const auditStart = Date.now()
+  const auditRes = await callInternal<QualityAuditorResp>(
+    fnUrl('quality-auditor'),
+    {
+      research_strategy: researchStrategy,
+      rubric,
+      topics_output: {
+        topics,
+        coverage_map: coverageMap,
+        cultural_warnings: synthRes.data.cultural_warnings ?? [],
+        devil_advocate_topic_id: devilAdvocateId,
+      },
+      lang: body.lang,
+      signals_input: topSignals.map((s) => ({ id: s.id, source: s.source, lang: s.lang })),
+    },
+    serviceKey,
+    STAGE_TIMEOUTS_MS.audit,
+    fetch,
+    proxyHeader,
+  )
+  pushStage(telemetry, 'quality-auditor', auditStart, {
+    ok: auditRes.ok,
+    durationMs: auditRes.durationMs,
+    error: auditRes.ok ? undefined : auditRes.error,
+  })
+  if (!auditRes.ok || !auditRes.data) {
+    // Audit fail = non bloquant : on retourne quand même les topics avec
+    // un flag warning. Si scoring_quality=poor, on le mentionne aussi.
+    telemetry.total_duration_ms = Date.now() - pipelineStarted
+    const fallbackWarning =
+      scoringQuality === 'poor' ? 'scoring_poor_and_audit_unavailable' : 'audit_unavailable'
+    return jsonResp(
       {
+        ok: true,
+        session_id: sessionId,
         research_strategy: researchStrategy,
         rubric,
-        topics_output: {
-          topics,
-          coverage_map: coverageMap,
-          cultural_warnings: culturalWarnings,
-          devil_advocate_topic_id: devilAdvocateId,
-        },
-        lang: body.lang,
-        signals_input: topSignals.map((s) => ({ id: s.id, source: s.source, lang: s.lang })),
+        topics,
+        coverage_map: coverageMap,
+        cultural_warnings: synthRes.data.cultural_warnings ?? [],
+        devil_advocate_topic_id: devilAdvocateId,
+        audit: null,
+        quality_warning: fallbackWarning,
+        scoring_quality: scoringQuality,
+        telemetry,
       },
-      serviceKey,
-      STAGE_TIMEOUTS_MS.audit,
-      fetch,
-      proxyHeader,
+      200,
+      cors,
     )
-    if (auditRes.ok && auditRes.data) {
-      auditorOk = true
-      auditVerdict = auditRes.data.verdict ?? 'warn'
-      auditIssues = auditRes.data.issues ?? []
-      auditAutoCorrections = auditRes.data.auto_corrections_applied ?? {}
-      auditDeepeningTargets = auditRes.data.deepening_targets ?? []
-      telemetry.total_cost_usd += auditRes.data.telemetry?.llm_cost ?? 0
-      pushStage(telemetry, 'quality-auditor', auditStart, {
-        ok: true,
-        durationMs: auditRes.durationMs,
-      })
-    } else {
-      const failStatus = auditRes.ok ? 502 : auditRes.status
-      const failError = auditRes.ok ? 'invalid_response' : auditRes.error
-      const failDetail = auditRes.ok ? 'missing_audit_response' : (auditRes.detail ?? '')
-      auditorFailureType = classifyFailure({
-        status: failStatus,
-        error: failError,
-        detail: failDetail,
-      })
-      pushStage(telemetry, 'quality-auditor', auditStart, {
-        ok: false,
-        durationMs: auditRes.durationMs,
-        error: failError,
-        status: failStatus,
-        detail: failDetail,
-        fallback_engaged: true,
-      })
-    }
-  } else {
-    // Skip auditor entirely — pushed as marker stage with duration_ms=0
-    pushStage(telemetry, 'quality-auditor', Date.now(), {
-      ok: true,
-      durationMs: 0,
-      fallback_engaged: true,
-    })
   }
+  telemetry.total_cost_usd += auditRes.data.telemetry?.llm_cost ?? 0
 
-  // Compose quality_warning consolidé (priorité au mode le plus dégradé).
+  const verdict = auditRes.data.verdict ?? 'warn'
   const depthHint = body.depth_hint ?? 0
+
+  // V1 : pas d'iterative deepening — flag warning seul.
   let qualityWarning: string | null = null
-  if (!synthesizerOk) {
-    qualityWarning = 'synthesizer_unavailable'
-  } else if (!auditorOk) {
-    qualityWarning = 'audit_unavailable'
-  } else if (auditVerdict === 'deepen' && depthHint < 2) {
+  if (verdict === 'deepen' && depthHint < 2) {
     qualityWarning = 'deepening_recommended'
     console.warn(
       `[research-from-seed] session=${sessionId} verdict=deepen — V1 ne re-pipeline pas (US-K08).`,
     )
-  } else if (auditVerdict === 'fail') {
+  } else if (verdict === 'fail') {
     qualityWarning = 'quality_fail'
-  } else if (auditVerdict === 'warn') {
+  } else if (verdict === 'warn') {
     qualityWarning = 'quality_warn'
   }
 
-  telemetry.total_duration_ms = Date.now() - pipelineStarted
+  // Hotfix 2026-05-17 : si scoring poor, surclass un warning de niveau inférieur.
+  // Ordre de priorité : quality_fail > scoring_poor > quality_warn > deepening_recommended.
+  if (scoringQuality === 'poor' && qualityWarning !== 'quality_fail') {
+    qualityWarning = 'scoring_poor'
+  }
 
-  // Slim scored_signals payload returned in fallback mode for Bassira UI :
-  // top 30 max, gardons juste les champs utiles à l'affichage dégradé.
-  // En mode nominal on n'inclut PAS scored_signals_top (économie payload).
-  const scoredSignalsTop = synthesizerOk
-    ? undefined
-    : topSignals.slice(0, 30).map((s) => ({
-        id: s.id,
-        title: s.title,
-        url: s.url,
-        source: s.source,
-        lang: s.lang,
-        score: s.score,
-        excerpt: s.excerpt,
-        applied_boosts: s.applied_boosts,
-      }))
+  telemetry.total_duration_ms = Date.now() - pipelineStarted
 
   return jsonResp(
     {
@@ -799,20 +649,16 @@ const handlerPipelineSync = async (req: Request): Promise<Response> => {
       rubric,
       topics,
       coverage_map: coverageMap,
-      cultural_warnings: culturalWarnings,
+      cultural_warnings: synthRes.data.cultural_warnings ?? [],
       devil_advocate_topic_id: devilAdvocateId,
-      audit: auditorOk
-        ? {
-            verdict: auditVerdict,
-            issues: auditIssues,
-            auto_corrections_applied: auditAutoCorrections,
-            deepening_targets: auditDeepeningTargets,
-          }
-        : null,
+      audit: {
+        verdict,
+        issues: auditRes.data.issues ?? [],
+        auto_corrections_applied: auditRes.data.auto_corrections_applied ?? {},
+        deepening_targets: auditRes.data.deepening_targets ?? [],
+      },
       quality_warning: qualityWarning,
-      ...(synthesizerFailureType ? { synthesizer_failure_type: synthesizerFailureType } : {}),
-      ...(auditorFailureType ? { auditor_failure_type: auditorFailureType } : {}),
-      ...(scoredSignalsTop ? { scored_signals_top: scoredSignalsTop } : {}),
+      scoring_quality: scoringQuality,
       telemetry,
     },
     200,
@@ -828,27 +674,15 @@ interface StageRecord {
   ok: boolean
   durationMs: number
   error?: string
-  status?: number
-  detail?: string
-  fallback_engaged?: boolean
 }
 
 function pushStage(tel: PipelineTelemetry, stage: string, startMs: number, res: StageRecord): void {
-  const entry: StageTelemetry = {
+  tel.stages.push({
     stage,
     duration_ms: res.durationMs ?? Date.now() - startMs,
     ok: res.ok,
     error: res.error,
-  }
-  if (!res.ok) {
-    entry.failure_type = classifyFailure({
-      status: res.status,
-      error: res.error,
-      detail: res.detail,
-    })
-  }
-  if (res.fallback_engaged) entry.fallback_engaged = true
-  tel.stages.push(entry)
+  })
 }
 
 function stageFail(
@@ -860,17 +694,11 @@ function stageFail(
   tel.total_duration_ms = tel.stages.reduce((acc, s) => acc + s.duration_ms, 0)
   // Si timeout interne → 504 STAGE_TIMEOUT
   const isTimeout = res.status === 504 || res.error === 'timeout'
-  const failureType = classifyFailure({
-    status: res.status,
-    error: res.error,
-    detail: res.detail,
-  })
   return jsonResp(
     {
       ok: false,
       error: isTimeout ? 'STAGE_TIMEOUT' : 'STAGE_FAILED',
       stage,
-      failure_type: failureType,
       detail: res.detail ?? res.error,
       // Propagate the upstream validation errors when available so the
       // Bassira frontend (and operators reading research_sessions.error_detail)
@@ -986,7 +814,38 @@ async function handlePostAsync(req: Request, cors: Record<string, string>): Prom
     return jsonResp({ ok: false, error: validation.error }, 400, cors)
   }
 
-  // Create session row
+  // ─── Idempotency dedup (hotfix 2026-05-17) ───────────────────────────────
+  // Si le caller fournit un idempotency_key, on lookup d'abord. Couple unique
+  // (api_key_id, idempotency_key) garanti par index DB (cf. migration
+  // 20260518000001_research_sessions_idempotency_supervision.sql).
+  if (validation.body.idempotency_key) {
+    const existing = await supabase
+      .from('research_sessions')
+      .select('id, status, created_at')
+      .eq('api_key_id', apiKeyRow.id)
+      .eq('idempotency_key', validation.body.idempotency_key)
+      .maybeSingle()
+    if (existing.data) {
+      return jsonResp(
+        {
+          ok: true,
+          session_id: existing.data.id,
+          status: existing.data.status,
+          message: `Idempotent hit — session already exists, created_at=${existing.data.created_at}.`,
+          idempotent: true,
+        },
+        200,
+        cors,
+      )
+    }
+    // existing.error si non-200 mais "no rows" est OK (maybeSingle).
+    // Si autre erreur DB, on continue best-effort plutôt que de bloquer.
+  }
+
+  // Calcul seed_hash anonymisé pour observabilité (anti-PII leak)
+  const seedHash = await hashSeed(validation.body.seed)
+
+  // Create session row (idempotency_key + seed_hash inclus)
   const sessionId = crypto.randomUUID()
   const insertRes = await supabase.from('research_sessions').insert({
     id: sessionId,
@@ -994,12 +853,38 @@ async function handlePostAsync(req: Request, cors: Record<string, string>): Prom
     proxy_user_id: apiKeyRow.proxy_user_id,
     status: 'running',
     seed: validation.body.seed,
+    seed_hash: seedHash,
     lang: validation.body.lang,
     sector_hint: validation.body.sector_hint ?? null,
     depth_hint: validation.body.depth_hint ?? null,
     output_profile: validation.body.output_profile ?? null,
+    idempotency_key: validation.body.idempotency_key ?? null,
   })
   if (insertRes.error) {
+    // Cas race : 2 POST concurrents avec même idempotency_key → un gagne,
+    // l'autre se prend un 23505 (unique violation). On retourne 200 idempotent
+    // pour le perdant en re-lookup-ant.
+    if (validation.body.idempotency_key && insertRes.error.code === '23505') {
+      const winner = await supabase
+        .from('research_sessions')
+        .select('id, status, created_at')
+        .eq('api_key_id', apiKeyRow.id)
+        .eq('idempotency_key', validation.body.idempotency_key)
+        .maybeSingle()
+      if (winner.data) {
+        return jsonResp(
+          {
+            ok: true,
+            session_id: winner.data.id,
+            status: winner.data.status,
+            message: 'Idempotent race resolved — winner session returned.',
+            idempotent: true,
+          },
+          200,
+          cors,
+        )
+      }
+    }
     return jsonResp(
       { ok: false, error: 'session_create_failed', detail: insertRes.error.message },
       500,
