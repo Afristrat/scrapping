@@ -1,7 +1,9 @@
 # HANDOFF — Kairos (anciennement theresa-scrap / zlatan-scrap)
 
-> **Date** : 2026-05-04 (MAJ session 3)
-> **État global** : production stable sur `https://scrap.ai-mpower.com`. Wave 1-9.2 + Sprint 0 + Wave 11 + **Wave 10A** + **Wave 10B** + **RSS feeds** livrées et mergées sur `main`. Wave 10C-E à venir (21 stories restantes).
+> **Date** : 2026-05-22 (MAJ session devil-advocate Bassira→Kairos hardening)
+> **État global** : production stable sur `https://scrap.ai-mpower.com`. Wave 1-11 livrées + **Pipeline Bassira (K05→K10) durci** + **Watchlist (US-K11/K12)** + **Devil-advocate hardening 2026-05-17/18 (9 fixes antifragiles)** mergés sur `main`. Wave 10C-E à venir (21 stories restantes).
+>
+> **Pipeline `research-from-seed` (Bassira → Kairos) opérationnel end-to-end** après 9 fixes en cascade. Dernière session de référence : `22f5e86a` (completed, 123s, 2 topics, scoring_quality=partial, tous stages OK).
 
 ---
 
@@ -32,6 +34,12 @@
 - `feedback_no_assumptions.md` — vérifier avant d'affirmer
 - `feedback_autonomous_corrections.md` — fix direct, pas dicter
 - `feedback_supabase_rpc_pattern.md` — `supabase.rpc()` jamais détaché en variable
+- `feedback_byok_suprem.md` — BYOK non-négociable, fix le pipeline pas le modèle
+- `feedback_supabase_no_verify_jwt.md` — `--no-verify-jwt` obligatoire pour toutes fns Bassira
+- `bassira_pipeline_definitif.md` — architecture finale post-2026-05-15 + clé bsr_7123 + F3-F7b + scope_profiles
+- `watchlist_mission_handoff.md` — topics_of_interest + topics-search + watchlist-tick livrés 2026-05-16
+- `a3_credentials_rotation_runbook.md` — procédure 15min rotation service_role + anon + Coolify + MinIO
+- `devil_advocate_2026_05_18.md` — 9 fixes session devil-advocate Bassira→Kairos
 - `MEMORY.md` — index des mémoires
 
 ---
@@ -41,18 +49,31 @@
 ### HEAD courant
 
 ```
-main = 2ab33df fix(pdf): retire fontStyle italic non-supporte
-       (synchronisé avec feat/topic-tracking-minio)
+main = d7d0a9b docs(devil-advocate): section 8b — cascade fix logs.org_id + smoke #3 verdict
+       (worktree OneDrive local desync sur 6cbe4a3, /c/temp/kairos-hotfix à jour)
 ```
+
+Derniers commits significatifs (origin/main) :
+
+| Commit    | Message                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------- |
+| `d7d0a9b` | docs(devil-advocate): section 8b — cascade fix logs.org_id + smoke #3 verdict               |
+| `6316d01` | fix(bassira→kairos): reasoning models compat + logs.org_id nullable (FIX #8+#9)             |
+| `baf2f72` | docs(devil-advocate): section 8 — reasoning models compat + reco user                       |
+| `87fb3ca` | fix(bassira→kairos): devil-advocate hardening — 7 fixes antifragiles (FIX #1-7)             |
+| `913f5ec` | feat(kairos): scope-profiles endpoint + watchlist-tick auth fallback + classifyFailure fix  |
+| `d8b332b` | merge feat/topics-watchlist (US-K11/K12) déployé prod 2026-05-16                            |
+| `fa11869` | merge fix/bassira-pipeline-defense-in-depth (F3+F4+F6+F7a+F7b+F-Profile) déployé 2026-05-15 |
+| `6cbe4a3` | [hotfix K05 #10] signal-synthesizer : seuils dégradés MIN_SIGNALS=1 MIN_TOPICS=1            |
 
 ### Stack
 
 - **Frontend** : React 19 + Vite 8 + TypeScript strict + Tailwind v4 + shadcn/ui (Radix), Material You design system
 - **Backend** : Supabase Postgres + Auth + Edge Functions Deno + Storage + pg_cron
-- **LLM** : BYOK 10 providers (OpenRouter, Anthropic, OpenAI, Mistral, Groq, Together, DeepSeek, Moonshot, Google, Ollama). DeepSeek V4 Flash modèle digest actif chez le founder.
+- **LLM** : BYOK 10 providers (OpenRouter, Anthropic, OpenAI, Mistral, Groq, Together, DeepSeek, Moonshot, Google, Ollama). **Founder config actuelle : `deepseek-v4-flash` pour scoring/enrichment/scraping/digest (reasoning model) + `kimi-k2-0905-preview` pour monitoring.** Pas d'OpenRouter chez l'user.
 - **Sources** : X (Apify `apidojo/twitter-list-scraper`), Reddit (Apify `automation-lab/reddit-scraper`), arXiv (API officielle directe)
 - **Storage** : MinIO (`zlatan-scrap-topics` bucket, lifecycle 100j) pour topic tracking 90j
-- **Deploy** : Coolify auto-deploy sur push `feat/topic-tracking-minio`
+- **Deploy** : Coolify auto-deploy sur push `feat/topic-tracking-minio` (frontend), edge fns Supabase deployées manuellement via `bunx supabase functions deploy`
 
 ### Quality gates au dernier commit
 
@@ -60,6 +81,10 @@ main = 2ab33df fix(pdf): retire fontStyle italic non-supporte
 bun x tsc -b --noEmit              # 0 erreur
 bun x eslint . --max-warnings 0    # 0 warning
 bun x vitest run                   # 181/181 tests
+# Deno tests pipeline Bassira (session 2026-05-17/18) :
+deno test --allow-all --no-check supabase/functions/rubric-architect/    # 37 passed
+deno test --allow-all --no-check supabase/functions/llm-score-batch/     # 109 passed (39 index + 70 modules)
+deno test --allow-all --no-check supabase/functions/research-from-seed/  # 53 passed
 ```
 
 ---
@@ -88,7 +113,96 @@ bun x vitest run                   # 181/181 tests
 
 ---
 
-## 3. User Stories — état complet (90 total trackées)
+## 3. Pipeline Bassira → Kairos (`research-from-seed`) — état post-2026-05-18
+
+### Architecture
+
+```
+Bassira backend (Flask Python, Coolify miro-shark u6pn5mr2pgi88s13un55pkzb)
+  ↓ POST /api/research/from-seed  (headers: x-api-key: bsr_7123...)
+research-from-seed (verify_jwt=false)
+  ↓ 7 stages chaînés
+  1. research-strategist     [120s budget] seed → research_strategy + hints
+  2. rubric-architect        [120s budget] strategy → rubric 3-couches (criteria/disq/boosts/calibration)
+  3. scrape parallèle        [90s budget]  x + reddit + arxiv via signals_session éphémère
+  4. read_signals            [n/a]         lecture signals_session (limit 200)
+  5. llm-score-batch         [150s budget] top 30 scoredSignals (30 × 2-3 LLM calls //)
+  6. signal-synthesizer      [150s budget] F3 best-effort fallback si timeout/schema
+  7. quality-auditor         [60s budget]  verdict pass/warn/fail/deepen (F3 best-effort)
+```
+
+**Clé API Bassira active** : `bsr_7123800c10cf61ef4f3a116ae2e8a544` (rotée 2026-05-15, prefix `bsr_7123`, scope `research-only`, rate-limit 60/min).
+**Coolify env var** : `KAIROS_API_KEY` (uuid `koxe4dustc3joqhg5wacywvm`).
+
+### 9 fixes antifragiles (session devil-advocate 2026-05-17/18)
+
+| #   | Fichier                             | Fix                                                                                                                          |
+| --- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 1   | (audit)                             | 38 failure modes audités — 22 → 35 couverts (de 58% à 92%)                                                                   |
+| 2   | `rubric-architect/index.ts`         | `normalizeScoringPromptLength` — auto-pad si <200 mots depuis contenu rubric / auto-truncate si >500                         |
+| 3   | `research-from-seed/lib.ts:28`      | `STAGE_TIMEOUTS_MS.score: 90_000 → 150_000` (30 signaux × 2-3 LLM calls //)                                                  |
+| 4   | `rubric-architect/index.ts`         | 5 normalizers defense-in-depth (criteria_count clip 8, disq_count clip 6, soft_boosts cap+scale, calibration min/median/max) |
+| 5   | `research-from-seed/{index,lib}.ts` | idempotency_key support + seed_hash 16-char SHA-256 (PII) + cron `mark_stale_running_sessions` 5min                          |
+| 6   | `llm-score-batch/{index,engine}.ts` | `scoring_failed` flag + `scoring_quality` (full/partial/poor) + filtrage avant synth + 422 `SCORING_TOTAL_FAILURE`           |
+| 7   | migration `20260518000001_*.sql`    | Vue `research_sessions_health` + RPC `alert_on_failure_spike` + cron `check-research-failure-spike` 30min + vue alertes      |
+| 8   | `dispatch-llm/index.ts` + engine    | Compat reasoning models : si content vide + reasoning_content présent → fallback. max_tokens bumpés (criteria 600→2000)      |
+| 9   | migration `20260518000002_*.sql`    | `ALTER TABLE logs ALTER COLUMN org_id DROP NOT NULL` (sabotait tous mes logs antifragiles)                                   |
+
+### Sessions de référence (5 runs successifs)
+
+| Session        | Date             | Status        | Score stage                        | Quality     | Topics                         |
+| -------------- | ---------------- | ------------- | ---------------------------------- | ----------- | ------------------------------ |
+| `777f6c28`     | 2026-05-17 22h   | failed        | timeout 90s                        | —           | 0                              |
+| `fec78bae`     | 2026-05-17 22h   | failed        | rubric schema (scoring_prompt=28w) | —           | 0                              |
+| `30257bfb`     | 2026-05-17 23h   | completed     | 6.8s ✓                             | poor        | 0                              |
+| `787362ea`     | 2026-05-18 00h   | failed        | 8.2s ✓                             | —           | 0 (synth INSUFFICIENT_SIGNALS) |
+| **`22f5e86a`** | 2026-05-18 00h43 | **completed** | **15.5s ✓**                        | **partial** | **2**                          |
+
+### Pièges critiques à connaître pour future debug
+
+1. **Toutes les fns du pipeline DOIVENT être déployées `--no-verify-jwt`**. Oublier ce flag casse Bassira en ~30s (toutes les requêtes deviennent 401 `UNAUTHORIZED_NO_AUTH_HEADER`, masqué côté MiroShark en `KAIROS_INVALID_KEY` 502).
+2. **`logs.org_id` est désormais nullable** (migration 20260518000002). Si tu remets `NOT NULL`, tous les inserts d'observabilité depuis les edge fns ad_hoc échouent silencieusement.
+3. **Founder n'utilise PAS OpenRouter** — `deepseek-v4-flash` (reasoning) pour scoring/enrichment. Dispatch-llm fallback sur `reasoning_content` si `content` vide.
+4. **BYOK supreme** : ne JAMAIS changer le modèle (memory `feedback_byok_suprem.md`). Fix le pipeline, pas le modèle.
+5. **Recommandation user (option, hors BYOK)** : passer `model_config.scoring.model` de `deepseek-v4-flash` à `deepseek-chat` (non-reasoning) pour latence 3-5× moindre. Doc devil-advocate section 8 §reco.
+6. **Supervision** : vue `research_sessions_health` (7j horaire), RPC `alert_on_failure_spike(window_minutes, threshold_pct)`, vue `research_alerts_recent`, tous service_role only.
+
+### Investiguer une future panne
+
+```bash
+SERVICE_ROLE="..." ; PROJECT="crplceoptyeslqyfcqvj"
+
+# 1. Health 24h
+curl -s -H "apikey: $SERVICE_ROLE" -H "Authorization: Bearer $SERVICE_ROLE" \
+  "https://$PROJECT.supabase.co/rest/v1/research_sessions_health?limit=24"
+
+# 2. Sessions failed récentes avec failure_type
+curl -s -H "apikey: $SERVICE_ROLE" -H "Authorization: Bearer $SERVICE_ROLE" \
+  "https://$PROJECT.supabase.co/rest/v1/research_sessions?status=in.(failed,timeout,stale)&order=created_at.desc&limit=10&select=id,seed_hash,status,error_detail,telemetry"
+
+# 3. Failure spike check
+curl -X POST -H "apikey: $SERVICE_ROLE" -H "Authorization: Bearer $SERVICE_ROLE" \
+  -H "Content-Type: application/json" \
+  "https://$PROJECT.supabase.co/rest/v1/rpc/alert_on_failure_spike" \
+  -d '{"window_minutes":60,"failure_threshold_pct":30}'
+
+# 4. Versions déployées vs commits
+cd /c/temp/kairos-hotfix && bunx supabase functions list --project-ref $PROJECT
+```
+
+Doc référence complète : `docs/bassira-kairos-devil-advocate.md` (8 sections : inventaire 38 failure modes, fixes détaillés, invariants, détection, remédiation par failure_type, limites V2).
+
+### Watchlist (US-K11/K12) — livré prod 2026-05-16
+
+- Migration `20260516100001_topics_watchlist.sql` : `topics_of_interest` (vector 1024) + `topics_archive` + `topic_collect_runs` + RPC `topics_of_interest_match` + cron `purge_topics_archive_daily` + cron `watchlist_tick_hourly`
+- Edge fns `topics-of-interest`, `topics-search`, `watchlist-tick` (toutes `--no-verify-jwt`)
+- `_shared/embeddings.ts` multi-provider DashScope/OpenAI/OpenRouter 1024 dims Matryoshka (Qwen3-Embedding-8B)
+- **Bloqueur smoke test** : `DASHSCOPE_API_KEY` non set, founder doit provisionner clé Singapore (cf. memory `watchlist_mission_handoff.md` §Bloqueur)
+- Cron `watchlist_tick_hourly` échoue auth jusqu'à `app.settings.watchlist_cron_secret` set côté DB (cf. workaround memory)
+
+---
+
+## 4. User Stories — état complet (90 total trackées)
 
 | Wave                | Stories | Statut           | Détail                                                                                                                                                    |
 | ------------------- | ------: | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -119,7 +233,7 @@ bun x vitest run                   # 181/181 tests
 
 ---
 
-## 4. Bugs critiques résolus (session 2026-05-03)
+## 5. Bugs critiques résolus (session 2026-05-03)
 
 | #   | Bug                                                                                      | Fix                                                                                       | Commit    |
 | --- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------- |
@@ -146,55 +260,76 @@ bun x vitest run                   # 181/181 tests
 
 ---
 
-## 5. Edge Functions actives (28 deployées)
+## 6. Edge Functions actives
+
+### Pipeline Bassira → Kairos (`--no-verify-jwt` obligatoire)
+
+```
+research-from-seed          v22+ (devil-advocate hardening : idempotency + seed_hash + scoring_quality propagation)
+research-strategist         v8+  (F7a retry si <50% hints)
+rubric-architect            v12+ (5 normalizers defense-in-depth + scoring_prompt auto-pad/truncate)
+llm-score-batch             v8+  (scoring_failed flag + scoring_quality + max_tokens reasoning models)
+signal-synthesizer          v19+ (F3 best-effort + auto-truncate key_signals_supporting)
+quality-auditor             v7+  (F3 best-effort + verdict deepen V1)
+dispatch-llm                v7+  (compat reasoning models : fallback reasoning_content si content vide)
+topics-of-interest          v3   (CRUD x-api-key)
+topics-search               v3   (match cosine + lookup archive)
+watchlist-tick              v3   (worker 2 phases START + FINALIZE)
+```
+
+### Pipeline veille Kairos historique
 
 ```
 digest                      v5+ (PDB prompt + footnotes auto-inject + language override)
-llm-score-batch             v6+ (consensus N modèles + dedup OPTIONS fix)
 backtest-rubric             v1 (Wave 9.2 dry-run)
 scraper-x / reddit / arxiv  v3+ (dedup external_id)
+scraper-rss                 v1 (RSS 2.0 + Atom 1.0)
 topic-classifier            v4
-dispatch-llm                v5
 refresh-models              v4
 run-pipeline                v2
 purge                       v2
 admin-metrics               v2
 audit-log helpers           multiple
-invite-member               v2
-accept-invitation           v2
-remove-member               v2
+invite-member / accept-invitation / remove-member  v2
 validate-api-key            v2
 provision-isolated-tenant   v2
 stripe-webhook              v2
-record-usage                v2
-record-health-check         v2
+record-usage / record-health-check  v2
 create-checkout-session     v2
 health                      v2
 minio-init                  v1 (Wave 11 init bucket)
 create-public-share         v1 (Wave 11)
 run-admin-prompt            v2
+enrich-signal / suggest-personas / cluster-signals / compute-reputation  v1 (Wave 10A)
 ```
 
 ---
 
-## 6. À faire (urgent / non-bloquant)
+## 7. À faire (urgent / non-bloquant)
 
 ### Urgent
 
-1. **Rotater 4 credentials leakés dans le chat** : service_role Supabase, anon, Coolify token, MinIO secrets (**toujours pas fait**)
-2. **Configurer Stripe** : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICES_CATALOG` (script `stripe-bootstrap.ts`)
-3. **Re-trigger run-pipeline** pour rétablir les 148 signaux X — nécessite d'abord setter `APIFY_TOKEN` + `OPENROUTER_API_KEY` via `bun x supabase secrets set` (dans `/c/temp/kairos-hotfix`)
-4. **PR + merge Wave 10A** : branche `feat/wave-10A-foundation` prête → https://github.com/Afristrat/scrapping/pull/new/feat/wave-10A-foundation
+1. **Rotater 4 credentials leakés dans le chat** : service_role Supabase, anon, Coolify token, MinIO secrets — procédure 15min dans memory `a3_credentials_rotation_runbook.md`. Non automatisable par Claude faute de PAT. **Toujours pas fait au 2026-05-22.**
+2. **Provisionner clé DashScope Singapore** + set `DASHSCOPE_API_KEY` secret + insert dans `user_api_keys` provider='dashscope' pour proxy_user — débloque smoke test watchlist (cf. memory `watchlist_mission_handoff.md`).
+3. **Set cron secret côté DB** : `SELECT vault.create_secret('<value from /tmp/watchlist_secret.env>', 'watchlist_cron_secret')` — débloque cron `watchlist_tick_hourly`.
+4. **Configurer Stripe** : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICES_CATALOG` (script `stripe-bootstrap.ts`).
+5. **Re-trigger run-pipeline** pour rétablir les 148 signaux X — nécessite d'abord setter `APIFY_TOKEN` + `OPENROUTER_API_KEY` via `bun x supabase secrets set` (dans `/c/temp/kairos-hotfix`).
+
+### Recommandé (optionnel)
+
+6. **User Settings UI** : passer `model_config.scoring.model` et `model_config.enrichment.model` de `deepseek-v4-flash` (reasoning) à `deepseek-chat` (classique) → latence 3-5× moindre sur pipeline Bassira, même clé API DeepSeek. Garder reasoning pour `monitoring`/`digest` où ça aide.
+7. **PR + merge Wave 10A** si pas déjà fait : https://github.com/Afristrat/scrapping/pull/new/feat/wave-10A-foundation
 
 ### Non-bloquant
 
-4. Configurer Plausible analytics (compte créé + uncomment `index.html`) OU laisser tel quel
-5. Wave 10 Phase A (10 stories) — premier dispatch de la roadmap Second Cerveau
-6. Wave 11 TODO : OG meta tags dynamiques, Email HTML Resend, Slack webhook, Branding org PDF
+8. Configurer Plausible analytics (compte créé + uncomment `index.html`) OU laisser tel quel
+9. Wave 10 Phase C-E (21 stories) — async enrichment + Neo4j shadow + Neo4j active
+10. Wave 11 TODO : OG meta tags dynamiques, Email HTML Resend, Slack webhook, Branding org PDF
+11. **V2 hardening Bassira** : (a) iterative deepening US-K08 si verdict='deepen', (b) webhook alerte externe (Slack/email) au lieu de seul `logs` table, (c) cost cap budget par session, (d) détection prompt injection sémantique dans research-strategist (coût LLM additionnel)
 
 ---
 
-## 7. Comment reprendre
+## 8. Comment reprendre
 
 ### Setup local
 
@@ -214,6 +349,40 @@ bun dev   # http://localhost:5173
 bun x tsc -b --noEmit
 bun x eslint . --max-warnings 0
 bun x vitest run
+# Pipeline Bassira (Deno tests)
+deno test --allow-all --no-check supabase/functions/rubric-architect/
+deno test --allow-all --no-check supabase/functions/llm-score-batch/
+deno test --allow-all --no-check supabase/functions/research-from-seed/
+```
+
+### Deploy edge fns pipeline Bassira (`--no-verify-jwt` obligatoire)
+
+```bash
+cd /c/temp/kairos-hotfix
+bunx supabase db push --include-all  # applique les migrations
+bunx supabase functions deploy rubric-architect    --no-verify-jwt --project-ref crplceoptyeslqyfcqvj
+bunx supabase functions deploy llm-score-batch     --no-verify-jwt --project-ref crplceoptyeslqyfcqvj
+bunx supabase functions deploy research-from-seed  --no-verify-jwt --project-ref crplceoptyeslqyfcqvj
+bunx supabase functions deploy dispatch-llm        --no-verify-jwt --project-ref crplceoptyeslqyfcqvj
+bunx supabase functions deploy signal-synthesizer  --no-verify-jwt --project-ref crplceoptyeslqyfcqvj
+bunx supabase functions deploy quality-auditor     --no-verify-jwt --project-ref crplceoptyeslqyfcqvj
+bunx supabase functions deploy research-strategist --no-verify-jwt --project-ref crplceoptyeslqyfcqvj
+```
+
+### Smoke test Bassira post-deploy
+
+```bash
+API_KEY="bsr_7123800c10cf61ef4f3a116ae2e8a544"
+IDEMP="smoke-$(date +%s)"
+SEED="Phrase de seed >= 50 caractères pour passer la validation côté Kairos."
+
+curl -X POST -H "x-api-key: $API_KEY" -H "Content-Type: application/json" \
+  -H "Origin: https://prospectives.ai-mpower.com" \
+  "https://crplceoptyeslqyfcqvj.supabase.co/functions/v1/research-from-seed" \
+  -d "{\"seed\":\"$SEED\",\"lang\":\"fr\",\"idempotency_key\":\"$IDEMP\"}"
+
+# Attendu : 202 { session_id, status: 'running', message: 'Pipeline started. Poll GET ...' }
+# Replay même idempotency_key → 200 { session_id same, idempotent: true }
 ```
 
 ### Deploy Coolify (manuel via API token)
@@ -225,27 +394,33 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
   "https://coolify.ai-mpower.com/api/v1/deploy?uuid=$APP&force=true"
 ```
 
-### Spawn ralph-loop pour Wave 10 Phase A
+### Spawn ralph-loop pour Wave 10 Phase C-E
 
-Voir `docs/handoffs/2026-05-03-wave-10-second-cerveau-prd.md` pour le détail des 10 stories Phase A. Le PRD recommande :
+Voir `docs/handoffs/2026-05-03-wave-10-second-cerveau-prd.md` pour le détail des stories restantes (21 sur 5 sous-vagues). Le PRD recommande :
 
-- 1 worktree par phase (`/c/temp/kairos-w10A`)
-- Branche dédiée (`feat/wave-10A-foundation`)
+- 1 worktree par phase (`/c/temp/kairos-w10C`)
+- Branche dédiée (`feat/wave-10C-async-enrichment`)
 - Sonnet 4.6 par défaut, Haiku 4.5 pour stories triviales
 - JAMAIS Opus
 
 ---
 
-## 8. Conventions importantes
+## 9. Conventions importantes
 
-- Worktree de travail toujours `/c/temp/kairos-hotfix`, jamais OneDrive direct
+- Worktree de travail toujours `/c/temp/kairos-hotfix`, jamais OneDrive direct (lock SearchIndexer Windows)
 - Migrations versionnées `YYYYMMDDHHMMSS_description.sql`, RLS sur toutes nouvelles tables
+- **Toutes les edge fns du pipeline Bassira DOIVENT être déployées `--no-verify-jwt`** — sinon 401 `UNAUTHORIZED_NO_AUTH_HEADER` masqué en `KAIROS_INVALID_KEY` 502 côté MiroShark (memory `feedback_supabase_no_verify_jwt.md`)
+- **BYOK suprême — jamais changer le modèle LLM** (memory `feedback_byok_suprem.md`). Le modèle est choisi par l'user via `settings.model_config`. Fix le pipeline, pas le modèle.
+- **`logs.org_id` est nullable depuis 2026-05-18** (migration 20260518000002). Tous les inserts d'observabilité depuis edge fns ad_hoc en dépendent. Ne pas remettre `NOT NULL`.
+- **pgcrypto vit dans le schema `extensions`** sur Supabase Cloud. Qualifier `extensions.digest(...)` dans les migrations qui en font usage (sinon ERROR 42883).
 - Modèles agents ralph-loop : Sonnet 4.6 par défaut, Haiku 4.5 pour stories triviales, **JAMAIS Opus** (cost prohibitif)
 - Toujours `bun x supabase` (pas `npx`) — projet déjà link dans `/c/temp/kairos-hotfix`
 - Toute migration → regen `src/types/database.ts` via `bun x supabase gen types typescript --project-id crplceoptyeslqyfcqvj > src/types/database.ts`
 - Texte FR : accents OBLIGATOIRES partout (incluant majuscules — É À Ç). Aucune substitution ASCII.
 - Pas de tolérance « non bloquant » — chaque erreur TS/lint corrigée à la racine.
+- **`supabase.rpc()` jamais détaché en variable** (memory `feedback_supabase_rpc_pattern.md`) — perd le `this`, casse silencieusement.
+- **Idempotency Bassira** : si Bassira retry réseau, passer le même `idempotency_key` (1-64 chars `[A-Za-z0-9_-]`) pour dedup côté Kairos. Index unique partiel `(api_key_id, idempotency_key)` garantit l'unicité.
 
 ---
 
-_Mis à jour 2026-05-03. Authoritative à `.ralph/prd.json` pour le détail US._
+_Mis à jour 2026-05-22 (session devil-advocate Bassira→Kairos hardening). Authoritative à `.ralph/prd.json` pour le détail US et à `docs/bassira-kairos-devil-advocate.md` pour le pipeline Bassira._
