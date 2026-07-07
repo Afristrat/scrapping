@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { parseScoreResponse } from './parse-single.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -140,6 +141,19 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
   const raw = dispatchResult.content ?? '{}'
   const { score, reasoning } = parseScoreResponse(raw)
 
+  // Score illisible → on NE crée PAS de row score=0 (faux positif qui pollue le
+  // dashboard et sort le signal de unscored_signals). On loggue et on skip :
+  // le signal reste récupérable par le prochain run de scoring.
+  if (score === null) {
+    await supabase.from('logs').insert({
+      user_id: user.id,
+      action: 'llm-score:parse_fail',
+      status: 'error',
+      payload: { signal_id: body.signal_id, raw_preview: raw.slice(0, 2000) },
+    })
+    return json({ signal_id: body.signal_id, skipped: true, reason: 'parse_fail' }, 200)
+  }
+
   const usage = dispatchResult.usage
   const promptTokens = usage?.prompt_tokens ?? 0
   const completionTokens = usage?.completion_tokens ?? 0
@@ -183,19 +197,6 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
 
   return json({ signal_id: body.signal_id, score, reasoning, cost }, 200)
 })
-
-function parseScoreResponse(raw: string): { score: number; reasoning: string } {
-  try {
-    const parsed = JSON.parse(raw)
-    const rawScore = Number(parsed.score)
-    const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(100, rawScore)) : 0
-    const reasoning =
-      typeof parsed.reasoning === 'string' ? parsed.reasoning.slice(0, 1000) : '(no reasoning)'
-    return { score, reasoning }
-  } catch {
-    return { score: 0, reasoning: '(invalid LLM output)' }
-  }
-}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {

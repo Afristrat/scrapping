@@ -1,0 +1,13 @@
+{
+  "parcoursCritiques": ["auth-magic-link-login", "run-pipeline-scrape-score", "digest-generation"],
+  "urlTest": "http://localhost:5173",
+  "conformiteActivee": false,
+  "endpointsIaAMenager": [
+    "/functions/v1/dispatch-llm",
+    "/functions/v1/llm-score-batch",
+    "/functions/v1/digest",
+    "/functions/v1/research-from-seed"
+  ],
+  "stackDetectee": { "node": true, "supabase": true, "python": false },
+  "notes": "Bootstrap auto 2026-07-07 (session blindage full) : Supabase du projet déconnecté (confirmé Amine — base à refaire sur serveur .11). Runtime HTTP réel impossible tant que la nouvelle base n'est pas provisionnée → phase 4 en mode statique uniquement. Valeurs par défaut à ajuster par Amine si besoin."
+}

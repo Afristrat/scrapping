@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import RubricBacktest from './RubricBacktest'
 import type { BacktestResult } from '@/hooks/useBacktestRubric'
@@ -67,7 +68,9 @@ function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <RubricBacktest />
+      <MemoryRouter>
+        <RubricBacktest />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -164,7 +167,7 @@ describe('RubricBacktest', () => {
     })
   })
 
-  it('JSON criteria invalide → message d\'erreur', async () => {
+  it("JSON criteria invalide → message d'erreur", async () => {
     renderPage()
 
     const criteriaTextarea = screen.getByPlaceholderText(/label.*weight/i)

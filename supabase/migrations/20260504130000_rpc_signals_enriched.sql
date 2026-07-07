@@ -43,6 +43,7 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
   SELECT
     s.id,
@@ -95,6 +96,13 @@ AS $$
   LEFT JOIN scores sc ON sc.signal_id = s.id AND sc.user_id = s.user_id
   WHERE
     s.org_id = p_org_id
+    -- Garde d'isolation tenant : l'appelant DOIT être membre de p_org_id.
+    -- Sans cela, cette fonction SECURITY DEFINER (qui bypass la RLS) laisserait
+    -- n'importe quel utilisateur authentifié lire les signaux de toute organisation.
+    AND EXISTS (
+      SELECT 1 FROM organization_members om
+      WHERE om.org_id = p_org_id AND om.user_id = auth.uid()
+    )
     AND (p_sources IS NULL OR s.source::TEXT = ANY(p_sources))
     AND (p_window_hours IS NULL OR s.scraped_at >= NOW() - (p_window_hours || ' hours')::INTERVAL)
     AND (p_cursor IS NULL OR s.scraped_at < p_cursor)

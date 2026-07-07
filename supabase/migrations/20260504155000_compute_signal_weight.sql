@@ -37,7 +37,10 @@ ALTER TABLE signals
 COMMENT ON COLUMN signals.weight IS 'Poids composite 0.0000–1.0000 : importance×0.4 + frequency×0.2 + utility×0.3 + reputation×0.1.';
 
 -- Recréer la vue signals_enriched (identique à 20260503210004 — SELECT * inclut weight NUMERIC(5,4))
-CREATE OR REPLACE VIEW signals_enriched AS
+-- security_invoker=on : la vue applique la RLS de `signals` avec les droits de
+-- l'appelant (org-scopée). Sans cela, la vue s'exécute avec les droits du
+-- propriétaire (postgres) et expose les signaux de toutes les organisations.
+CREATE OR REPLACE VIEW signals_enriched WITH (security_invoker = on) AS
 SELECT
   s.*,
   ARRAY(
@@ -227,118 +230,7 @@ CREATE TRIGGER trg_weight_on_entity
   FOR EACH ROW
   EXECUTE FUNCTION trg_recompute_weight_on_entity();
 
--- =============================================================================
--- 5. Tests intégrés (assertions manuelles — pgTAP non disponible sur Supabase)
--- Toutes les variables déclarées au niveau du bloc principal (pas de sous-blocs
--- avec DECLARE imbriqué). Source = 'arxiv' (valeur valide de l'enum signal_source).
--- =============================================================================
-
-DO $test$
-DECLARE
-  v_org_id       UUID;
-  v_user_id      UUID;
-  v_signal_id    UUID;
-  v_signal_id_3  UUID;
-  v_entity_id    UUID;
-  v_weight       NUMERIC(5,4);
-BEGIN
-  -- -------------------------------------------------------------------------
-  -- Setup : utiliser une org + user existants pour éviter les violations FK
-  -- -------------------------------------------------------------------------
-  SELECT id INTO v_org_id FROM organizations LIMIT 1;
-
-  IF v_org_id IS NULL THEN
-    RAISE NOTICE 'TEST SKIPPED: aucune organisation en base.';
-    RETURN;
-  END IF;
-
-  SELECT user_id INTO v_user_id FROM organization_members WHERE org_id = v_org_id LIMIT 1;
-
-  IF v_user_id IS NULL THEN
-    RAISE NOTICE 'TEST SKIPPED: aucun membre pour org %.', v_org_id;
-    RETURN;
-  END IF;
-
-  -- -------------------------------------------------------------------------
-  -- Test 1 : signal sans score, sans entité → weight = 0.0000
-  -- source = 'arxiv' (valeur valide de l'enum signal_source)
-  -- -------------------------------------------------------------------------
-  INSERT INTO signals (org_id, user_id, source, title, url, scraped_at)
-  VALUES (v_org_id, v_user_id, 'arxiv', '[TEST S-10C.5] no score', 'https://test.s10c5.local/1', now())
-  RETURNING id INTO v_signal_id;
-
-  v_weight := compute_signal_weight(v_signal_id, v_org_id);
-
-  IF v_weight != 0.0000 THEN
-    -- Cleanup avant de lever l'exception
-    DELETE FROM signals WHERE id = v_signal_id;
-    RAISE EXCEPTION 'TEST 1 FAILED: weight sans score attendu 0.0000, obtenu %', v_weight;
-  END IF;
-  RAISE NOTICE 'TEST 1 PASSED: weight sans score ni entite = %', v_weight;
-
-  -- -------------------------------------------------------------------------
-  -- Test 2 : signal avec score = 80 (importance = utility = 0.8, freq = rep = 0)
-  -- → weight = 0.8×0.4 + 0×0.2 + 0.8×0.3 + 0×0.1 = 0.32 + 0.24 = 0.5600
-  -- -------------------------------------------------------------------------
-  INSERT INTO scores (signal_id, user_id, org_id, score, model_used, cost, scored_at)
-  VALUES (v_signal_id, v_user_id, v_org_id, 80, 'test-model', 0, now())
-  ON CONFLICT (signal_id, user_id) DO UPDATE SET score = 80, scored_at = now();
-
-  v_weight := compute_signal_weight(v_signal_id, v_org_id);
-
-  IF ABS(v_weight - 0.5600) > 0.0001 THEN
-    DELETE FROM scores WHERE signal_id = v_signal_id;
-    DELETE FROM signals WHERE id = v_signal_id;
-    RAISE EXCEPTION 'TEST 2 FAILED: weight score=80 attendu 0.5600, obtenu %', v_weight;
-  END IF;
-  RAISE NOTICE 'TEST 2 PASSED: weight score=80 = %', v_weight;
-
-  -- -------------------------------------------------------------------------
-  -- Test 3 : score = 100 + entité reputation_score = 1.0, frequency = 0
-  -- → weight = 1.0×0.4 + 0×0.2 + 1.0×0.3 + 1.0×0.1 = 0.8000
-  -- -------------------------------------------------------------------------
-  INSERT INTO signals (org_id, user_id, source, title, url, scraped_at)
-  VALUES (v_org_id, v_user_id, 'arxiv', '[TEST S-10C.5] full score', 'https://test.s10c5.local/3', now())
-  RETURNING id INTO v_signal_id_3;
-
-  INSERT INTO scores (signal_id, user_id, org_id, score, model_used, cost, scored_at)
-  VALUES (v_signal_id_3, v_user_id, v_org_id, 100, 'test-model', 0, now())
-  ON CONFLICT (signal_id, user_id) DO UPDATE SET score = 100, scored_at = now();
-
-  -- Entité avec reputation_score = 1.0
-  INSERT INTO entities (org_id, kind, canonical_name, metadata)
-  VALUES (v_org_id, 'person', '[TEST S-10C.5] Person Rep1', jsonb_build_object('reputation_score', 1.0))
-  ON CONFLICT (org_id, kind, canonical_name) DO UPDATE SET metadata = jsonb_build_object('reputation_score', 1.0)
-  RETURNING id INTO v_entity_id;
-
-  INSERT INTO signal_entities (signal_id, entity_id, org_id, confidence)
-  VALUES (v_signal_id_3, v_entity_id, v_org_id, 1.0)
-  ON CONFLICT (signal_id, entity_id) DO NOTHING;
-
-  v_weight := compute_signal_weight(v_signal_id_3, v_org_id);
-
-  -- Cleanup test 3 avant assertion (éviter orphelins si le test échoue)
-  DELETE FROM signal_entities WHERE signal_id = v_signal_id_3;
-  DELETE FROM scores           WHERE signal_id = v_signal_id_3;
-  DELETE FROM signals          WHERE id = v_signal_id_3;
-  DELETE FROM entities         WHERE id = v_entity_id;
-
-  IF ABS(v_weight - 0.8000) > 0.0001 THEN
-    DELETE FROM scores  WHERE signal_id = v_signal_id;
-    DELETE FROM signals WHERE id = v_signal_id;
-    RAISE EXCEPTION 'TEST 3 FAILED: weight score=100+rep=1.0 attendu 0.8000, obtenu %', v_weight;
-  END IF;
-  RAISE NOTICE 'TEST 3 PASSED: weight score=100 + reputation=1.0 = %', v_weight;
-
-  -- -------------------------------------------------------------------------
-  -- Cleanup test 1 + 2
-  -- -------------------------------------------------------------------------
-  DELETE FROM scores  WHERE signal_id = v_signal_id;
-  DELETE FROM signals WHERE id = v_signal_id;
-
-  RAISE NOTICE 'ALL TESTS PASSED — S-10C.5 compute_signal_weight OK';
-END;
-$test$;
+-- (Bloc de test intégré S-10C.5 retiré le 2026-07-07 : une migration DDL ne doit pas muter les tables de prod — il insérait un signal sans external_id, cassant la rejouabilité du schéma. Correctif audit blindage. Le calcul compute_signal_weight reste couvert par la logique de la fonction elle-même.)
 
 -- Refresh PostgREST schema cache
 NOTIFY pgrst, 'reload schema';

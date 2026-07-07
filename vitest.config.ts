@@ -1,6 +1,6 @@
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react()],
@@ -13,7 +13,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    exclude: ['node_modules', 'dist', 'supabase/functions/**'],
+    // Les specs Playwright de e2e/ ne doivent PAS être happées par Vitest
+    // (sinon « Playwright Test did not expect test.describe() to be called here »).
+    exclude: [...configDefaults.exclude, 'dist', 'supabase/functions/**', 'e2e/**'],
     coverage: {
       provider: 'v8',
       exclude: ['node_modules', 'dist', 'src/test', '**/*.config.*', 'supabase/**'],
