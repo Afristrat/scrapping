@@ -1,21 +1,32 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import OpenAI from 'npm:openai@4'
 import { getUserApiKey } from '../_shared/api-keys.ts'
 import { retryWithBackoff } from '../_shared/retry.ts'
 import { getProviderConfig } from '../_shared/providers.ts'
+import { internalServiceClient, resolveCaller } from '../_shared/internal-auth.ts'
+import { budgetExceeded } from '../_shared/budget-check.ts'
+import {
+  resolveProviderAndModel,
+  sanitizeCostTask,
+  validateOverrides,
+  type SettingsLike,
+} from './resolve.ts'
 
 /**
- * dispatch-llm — Single edge function that centralizes BYOK provider
- * resolution + chat completion. All LLM-consuming functions
- * (llm-score, llm-score-batch, topic-classifier, ...) call this fn
- * instead of duplicating provider logic.
+ * dispatch-llm — Péage unique LLM (ADR 0010). Toute fonction consommatrice
+ * (llm-score, llm-score-batch, digest, enrich-*, run-admin-prompt, backtest,
+ * chaîne K06, ...) passe par ici au lieu de dupliquer la logique provider.
  *
- * Resolution order for (provider, model):
- *   1. settings.model_config[task] (BYOK multi-provider, single source of truth)
- *   2. fallback to OpenRouter + 'openrouter/auto'
- *
- * OpenRouter remains a first-class citizen as the default provider when
- * nothing is configured (see DEFAULT_PROVIDER below).
+ * Responsabilités centralisées :
+ *   1. Auth dual-mode (resolveCaller, ADR 0009) : JWT user OU appel interne
+ *      (x-internal-secret + x-proxy-user-id).
+ *   2. Résolution (provider, model) : overrides du body (consensus
+ *      multi-modèles) > settings.model_config[task] > OpenRouter par défaut.
+ *   3. Garde budget (budget-check.ts, fail-open) : 402 si la dépense LLM du
+ *      jour atteint settings.daily_budget_usd — AVANT l'appel payant.
+ *   4. Péage argent : chaque complétion aboutie écrit UNE ligne llm_costs
+ *      (label fin via cost_task). Les callers n'écrivent plus llm_costs.
  */
 
 const CORS = {
@@ -23,9 +34,6 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
-
-const DEFAULT_PROVIDER = 'openrouter'
-const DEFAULT_MODEL = 'openrouter/auto'
 
 type Task = 'scoring' | 'scraping' | 'monitoring' | 'digest' | 'enrichment'
 
@@ -44,15 +52,15 @@ interface RequestBody {
   task: Task
   messages: ChatMessage[]
   options?: DispatchOptions
+  /** Override consensus : couple obligatoire, prioritaire sur model_config. */
+  provider_override?: string
+  model_override?: string
+  /** Label fin écrit dans llm_costs.task (ex. 'enrich:topic'). Défaut : task. */
+  cost_task?: string
 }
 
-interface ModelConfigEntry {
-  provider: string
-  model: string
-}
-
-interface SettingsRow {
-  model_config?: Record<string, ModelConfigEntry | null> | null
+interface SettingsRow extends SettingsLike {
+  daily_budget_usd?: number | string | null
 }
 
 const VALID_TASKS: ReadonlySet<Task> = new Set([
@@ -67,23 +75,37 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405)
 
-  const auth = req.headers.get('Authorization')
-  if (!auth) return json({ ok: false, error: 'missing_authorization' }, 401)
-
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
   if (!supabaseUrl || !supabaseAnonKey) {
     return json({ ok: false, error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: auth } },
+  // Client user-scoped (RLS) — utilisé par resolveCaller en mode user.
+  const auth = req.headers.get('Authorization')
+  const userScoped = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: auth ? { Authorization: auth } : {} },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ ok: false, error: 'invalid_token' }, 401)
+  const caller = await resolveCaller(userScoped, req)
+  if (!caller.ok) return json({ ok: false, error: caller.error }, 401)
+  const userId = caller.userId
+
+  // Mode internal : pas de JWT user → service_role avec filtres user_id
+  // explicites sur toutes les queries. Mode user : client RLS.
+  let db: SupabaseClient
+  if (caller.mode === 'internal') {
+    try {
+      db = internalServiceClient(createClient)
+    } catch (err) {
+      return json(
+        { ok: false, error: 'internal_client_misconfigured', detail: errMessage(err) },
+        500,
+      )
+    }
+  } else {
+    db = userScoped
+  }
 
   let body: RequestBody
   try {
@@ -108,28 +130,55 @@ Deno.serve(async (req) => {
     }
   }
 
+  const overrideValidation = validateOverrides(body.provider_override, body.model_override)
+  if (!overrideValidation.ok) {
+    return json({ ok: false, error: 'invalid_override', detail: overrideValidation.detail }, 400)
+  }
+
   // Defensive: if no settings row exists (trigger missed firing), use empty config
-  // → fallback chain in resolveProviderAndModel kicks in (DEFAULT_PROVIDER + DEFAULT_MODEL)
-  const settingsRes = await supabase
+  // → fallback chain in resolveProviderAndModel kicks in (OpenRouter defaults)
+  // et budget guard désactivé (fail-open).
+  const settingsRes = await db
     .from('settings')
-    .select('model_config')
-    .eq('user_id', user.id)
+    .select('model_config, daily_budget_usd')
+    .eq('user_id', userId)
     .maybeSingle()
 
-  const settings: SettingsRow = (settingsRes.data as SettingsRow | null) ?? { model_config: null }
+  const settings: SettingsRow = (settingsRes.data as SettingsRow | null) ?? {
+    model_config: null,
+    daily_budget_usd: null,
+  }
 
-  const { providerId, modelId } = resolveProviderAndModel(settings, body.task)
+  // org_id résolu explicitement : llm_costs.org_id et logs.org_id sont NOT NULL
+  // et leur DEFAULT user_default_org_id() repose sur auth.uid() — NULL en mode
+  // internal (service_role). Même sémantique que le DEFAULT : premier org rejoint.
+  const orgId = await resolveOrgId(db, userId)
 
-  const providerCfg = await getProviderConfig(supabase, providerId)
+  // ── Garde budget (AVANT l'appel payant) ────────────────────────────────────
+  const dailyBudget =
+    settings.daily_budget_usd === null || settings.daily_budget_usd === undefined
+      ? null
+      : Number(settings.daily_budget_usd)
+  if (await budgetExceeded(db, userId, dailyBudget)) {
+    await insertLog(db, userId, orgId, 'dispatch-llm:budget_exceeded', 'warning', {
+      task: body.task,
+      daily_budget_usd: dailyBudget,
+    })
+    return json({ ok: false, error: 'budget_exceeded', daily_budget_usd: dailyBudget }, 402)
+  }
+
+  const { providerId, modelId, source } = resolveProviderAndModel(
+    settings,
+    body.task,
+    overrideValidation.override,
+  )
+
+  const providerCfg = await getProviderConfig(db, providerId)
   if (!providerCfg) {
     return json({ ok: false, error: 'unknown_provider', provider: providerId }, 500)
   }
 
-  // getUserApiKey's signature only declares 'openrouter' | 'apify' historically.
-  // The BYOK migration extended user_api_keys.provider to arbitrary strings, but
-  // we deliberately don't modify _shared/api-keys.ts as part of this refactor —
-  // so we cast to the historic literal union to keep the call typed.
-  const apiKey = await getUserApiKey(supabase, user.id, providerId as 'openrouter' | 'apify')
+  const apiKey = await getUserApiKey(db, userId, providerId)
   if (!apiKey && providerCfg.modelsRequiresAuth) {
     return json({ ok: false, error: 'missing_api_key', provider: providerId }, 500)
   }
@@ -139,8 +188,8 @@ Deno.serve(async (req) => {
     apiKey: apiKey ?? 'not-required',
     defaultHeaders: {
       ...providerCfg.extraHeaders,
-      'HTTP-Referer': 'https://zlatan-scrap.local',
-      'X-Title': 'zlatan-scrap-dispatch',
+      'HTTP-Referer': 'https://kairos.local',
+      'X-Title': 'kairos-dispatch',
     },
   })
 
@@ -160,17 +209,13 @@ Deno.serve(async (req) => {
       { maxAttempts: 5, baseDelayMs: 1500 },
     )
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err)
-    await supabase.from('logs').insert({
-      user_id: user.id,
-      action: 'dispatch-llm:error',
-      status: 'error',
-      payload: {
-        task: body.task,
-        provider: providerId,
-        model: modelId,
-        error: reason,
-      },
+    const reason = errMessage(err)
+    await insertLog(db, userId, orgId, 'dispatch-llm:error', 'error', {
+      task: body.task,
+      provider: providerId,
+      model: modelId,
+      resolution_source: source,
+      error: reason,
     })
     return json(
       {
@@ -198,13 +243,46 @@ Deno.serve(async (req) => {
   let cost: number = rawUsage?.cost ?? 0
   if (rawUsage?.cost === undefined) {
     cost = await computeCostFromProviderModels(
-      supabase,
-      user.id,
+      db,
+      userId,
       providerId,
       modelId,
       promptTokens,
       completionTokens,
     )
+  }
+
+  // ── Péage argent : UNE ligne llm_costs par complétion aboutie ─────────────
+  const costTask = sanitizeCostTask(body.cost_task, body.task)
+  let costRecorded = false
+  if (orgId) {
+    const { error: costErr } = await db.from('llm_costs').insert({
+      user_id: userId,
+      org_id: orgId,
+      task: costTask,
+      model: modelId,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      cost,
+    })
+    costRecorded = !costErr
+    if (costErr) {
+      await insertLog(db, userId, orgId, 'dispatch-llm:cost_write_failed', 'error', {
+        task: costTask,
+        model: modelId,
+        cost,
+        error: costErr.message,
+      })
+    }
+  } else {
+    // Sans org, l'insert violerait NOT NULL — on logge fort plutôt que planter
+    // la réponse (le contenu LLM prime), mais ce cas est anormal (backfill org).
+    await insertLog(db, userId, null, 'dispatch-llm:cost_write_failed', 'error', {
+      task: costTask,
+      model: modelId,
+      cost,
+      error: 'org_id_unresolved',
+    })
   }
 
   return json(
@@ -218,22 +296,53 @@ Deno.serve(async (req) => {
       },
       model_used: modelId,
       provider_used: providerId,
+      cost_recorded: costRecorded,
     },
     200,
   )
 })
 
-function resolveProviderAndModel(
-  settings: SettingsRow,
-  task: Task,
-): { providerId: string; modelId: string } {
-  const taskCfg = settings.model_config?.[task] ?? null
+/** Premier org rejoint (même sémantique que le DEFAULT user_default_org_id()). */
+async function resolveOrgId(db: SupabaseClient, userId: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('organization_members')
+    .select('org_id')
+    .eq('user_id', userId)
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (error || !data) return null
+  return (data as { org_id: string }).org_id
+}
 
-  // OpenRouter is the default fallback provider — it remains first-class.
-  const providerId: string = taskCfg?.provider ?? DEFAULT_PROVIDER
-  const modelId: string = taskCfg?.model || DEFAULT_MODEL
+/**
+ * Insert logs best-effort. logs.org_id est NOT NULL : sans org résolu on
+ * s'appuie sur le DEFAULT (mode user) — en mode internal sans org le log est
+ * perdu, mais un échec de log ne doit jamais casser la réponse.
+ */
+async function insertLog(
+  db: SupabaseClient,
+  userId: string,
+  orgId: string | null,
+  action: string,
+  status: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await db.from('logs').insert({
+      user_id: userId,
+      ...(orgId ? { org_id: orgId } : {}),
+      action,
+      status,
+      payload,
+    })
+  } catch {
+    // best-effort
+  }
+}
 
-  return { providerId, modelId }
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
 }
 
 /**
@@ -244,7 +353,7 @@ function resolveProviderAndModel(
  * provider didn't return `usage.cost`.
  */
 async function computeCostFromProviderModels(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   userId: string,
   provider: string,
   model: string,

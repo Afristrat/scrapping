@@ -369,6 +369,7 @@ async function executePromptOnce(
       headers: { Authorization: ctx.authHeader, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         task: 'monitoring',
+        cost_task: `admin_prompt:${prompt.task_kind}`,
         messages: [
           { role: 'system', content: renderedSystem },
           { role: 'user', content: renderedUser },
@@ -455,31 +456,22 @@ async function executePromptOnce(
   const completionTokens = dispatchResult.usage?.completion_tokens ?? 0
   const cost = dispatchResult.usage?.cost ?? 0
 
-  const [runInsertRes, costInsertRes] = await Promise.all([
-    supabase
-      .from('admin_prompt_runs')
-      .insert({
-        user_id: userId,
-        prompt_id: prompt.id,
-        status: 'success',
-        output_markdown: content,
-        model_used: modelUsed,
-        provider_used: providerUsed,
-        prompt_tokens: promptTokens,
-        completion_tokens: completionTokens,
-        cost,
-      })
-      .select('id, executed_at')
-      .single(),
-    supabase.from('llm_costs').insert({
+  // Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010).
+  const runInsertRes = await supabase
+    .from('admin_prompt_runs')
+    .insert({
       user_id: userId,
-      task: `admin_prompt:${prompt.task_kind}`,
-      model: modelUsed,
+      prompt_id: prompt.id,
+      status: 'success',
+      output_markdown: content,
+      model_used: modelUsed,
+      provider_used: providerUsed,
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
       cost,
-    }),
-  ])
+    })
+    .select('id, executed_at')
+    .single()
 
   if (runInsertRes.error || !runInsertRes.data) {
     await supabase.from('logs').insert({
@@ -490,7 +482,6 @@ async function executePromptOnce(
         stage: 'persist_run',
         prompt_id: prompt.id,
         run_err: runInsertRes.error?.message ?? null,
-        cost_err: costInsertRes.error?.message ?? null,
       },
     })
     return failure('db_write_failed', null, 500)
@@ -676,7 +667,7 @@ function failure(
     composed_chain: [],
     cascade_total_cost: 0,
     error,
-    detail,
+    detail: detail ?? undefined,
     http_status: httpStatus,
   }
 }

@@ -207,6 +207,7 @@ Réponds avec ce JSON exact :
       headers: { Authorization: auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         task: 'enrichment',
+        cost_task: 'suggest:personas',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -245,20 +246,8 @@ Réponds avec ce JSON exact :
   const rawContent = dispatchResp.content ?? ''
   const suggestions = parseSuggestionsResponse(rawContent)
 
-  // ── 6. Tracker les coûts ──────────────────────────────────────────────────
+  // ── 6. Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010) ────
   const cost = dispatchResp.usage?.cost ?? 0
-  const promptTokens = dispatchResp.usage?.prompt_tokens ?? 0
-  const completionTokens = dispatchResp.usage?.completion_tokens ?? 0
-
-  await supabase.from('llm_costs').insert({
-    user_id: user.id,
-    org_id,
-    task: 'suggest:personas',
-    model: dispatchResp.model_used ?? SONNET_MODEL,
-    prompt_tokens: promptTokens,
-    completion_tokens: completionTokens,
-    cost,
-  })
 
   // ── 7. Logger ─────────────────────────────────────────────────────────────
   await supabase.from('logs').insert({

@@ -473,11 +473,10 @@ Deno.serve(async (req: Request) => {
   // déterministe depuis le payload `top` (on a tous les titres/urls/scores).
   const content = ensureFootnoteDefinitions(dispatchResult.content, top, language)
   const modelUsed = dispatchResult.model_used ?? 'unknown'
-  const promptTokens = dispatchResult.usage?.prompt_tokens ?? 0
-  const completionTokens = dispatchResult.usage?.completion_tokens ?? 0
   const cost = dispatchResult.usage?.cost ?? 0
 
-  // ---- 5. Persist digest + llm_costs (parallel)
+  // ---- 5. Persist digest (coût déjà enregistré par dispatch-llm — péage
+  // unique, ADR 0010)
   const scopeParams = {
     topic_ids: topicIds.length > 0 ? topicIds : undefined,
     persona_ids: personaIds.length > 0 ? personaIds : undefined,
@@ -487,31 +486,21 @@ Deno.serve(async (req: Request) => {
     window_extended: windowExtended || undefined,
   }
 
-  const [insertRes, costRes] = await Promise.all([
-    supabase
-      .from('digests')
-      .insert({
-        user_id: user.id,
-        language,
-        signal_count: top.length,
-        min_score: minScore,
-        window_hours: windowHours,
-        content,
-        model_used: modelUsed,
-        cost,
-        scope_params: scopeParams,
-      })
-      .select('id, generated_at')
-      .single(),
-    supabase.from('llm_costs').insert({
+  const insertRes = await supabase
+    .from('digests')
+    .insert({
       user_id: user.id,
-      task: 'digest',
-      model: modelUsed,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
+      language,
+      signal_count: top.length,
+      min_score: minScore,
+      window_hours: windowHours,
+      content,
+      model_used: modelUsed,
       cost,
-    }),
-  ])
+      scope_params: scopeParams,
+    })
+    .select('id, generated_at')
+    .single()
 
   if (insertRes.error || !insertRes.data) {
     await supabase.from('logs').insert({
@@ -521,7 +510,6 @@ Deno.serve(async (req: Request) => {
       payload: {
         stage: 'persist',
         digest_err: insertRes.error?.message ?? null,
-        cost_err: costRes.error?.message ?? null,
       },
     })
     return json({ ok: false, error: 'db_write_failed' }, 500)

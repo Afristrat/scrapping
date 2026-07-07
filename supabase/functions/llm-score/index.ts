@@ -155,41 +155,29 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
   }
 
   const usage = dispatchResult.usage
-  const promptTokens = usage?.prompt_tokens ?? 0
-  const completionTokens = usage?.completion_tokens ?? 0
   const cost = usage?.cost ?? 0
   const modelUsed = dispatchResult.model_used ?? 'unknown'
 
-  const [scoreInsert, costInsert] = await Promise.all([
-    supabase.from('scores').upsert(
-      {
-        signal_id: body.signal_id,
-        user_id: user.id,
-        score,
-        reasoning,
-        model_used: modelUsed,
-        cost,
-      },
-      { onConflict: 'signal_id,user_id' },
-    ),
-    supabase.from('llm_costs').insert({
+  // Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010).
+  const scoreInsert = await supabase.from('scores').upsert(
+    {
+      signal_id: body.signal_id,
       user_id: user.id,
-      task: 'scoring',
-      model: modelUsed,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
+      score,
+      reasoning,
+      model_used: modelUsed,
       cost,
-    }),
-  ])
-  if (scoreInsert.error || costInsert.error) {
+    },
+    { onConflict: 'signal_id,user_id' },
+  )
+  if (scoreInsert.error) {
     await supabase.from('logs').insert({
       user_id: user.id,
       action: 'llm:score',
       status: 'error',
       payload: {
         signal_id: body.signal_id,
-        score_err: scoreInsert.error?.message,
-        cost_err: costInsert.error?.message,
+        score_err: scoreInsert.error.message,
       },
     })
     return json({ error: 'db_write_failed' }, 500)

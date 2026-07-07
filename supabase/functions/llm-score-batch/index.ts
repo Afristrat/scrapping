@@ -701,8 +701,9 @@ async function handleAdHocOrHybridScoring(args: {
   )
 
   const results = settled
-    .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof scoreSignalWithRubric>>> =>
-      r.status === 'fulfilled',
+    .filter(
+      (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof scoreSignalWithRubric>>> =>
+        r.status === 'fulfilled',
     )
     .map((r) => r.value)
 
@@ -812,14 +813,8 @@ async function handleSingleDispatch(
         completion_tokens: completionTokens,
       },
     })
-    await supabase.from('llm_costs').insert({
-      user_id: userId,
-      task: 'scoring',
-      model: dispatchModel,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      cost: totalCost,
-    })
+    // Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010) — l'appel
+    // LLM a bien eu lieu même si sa sortie est illisible.
     return json(
       {
         batch_size: signals.length,
@@ -867,14 +862,7 @@ async function handleSingleDispatch(
     return json({ error: 'db_write_failed', ...formatted }, 500)
   }
 
-  await supabase.from('llm_costs').insert({
-    user_id: userId,
-    task: 'scoring',
-    model: dispatchModel,
-    prompt_tokens: promptTokens,
-    completion_tokens: completionTokens,
-    cost: totalCost,
-  })
+  // Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010).
 
   const scoredIds = scoreRows.map((r) => r.signal_id)
   const enrichPayload = buildEnrichPayload(scoredIds, orgId)

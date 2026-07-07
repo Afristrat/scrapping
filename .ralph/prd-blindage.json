@@ -45,7 +45,7 @@
     {
       "id": "BLD-2026-07-07-004",
       "title": "Budget daily_budget_usd jamais appliqué (org + clés publiques)",
-      "passes": false,
+      "passes": true,
       "priority": "critical",
       "severite": "P0",
       "depends_on": ["BLD-2026-07-07-010"],
@@ -53,7 +53,8 @@
         "supabase/functions/dispatch-llm/index.ts",
         "supabase/functions/research-from-seed/index.ts"
       ],
-      "critereAcceptation": "Un appel LLM au-delà du budget journalier (org ou clé) est rejeté 402/429 ; test de répro vert"
+      "critereAcceptation": "Un appel LLM au-delà du budget journalier (org ou clé) est rejeté 402/429 ; test de répro vert",
+      "resolution": "2026-07-07 péage : budget-check.ts (repêché Saqr, testé 10/10) évalué dans dispatch-llm AVANT l'appel → 402 budget_exceeded. Couvre les 14 fonctions consommatrices."
     },
     {
       "id": "BLD-2026-07-07-005",
@@ -67,12 +68,13 @@
         "supabase/functions/dispatch-llm/index.ts",
         "supabase/config.toml"
       ],
-      "critereAcceptation": "Un run research-from-seed via x-api-key produit un run réel non mocké (test d'intégration vert)"
+      "critereAcceptation": "Un run research-from-seed via x-api-key produit un run réel non mocké (test d'intégration vert)",
+      "note_progress": "2026-07-07 : dispatch-llm accepte le mode interne (resolveCaller). Reste : deploy + INTERNAL_FN_SECRET + mapping proxy_user_id + test e2e 2e saut."
     },
     {
       "id": "BLD-2026-07-07-006",
       "title": "Régression score=0 vs null dans llm-score (voie run-pipeline)",
-      "passes": false,
+      "passes": true,
       "priority": "high",
       "severite": "P1",
       "depends_on": [],
@@ -80,7 +82,8 @@
         "supabase/functions/llm-score/index.ts",
         "supabase/functions/_shared/parse-score.ts"
       ],
-      "critereAcceptation": "Un output LLM non-JSON pur ne produit aucune row scores ; le signal reste dans unscored_signals"
+      "critereAcceptation": "Un output LLM non-JSON pur ne produit aucune row scores ; le signal reste dans unscored_signals",
+      "resolution": "2026-05-10 session blindage : parse-single.ts + 7 tests, skip write (cf. passation) — flag resté périmé."
     },
     {
       "id": "BLD-2026-07-07-007",
@@ -108,17 +111,18 @@
     {
       "id": "BLD-2026-07-07-009",
       "title": "Gate tests en permanence rouge (e2e happés + Router manquant + node_modules Deno)",
-      "passes": false,
+      "passes": true,
       "priority": "high",
       "severite": "P1",
       "depends_on": [],
       "files": ["vitest.config.ts", "src/pages/RubricBacktest.test.tsx"],
-      "critereAcceptation": "npx vitest run vert et déterministe ; e2e exclus ; RubricBacktest wrappé MemoryRouter"
+      "critereAcceptation": "npx vitest run vert et déterministe ; e2e exclus ; RubricBacktest wrappé MemoryRouter",
+      "resolution": "2026-05-10 session blindage : exclude e2e + MemoryRouter (cf. passation) — flag resté périmé."
     },
     {
       "id": "BLD-2026-07-07-010",
       "title": "Coûts LLM non écrits sur >=7 chemins (record-usage aveugle)",
-      "passes": false,
+      "passes": true,
       "priority": "high",
       "severite": "P1",
       "depends_on": [],
@@ -127,7 +131,8 @@
         "supabase/functions/llm-score-batch/index.ts",
         "supabase/functions/backtest-rubric/index.ts"
       ],
-      "critereAcceptation": "Tout appel LLM écrit une row llm_costs avec org_id correct (péage unique dispatch-llm)"
+      "critereAcceptation": "Tout appel LLM écrit une row llm_costs avec org_id correct (péage unique dispatch-llm)",
+      "resolution": "2026-07-07 péage : llm_costs.task ENUM→TEXT (migration 20260511000001, cause racine : 0 ligne live, violations d'enum silencieuses) ; écriture unique dans dispatch-llm avec cost_task fin + org_id explicite ; 9 inserts callers supprimés, 5 fonctions qui n'écrivaient rien couvertes d'office. Prouvé live sur .11."
     },
     {
       "id": "BLD-2026-07-07-011",
@@ -205,7 +210,7 @@
     {
       "id": "BLD-2026-07-07-018",
       "title": "SECURITY DEFINER sans SET search_path (compute_signal_weight exécutable PUBLIC, etc.)",
-      "passes": false,
+      "passes": true,
       "priority": "medium",
       "severite": "P2",
       "depends_on": [],
@@ -214,7 +219,8 @@
         "supabase/migrations/20260503210003_entities.sql",
         "supabase/migrations/20260504150000_pending_enrichments.sql"
       ],
-      "critereAcceptation": "SET search_path sur chaque fonction DEFINER + REVOKE EXECUTE FROM PUBLIC sur compute_signal_weight"
+      "critereAcceptation": "SET search_path sur chaque fonction DEFINER + REVOKE EXECUTE FROM PUBLIC sur compute_signal_weight",
+      "resolution": "2026-05-10 : migration 20260510000001_harden_definer_functions appliquée live, 0 DEFINER sans search_path — flag resté périmé."
     },
     {
       "id": "BLD-2026-07-07-019",

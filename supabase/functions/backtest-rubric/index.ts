@@ -237,6 +237,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             task: 'scoring',
+            cost_task: 'backtest:rubric',
             messages: [
               {
                 role: 'system',
