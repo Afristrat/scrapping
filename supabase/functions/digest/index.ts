@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { extractAuthor } from '../_shared/signal-text.ts'
 
 /**
  * digest — Edge function qui agrège les signaux scorés sur une fenêtre
@@ -862,39 +863,6 @@ function ensureFootnoteDefinitions(
 
   const trailing = content.endsWith('\n') ? '' : '\n'
   return `${content}${trailing}\n${defLines.join('\n')}\n`
-}
-
-/**
- * Extrait l'auteur depuis raw_payload selon la source. Best-effort, retourne
- * null si introuvable. Permet au LLM de citer le handle/auteur dans la section
- * « Confiance & sources » du brief.
- */
-function extractAuthor(raw: Record<string, unknown> | null, source: string): string | null {
-  if (!raw) return null
-  try {
-    if (source === 'x' || source === 'twitter') {
-      const user = (raw as { user?: { screen_name?: string; username?: string } }).user
-      const screen = user?.screen_name ?? user?.username
-      if (typeof screen === 'string' && screen.length > 0) return `@${screen}`
-    }
-    if (source === 'reddit') {
-      const author = (raw as { author?: string }).author
-      if (typeof author === 'string' && author.length > 0) return `u/${author}`
-    }
-    if (source === 'arxiv') {
-      const authors = (raw as { authors?: Array<{ name?: string }> | string[] }).authors
-      if (Array.isArray(authors) && authors.length > 0) {
-        const first = authors[0]
-        if (typeof first === 'string') return first
-        if (first && typeof (first as { name?: string }).name === 'string') {
-          return (first as { name: string }).name
-        }
-      }
-    }
-  } catch {
-    /* noop — best-effort extraction */
-  }
-  return null
 }
 
 function json(body: unknown, status: number): Response {
