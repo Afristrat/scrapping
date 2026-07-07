@@ -48,6 +48,8 @@ export interface ScoredSignal {
   excerpt: string
   disqualified: boolean
   applied_boosts: string[]
+  /** Date du contenu source — optionnelle (sert au freshness_median_days calculé). */
+  signal_date?: string | null
 }
 
 export interface ResearchStrategySubject {
@@ -82,7 +84,8 @@ interface BriefVariant {
 interface TopicProvenance {
   lang_distribution: Record<string, number>
   source_diversity_score: number
-  freshness_median_days: number
+  /** null si aucune signal_date dans l'input (jamais inventé). */
+  freshness_median_days: number | null
 }
 
 interface CrossTopicConflict {
@@ -115,7 +118,8 @@ interface CoverageMapEntry {
 interface SynthesizerOutput {
   topics: SynthesizedTopic[]
   coverage_map: Record<string, CoverageMapEntry>
-  cultural_warnings: string[]
+  /** N'est plus demandé au LLM (calculé côté serveur) — toléré si présent. */
+  cultural_warnings?: string[]
   devil_advocate_topic_id: string
 }
 
@@ -286,6 +290,33 @@ export const handler = async (req: Request): Promise<Response> => {
     t.summary = sanitizeUnicodeString(t.summary)
   }
 
+  // Provenance DÉTERMINISTE (L99 C#3) : recalculée en code depuis les signaux
+  // réels — le LLM ne compte pas, et il n'a jamais eu les dates en input
+  // (freshness_median_days LLM = hallucination pure). mono_source_warning
+  // devient un constat réel, plus une estimation.
+  for (const t of sanitized.topics) {
+    const topicIds = [...(t.key_signals_supporting ?? []), ...(t.key_signals_conflicting ?? [])]
+    t.provenance = computeTopicProvenance(retained, topicIds)
+    const warnings = Array.isArray(t.warnings) ? t.warnings : []
+    const isMonoSource =
+      topicIds.length >= 2 &&
+      new Set(topicIds.map((id) => retained.find((s) => s.id === id)?.source).filter(Boolean))
+        .size === 1
+    if (isMonoSource && !warnings.includes('mono_source_warning')) {
+      warnings.push('mono_source_warning')
+    }
+    t.warnings = warnings
+  }
+
+  // Cultural check déterministe : language_mix attendu vs langues réellement
+  // présentes dans les signaux retenus (ex-étape 7 du prompt).
+  const culturalWarnings = [
+    ...new Set([
+      ...(sanitized.cultural_warnings ?? []),
+      ...computeCulturalWarnings(retained, research_strategy.language_mix ?? []),
+    ]),
+  ]
+
   const totalCost = firstCall.usage?.cost ?? 0
   const telemetry = {
     signals_in: signals.length,
@@ -315,7 +346,7 @@ export const handler = async (req: Request): Promise<Response> => {
       ok: true,
       topics: sanitized.topics,
       coverage_map: sanitized.coverage_map,
-      cultural_warnings: sanitized.cultural_warnings,
+      cultural_warnings: culturalWarnings,
       devil_advocate_topic_id: sanitized.devil_advocate_topic_id,
       telemetry,
     },
@@ -587,6 +618,57 @@ export function computeLangDistribution(
   return out
 }
 
+/**
+ * Provenance d'un topic calculée en code depuis ses signaux réels (L99 C#3) :
+ * lang_distribution (comptage), source_diversity_score (sources uniques /
+ * signaux du topic), freshness_median_days (médiane vs signal_date — null si
+ * aucune date disponible, jamais inventé).
+ */
+export function computeTopicProvenance(
+  signals: ScoredSignal[],
+  ids: string[],
+  nowMs: number = Date.now(),
+): TopicProvenance {
+  const matched = ids
+    .map((id) => signals.find((s) => s.id === id))
+    .filter((s): s is ScoredSignal => Boolean(s))
+
+  const uniqueSources = new Set(matched.map((s) => s.source)).size
+  const source_diversity_score =
+    matched.length > 0 ? Math.round((uniqueSources / matched.length) * 100) / 100 : 0
+
+  const timestamps = matched
+    .map((s) => (s.signal_date ? Date.parse(s.signal_date) : NaN))
+    .filter((t) => !Number.isNaN(t))
+    .sort((a, b) => a - b)
+  let freshness_median_days: number | null = null
+  if (timestamps.length > 0) {
+    const mid = Math.floor(timestamps.length / 2)
+    const median =
+      timestamps.length % 2 === 1 ? timestamps[mid] : (timestamps[mid - 1] + timestamps[mid]) / 2
+    freshness_median_days = Math.max(0, Math.round((nowMs - median) / 86_400_000))
+  }
+
+  return {
+    lang_distribution: computeLangDistribution(signals, ids),
+    source_diversity_score,
+    freshness_median_days,
+  }
+}
+
+/**
+ * Cultural check déterministe : chaque langue attendue par language_mix mais
+ * absente des signaux retenus produit un warning (ex-étape 7 du prompt).
+ */
+export function computeCulturalWarnings(signals: ScoredSignal[], languageMix: string[]): string[] {
+  const expected = [...new Set(languageMix.filter((l) => typeof l === 'string' && l.length > 0))]
+  if (expected.length < 2) return []
+  const present = new Set(signals.map((s) => s.lang))
+  const missing = expected.filter((l) => !present.has(l))
+  if (missing.length === 0) return []
+  return [`language_mix_gap: attendu {${expected.join(', ')}}, absent {${missing.join(', ')}}`]
+}
+
 // --------------------------------------------------------------------------
 // Prompt construction
 // --------------------------------------------------------------------------
@@ -656,17 +738,18 @@ UN TOPIC RICHE EN PROSPECTIVE A 4 PROPRIÉTÉS :
    nombre de signaux retenus. Si un subject a 0 signaux, c'est un
    GAP qui peut déclencher iterative-deepening.
 
-7. CULTURAL CHECK : si language_mix attendu était {fr, ar, en} mais
-   100% des signaux retenus sont fr → flag dans cultural_warnings.
-
 INTERDICTIONS :
 - Inventer un signal_id absent de l'input.
 - Mettre en key_signals_supporting plus de 6 ids (resté en focus).
 - Brief hors longueur 250-400.
 - Brief en langue ≠ ${lang}.
 - Brief copy-collé à la graine.
-- Topic mono-source (tous les signaux d'un cluster viennent de la
-  même source) → flag mono_source_warning.
+- Éviter les topics mono-source (tous les signaux d'un cluster issus
+  de la même source).
+
+NE CALCULE AUCUNE MÉTRIQUE : provenance (répartition langues, diversité
+sources, fraîcheur), cultural check et flags mono-source sont calculés
+côté serveur depuis les données réelles.
 
 ${langLine}
 
@@ -690,11 +773,6 @@ SCHEMA OUTPUT (JSON strict, aucun préambule, aucune balise XML, aucun markdown)
           "rationale": "10-20 mots — pourquoi ce frame ici"
         }
       ],
-      "provenance": {
-        "lang_distribution": {"fr": 5, "en": 2, "ar": 1},
-        "source_diversity_score": 0.0-1.0,
-        "freshness_median_days": 0
-      },
       "confidence": 0.0-1.0,
       "warnings": []
     }
@@ -702,7 +780,6 @@ SCHEMA OUTPUT (JSON strict, aucun préambule, aucune balise XML, aucun markdown)
   "coverage_map": {
     "s_001": { "signals_count": 12, "covered": true, "topics": ["t_001"] }
   },
-  "cultural_warnings": [],
   "devil_advocate_topic_id": "t_007"
 }`
 }
