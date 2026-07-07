@@ -1,3 +1,38 @@
+== PASSATION Kairos/Saqr — 2026-07-07 (suite : péage ADR 0010 livré) ==
+
+[ETAT]
+Branche `ralph/k06-orchestrator`, head `af1a45a` poussé (PR #11). Build/lint/typecheck VERTS. Deno 415/415. Base .11 : migration 20260511000001 APPLIQUÉE et prouvée live.
+
+[FAIT] (tout prouvé par commande)
+
+- **[NEXT] n°1 de la passation précédente LIVRÉ** : dispatch-llm = péage unique (ADR 0010, `docs/architecture/adrs/0010-peage-argent-unique-dispatch-llm.md`).
+  - Cause racine P1-010 TROUVÉE et purgée : `llm_costs.task` était un ENUM 3 valeurs → tous les inserts 'digest'/'enrich:_'/'admin_prompt:_' échouaient en silence → 0 ligne live (prouvé avant fix). Migration task ENUM→TEXT appliquée sur .11 (insert label libre prouvé).
+  - Overrides provider/model honorés → consensus multi-modèles redevient RÉEL (fin du N× coût pour variance bidon).
+  - Budget guard `_shared/budget-check.ts` (repêché du repo Saqr, 10 tests) → 402 AVANT l'appel payant, couvre les 14 fonctions consommatrices.
+  - resolveCaller dual-mode câblé dans dispatch-llm (mode interne service_role + org_id résolu explicitement — NOT NULL oblige).
+  - 12 callers nettoyés (9 inserts llm_costs supprimés + labels cost_task fins), `resolve.ts` pur + 16 tests.
+  - Préexistants corrigés en passant : providers.ts (2 TS), typage client enrich-signal/enrich-entities, run-admin-prompt, fixture scope.test.ts digest.
+
+[ALERTE]
+
+- **CI ne tourne PAS sur la PR #11** (0 checks — triggers = push main/develop + pull_request main/develop, mais aucun run déclenché ; à investiguer : Actions possiblement restreintes). La gate vitest Linux n'arbitre donc rien pour cette branche → gates locales = seule preuve. Vitest local pathologique (collecte 0 ou 1 fichier par flake OneDrive) : run ciblé 56/56 OK ; ne JAMAIS conclure d'un run pleine-suite local.
+- `src/types/database.ts` patché à la MAIN (llm_task purgé, task string) — précédent Wave 6.1. Câbler un vrai `gen types --db-url` vers .11 serait plus propre (mot de passe pg dans l'env Coolify du stack, jamais l'afficher).
+
+[NEXT] (ordre L99 — le n°1 est fait, la suite glisse d'un cran)
+
+1. Gardes anti-injection + délimiteurs scoring/gates ; factoriser `_shared/{signal-text,llm-json,llm-guards}.ts`.
+2. Déterminisme : topics par embeddings, entités person en code, pré-filtre disqualifiers.
+3. signal-synthesizer : calculs déterministes hors prompt.
+4. Portage P1 Saqr : cron-pipeline-trigger, score-pending, slack-digest, chaînon RSS.
+5. Runtime : deploy edge fns sur .11 + INTERNAL_FN_SECRET + proxy_user_id + test e2e 2ᵉ saut + repointer CLAUDE.md.
+6. Reste audit : P1-007 sièges, P2 (SSRF, locks, idempotence), lockfiles.
+
+- Réparer le déclenchement CI sur les PR (sinon la gate Linux est morte pour toutes les branches).
+
+[MEMO] Pin claude-fable-5 = DERNIER JOUR ; demain 2026-07-08 bascule opusplan (`switch-to-opusplan.ps1`). Le reste : voir la passation ci-dessous (identité, accès .11, divergence main).
+
+---
+
 == PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session blindage + reset base .11 + deep-explore L99) ==
 
 [IDENTITE] (corrige les entrées plus anciennes de ce fichier)
