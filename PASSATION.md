@@ -1,7 +1,7 @@
 == PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-08 (portage Saqr P1 CLOS + DÉPLOYÉ EN LIVE sur .11 + pipeline d'enrichissement réparé — synthèse consolidée) ==
 
 [ETAT]
-Branche `ralph/k06-orchestrator`, HEAD `113a069` poussé, CI verte sur `0f258cc`. **Portage Saqr P1 = TERMINÉ (4/4 : cron-pipeline-trigger, score-pending, slack-digest, chaînon RSS Google News) ET RÉELLEMENT DÉPLOYÉ EN LIVE sur .11** (décision Amine : sync complet du dossier de fonctions). Au passage : réparé un bug de prod dormant (GUC cron cassés depuis un reset antérieur) + un 401 systémique cassant tout le pipeline d'enrichissement post-scoring depuis TOUJOURS. Gates locales à chaque commit : deno test 482/482 · deno check OK · tsc 0 · lint 0 · build OK.
+Branche `ralph/k06-orchestrator`, HEAD `0a024cd` poussé (dernier commit = cette passation), CI verte sur `0f258cc`. **Portage Saqr P1 = TERMINÉ (4/4 : cron-pipeline-trigger, score-pending, slack-digest, chaînon RSS Google News) ET RÉELLEMENT DÉPLOYÉ EN LIVE sur .11** (décision Amine : sync complet du dossier de fonctions). Au passage : réparé un bug de prod dormant (GUC cron cassés depuis un reset antérieur) + un 401 systémique cassant tout le pipeline d'enrichissement post-scoring depuis TOUJOURS. Gates locales à chaque commit : deno test 482/482 · deno check OK · tsc 0 · lint 0 · build OK.
 
 [FAIT]
 
