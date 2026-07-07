@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { getUserApiKey } from '../_shared/api-keys.ts'
 import { isQualitySignal } from '../_shared/filter.ts'
 import { buildSessionRow, isSessionMode, parseSessionRouting } from '../_shared/session-routing.ts'
+import { internalServiceClient, resolveCaller, resolveOrgId } from '../_shared/internal-auth.ts'
 
 const SUBS_PER_CHUNK = 6
 
@@ -57,6 +58,7 @@ Deno.serve(async (req) => {
   // session/legacy (cf. pattern _shared/api-keys.ts).
   let supabase: SupabaseClient
   let userId: string | null = null
+  let orgId: string | null = null
   let subs: string[] = []
   let redditActor: string = DEFAULT_REDDIT_ACTOR
   let sort: string = DEFAULT_SORT
@@ -97,26 +99,27 @@ Deno.serve(async (req) => {
       )
     }
   } else {
-    // Auth
+    // Auth dual-mode (ADR 0009) : JWT user OU appel interne (cron / orchestrateur)
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return json({ error: 'missing_authorization' }, 401)
+    const userScoped = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: authHeader ? { Authorization: authHeader } : {} } },
+    )
+    const caller = await resolveCaller(userScoped, req)
+    if (!caller.ok) return json({ error: caller.error }, 401)
+    userId = caller.userId
+    supabase = caller.mode === 'internal' ? internalServiceClient(createClient) : userScoped
 
-    supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    })
-
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser()
-    if (userErr || !user) return json({ error: 'invalid_token' }, 401)
-    userId = user.id
+    // org explicite sur toutes les écritures : le DEFAULT user_default_org_id()
+    // repose sur auth.uid(), nul en service_role (mode internal).
+    orgId = await resolveOrgId(supabase, userId)
 
     // Settings
     const { data: settings } = await supabase
       .from('settings')
       .select('reddit_subs, apify_config')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     const settingsRow = settings as {
@@ -138,10 +141,11 @@ Deno.serve(async (req) => {
     maxPerSub = (apifyConfig.reddit_max_per_sub as number | undefined) ?? DEFAULT_MAX_PER_SUB
 
     // Apify token: user key > env fallback > degraded
-    apifyToken = await getUserApiKey(supabase, user.id, 'apify')
+    apifyToken = await getUserApiKey(supabase, userId, 'apify')
     if (!apifyToken) {
       await supabase.from('logs').insert({
-        user_id: user.id,
+        user_id: userId,
+        org_id: orgId,
         action: 'scrape:reddit',
         status: 'degraded',
         payload: {
@@ -157,6 +161,7 @@ Deno.serve(async (req) => {
   if (!sessionMode && userId) {
     await supabase.from('logs').insert({
       user_id: userId,
+      org_id: orgId,
       action: 'scrape:reddit',
       status: 'start',
       payload: { subs, sort, timeFilter, maxPerSub, actor: redditActor },
@@ -273,6 +278,7 @@ Deno.serve(async (req) => {
     } else {
       const rows = dedupedItems.map((it) => ({
         user_id: userId!,
+        org_id: orgId,
         source: 'reddit' as const,
         external_id: it.external_id,
         url: it.url,
@@ -294,6 +300,7 @@ Deno.serve(async (req) => {
     const finalStatus = inserted > 0 ? 'ok' : errors.length > 0 ? 'error' : 'degraded'
     await supabase.from('logs').insert({
       user_id: userId,
+      org_id: orgId,
       action: 'scrape:reddit',
       status: finalStatus,
       payload: { fetched, inserted, errors, subs, chunks: chunks.length },

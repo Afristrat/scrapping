@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { DOMParser, type Element } from 'jsr:@b-fuze/deno-dom'
 import { buildSessionRow, isSessionMode, parseSessionRouting } from '../_shared/session-routing.ts'
+import { internalServiceClient, resolveCaller, resolveOrgId } from '../_shared/internal-auth.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -88,31 +89,20 @@ Deno.serve(async (req) => {
       active: true,
     }))
   } else {
+    // Auth dual-mode (ADR 0009) : JWT user OU appel interne (cron / orchestrateur)
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return json({ error: 'missing_authorization' }, 401)
+    const userScoped = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: authHeader ? { Authorization: authHeader } : {} } },
+    )
+    const caller = await resolveCaller(userScoped, req)
+    if (!caller.ok) return json({ error: caller.error }, 401)
+    userId = caller.userId
+    supabase = caller.mode === 'internal' ? internalServiceClient(createClient) : userScoped
 
-    supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    })
-
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser()
-    if (userErr || !user) return json({ error: 'invalid_token' }, 401)
-    userId = user.id
-
-    // Résoudre org_id : paramètre body ou lookup dans organization_members
-    orgId = body.org_id ?? null
-    if (!orgId) {
-      const { data: member } = await supabase
-        .from('organization_members')
-        .select('org_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle()
-      orgId = (member as { org_id?: string } | null)?.org_id ?? null
-    }
+    // Résoudre org_id : paramètre body ou premier org rejoint
+    orgId = body.org_id ?? (await resolveOrgId(supabase, userId))
     if (!orgId) return json({ error: 'org_id_required' }, 400)
 
     // Récupérer les flux actifs de l'org
@@ -133,6 +123,7 @@ Deno.serve(async (req) => {
   if (!sessionMode && userId) {
     await supabase.from('logs').insert({
       user_id: userId,
+      org_id: orgId,
       action: 'scraper:rss',
       status: 'start',
       payload: { feeds_count: feeds.length, org_id: orgId },
@@ -188,6 +179,7 @@ Deno.serve(async (req) => {
         } else {
           const rows: Array<{
             user_id: string
+            org_id: string | null
             source: string
             external_id: string
             url: string
@@ -202,6 +194,7 @@ Deno.serve(async (req) => {
             const signalDate = item.pubDate ? safeParse(item.pubDate) : null
             rows.push({
               user_id: userId!,
+              org_id: orgId,
               source: 'rss',
               external_id: item.link,
               url: item.link,
@@ -273,6 +266,7 @@ Deno.serve(async (req) => {
   if (!sessionMode && userId) {
     await supabase.from('logs').insert({
       user_id: userId,
+      org_id: orgId,
       action: 'scraper:rss',
       status: errors.length > 0 && feedsProcessed === 0 ? 'error' : 'ok',
       payload: {

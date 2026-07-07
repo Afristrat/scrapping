@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { DOMParser, type Element } from 'jsr:@b-fuze/deno-dom'
 import { buildSessionRow, isSessionMode, parseSessionRouting } from '../_shared/session-routing.ts'
+import { internalServiceClient, resolveCaller, resolveOrgId } from '../_shared/internal-auth.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -63,6 +64,7 @@ Deno.serve(async (req) => {
   // les deux modes et matche le pattern utilisé dans `_shared/api-keys.ts`.
   let supabase: SupabaseClient
   let userId: string | null = null
+  let orgId: string | null = null
 
   if (sessionMode) {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -73,19 +75,21 @@ Deno.serve(async (req) => {
     supabase = createClient(supabaseUrl, serviceKey)
   } else {
     // Mode legacy : auth user JWT obligatoire
+    // Auth dual-mode (ADR 0009) : JWT user OU appel interne (cron / orchestrateur)
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return json({ error: 'missing_authorization' }, 401)
+    const userScoped = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: authHeader ? { Authorization: authHeader } : {} } },
+    )
+    const caller = await resolveCaller(userScoped, req)
+    if (!caller.ok) return json({ error: caller.error }, 401)
+    userId = caller.userId
+    supabase = caller.mode === 'internal' ? internalServiceClient(createClient) : userScoped
 
-    supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    })
-
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser()
-    if (userErr || !user) return json({ error: 'invalid_token' }, 401)
-    userId = user.id
+    // org explicite sur toutes les écritures : le DEFAULT user_default_org_id()
+    // repose sur auth.uid(), nul en service_role (mode internal).
+    orgId = await resolveOrgId(supabase, userId)
   }
 
   const categories = body.categories.slice(0, 5)
@@ -99,6 +103,7 @@ Deno.serve(async (req) => {
   if (!sessionMode && userId) {
     await supabase.from('logs').insert({
       user_id: userId,
+      org_id: orgId,
       action: 'scrape:arxiv',
       status: 'start',
       payload: { categories },
@@ -115,6 +120,7 @@ Deno.serve(async (req) => {
         if (!sessionMode && userId) {
           await supabase.from('logs').insert({
             user_id: userId,
+            org_id: orgId,
             action: 'scrape:arxiv',
             status: 'error',
             payload: { category: cat, http_status: resp.status },
@@ -169,6 +175,7 @@ Deno.serve(async (req) => {
           const signalDate = d && !Number.isNaN(d.getTime()) ? d.toISOString() : null
           return {
             user_id: userId!,
+            org_id: orgId,
             source: 'arxiv' as const,
             external_id: e.id,
             url: e.id,
@@ -207,6 +214,7 @@ Deno.serve(async (req) => {
         if (userId) {
           await supabase.from('logs').insert({
             user_id: userId,
+            org_id: orgId,
             action: 'scrape:arxiv',
             status: 'ok',
             payload: { category: cat, fetched: rows.length, returned: rows.length },
@@ -224,6 +232,7 @@ Deno.serve(async (req) => {
       if (!sessionMode && userId) {
         await supabase.from('logs').insert({
           user_id: userId,
+          org_id: orgId,
           action: 'scrape:arxiv',
           status: 'error',
           payload: { category: cat, error: reason },
@@ -236,6 +245,7 @@ Deno.serve(async (req) => {
   if (!sessionMode && userId) {
     await supabase.from('logs').insert({
       user_id: userId,
+      org_id: orgId,
       action: 'scrape:arxiv',
       status: 'ok',
       payload: { fetched, inserted, errors_count: errors.length, categories },

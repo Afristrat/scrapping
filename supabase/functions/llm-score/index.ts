@@ -1,4 +1,10 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import {
+  buildInternalHeaders,
+  internalServiceClient,
+  resolveCaller,
+  resolveOrgId,
+} from '../_shared/internal-auth.ts'
 import { parseScoreResponse } from './parse-single.ts'
 
 const CORS = {
@@ -30,7 +36,6 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
   const auth = req.headers.get('Authorization')
-  if (!auth) return json({ error: 'missing_authorization' }, 401)
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
@@ -38,14 +43,23 @@ Deno.serve(async (req) => {
     return json({ error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: auth } },
+  // Auth dual-mode (ADR 0009) : JWT user OU appel interne (run-pipeline cron)
+  const userScoped = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: auth ? { Authorization: auth } : {} },
   })
+  const caller = await resolveCaller(userScoped, req)
+  if (!caller.ok) return json({ error: caller.error }, 401)
+  const userId = caller.userId
+  const supabase = caller.mode === 'internal' ? internalServiceClient(createClient) : userScoped
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ error: 'invalid_token' }, 401)
+  // org explicite : les DEFAULT SQL reposent sur auth.uid(), nul en service_role
+  const orgId = await resolveOrgId(supabase, userId)
+
+  // Vers dispatch-llm : propager le mode (le Bearer service_role ne passe pas getUser)
+  const dispatchHeaders: Record<string, string> =
+    caller.mode === 'internal'
+      ? buildInternalHeaders(userId)
+      : { Authorization: auth ?? '', 'Content-Type': 'application/json' }
 
   let body: RequestBody
   try {
@@ -58,8 +72,8 @@ Deno.serve(async (req) => {
   }
 
   const [signalRes, settingsRes] = await Promise.all([
-    supabase.from('signals').select('*').eq('id', body.signal_id).single(),
-    supabase.from('settings').select('*').eq('user_id', user.id).single(),
+    supabase.from('signals').select('*').eq('id', body.signal_id).eq('user_id', userId).single(),
+    supabase.from('settings').select('*').eq('user_id', userId).single(),
   ])
   if (signalRes.error || !signalRes.data) return json({ error: 'signal_not_found' }, 404)
   if (settingsRes.error || !settingsRes.data) return json({ error: 'settings_not_found' }, 404)
@@ -102,10 +116,7 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
   try {
     const dispatchRes = await fetch(`${supabaseUrl}/functions/v1/dispatch-llm`, {
       method: 'POST',
-      headers: {
-        Authorization: auth,
-        'Content-Type': 'application/json',
-      },
+      headers: dispatchHeaders,
       body: JSON.stringify({
         task: 'scoring',
         messages: [{ role: 'user', content: prompt }],
@@ -119,7 +130,8 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
+      org_id: orgId,
       action: 'llm:score',
       status: 'error',
       payload: { signal_id: body.signal_id, error: reason, stage: 'dispatch_fetch' },
@@ -130,7 +142,8 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
   if (!dispatchResult.ok) {
     const reason = dispatchResult.error ?? 'dispatch_failed'
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
+      org_id: orgId,
       action: 'llm:score',
       status: 'error',
       payload: { signal_id: body.signal_id, error: reason },
@@ -146,7 +159,8 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
   // le signal reste récupérable par le prochain run de scoring.
   if (score === null) {
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
+      org_id: orgId,
       action: 'llm-score:parse_fail',
       status: 'error',
       payload: { signal_id: body.signal_id, raw_preview: raw.slice(0, 2000) },
@@ -162,7 +176,8 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
   const scoreInsert = await supabase.from('scores').upsert(
     {
       signal_id: body.signal_id,
-      user_id: user.id,
+      user_id: userId,
+      org_id: orgId,
       score,
       reasoning,
       model_used: modelUsed,
@@ -172,7 +187,8 @@ Reponds en JSON strict : {"score": <0-100>, "reasoning": "<1 phrase>"}`
   )
   if (scoreInsert.error) {
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
+      org_id: orgId,
       action: 'llm:score',
       status: 'error',
       payload: {
