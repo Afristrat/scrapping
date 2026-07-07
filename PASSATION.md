@@ -1,7 +1,7 @@
 == PASSATION Kairos/Saqr — 2026-07-07 (suite : péage ADR 0010 livré) ==
 
 [ETAT]
-Branche `ralph/k06-orchestrator`, head `af1a45a` poussé (PR #11). Build/lint/typecheck VERTS. Deno 415/415. Base .11 : migration 20260511000001 APPLIQUÉE et prouvée live.
+Branche `ralph/k06-orchestrator`, head `7259111` poussé (PR #11). Build/lint/typecheck VERTS. Deno 441/441. Base .11 : migration 20260511000001 APPLIQUÉE et prouvée live.
 
 [FAIT] (tout prouvé par commande)
 
@@ -12,20 +12,20 @@ Branche `ralph/k06-orchestrator`, head `af1a45a` poussé (PR #11). Build/lint/ty
   - resolveCaller dual-mode câblé dans dispatch-llm (mode interne service_role + org_id résolu explicitement — NOT NULL oblige).
   - 12 callers nettoyés (9 inserts llm_costs supprimés + labels cost_task fins), `resolve.ts` pur + 16 tests.
   - Préexistants corrigés en passant : providers.ts (2 TS), typage client enrich-signal/enrich-entities, run-admin-prompt, fixture scope.test.ts digest.
+- **[NEXT] n°1 (anti-injection LLM01) LIVRÉ aussi (commit `7259111`)** : `_shared/llm-json.ts` (parse tolérant consolidé, remplace 7 copies, +16 tests), `_shared/signal-text.ts` (extraction canonique — 1 seul ordre de clés au lieu de 6, blocs délimités anti-breakout testés, +11 tests), `_shared/llm-guards.ts` (gardes DATA/JSON/accents). Câblé : scoring batch (system/user scindés, signaux délimités, temperature 0 ×3 sites), gates rubric-override (gardes + parse_ok exposé + gate_parse_failed loggé warning), parseurs enrich/ner/suggest/auditor migrés, strategist/architect délèguent. Deno 441/441.
 
 [ALERTE]
 
 - **CI ne tourne PAS sur la PR #11** (0 checks — triggers = push main/develop + pull_request main/develop, mais aucun run déclenché ; à investiguer : Actions possiblement restreintes). La gate vitest Linux n'arbitre donc rien pour cette branche → gates locales = seule preuve. Vitest local pathologique (collecte 0 ou 1 fichier par flake OneDrive) : run ciblé 56/56 OK ; ne JAMAIS conclure d'un run pleine-suite local.
 - `src/types/database.ts` patché à la MAIN (llm_task purgé, task string) — précédent Wave 6.1. Câbler un vrai `gen types --db-url` vers .11 serait plus propre (mot de passe pg dans l'env Coolify du stack, jamais l'afficher).
 
-[NEXT] (ordre L99 — le n°1 est fait, la suite glisse d'un cran)
+[NEXT] (ordre L99 — péage ET anti-injection faits, la suite glisse)
 
-1. Gardes anti-injection + délimiteurs scoring/gates ; factoriser `_shared/{signal-text,llm-json,llm-guards}.ts`.
-2. Déterminisme : topics par embeddings, entités person en code, pré-filtre disqualifiers.
-3. signal-synthesizer : calculs déterministes hors prompt.
-4. Portage P1 Saqr : cron-pipeline-trigger, score-pending, slack-digest, chaînon RSS.
-5. Runtime : deploy edge fns sur .11 + INTERNAL_FN_SECRET + proxy_user_id + test e2e 2ᵉ saut + repointer CLAUDE.md.
-6. Reste audit : P1-007 sièges, P2 (SSRF, locks, idempotence), lockfiles.
+1. Déterminisme : topics par embeddings, entités person en code, pré-filtre disqualifiers.
+2. signal-synthesizer : calculs déterministes hors prompt.
+3. Portage P1 Saqr : cron-pipeline-trigger, score-pending, slack-digest, chaînon RSS.
+4. Runtime : deploy edge fns sur .11 + INTERNAL_FN_SECRET + proxy_user_id + test e2e 2ᵉ saut + repointer CLAUDE.md.
+5. Reste audit : P1-007 sièges, P2 (SSRF, locks, idempotence), lockfiles.
 
 - Réparer le déclenchement CI sur les PR (sinon la gate Linux est morte pour toutes les branches).
 
