@@ -188,3 +188,19 @@ PRD ouverte 2026-05-01T18:00 par brief utilisateur ambitieux : delete inline/bul
 **Validation** : deno check 7/7 fonctions touchées · deno test **441/441** (dont 26 nouveaux modules + 415 existants intacts — les tests des parseurs migrés passent sans modification) · tsc 0 · lint 0 · build OK.
 
 **Piège Windows documenté** : les séquences \xNN/\uNNNN dans le contenu écrit par l'outil Write peuvent arriver en octets RÉELS (NUL littéral dans le source). Pour les tests avec caractères de contrôle → `String.fromCharCode(...)`, jamais de littéraux échappés.
+
+### 2026-07-07 — Déterminisme L99 (A#2 + A#3 + A#4 + C#3) + CI ressuscitée ✓
+
+**CI (transverse)** : cause racine trouvée — la PR #11 est `CONFLICTING` vs main (lignes divergentes assumées) → GitHub ne construit jamais la ref de merge → les triggers `pull_request` ne partent JAMAIS (83 runs historiques, tous `push` sur main). Fix : trigger `push` sur `ralph/**` + gate Deno élargie de `_shared/minio.test.ts` seul à TOUTE la suite. **Runs verts prouvés** sur 7177567, 1cf756f, a34974a (vitest Linux + suite Deno complète).
+
+**A#2 — Topics par embeddings** (`1cf756f`) : `_shared/embeddings.ts` (fetchEmbeddingsBatch déplacé de cluster-signals + chunking 500, cosineSimilarity/isSimilar déplacés de cluster.ts avec ré-export, rankBySimilarity pur +6 tests, resolveEmbeddingKeys factorisé). enrich-signal : topics par similarité (signal ↔ nom+description, 1 appel embeddings par batch, `source='embedding'`), LLM en fallback sans clé ; purge de son extractSignalText local divergent. topic-classifier : assignation déterministe aux topics connus, le LLM ne voit que les signaux sans correspondance (nouveaux topics). Seuil 0.4 = knob non calibré (ponytail annoté, à mesurer sur .11).
+
+**A#3 — Entités person + canonicalisation** (`a34974a`) : migration `20260512000001` APPLIQUÉE sur .11 et PROUVÉE live (« Öpen AÏ » → `openai`, « open ai » absorbé par ON CONFLICT). `normalized_name` calculé par trigger DB (autorité unique) + fusion des doublons + index UNIQUE remplaçant l'exact-match. enrich-entities : person = auteur extrait en code (extractAuthor factorisé dans \_shared/signal-text.ts, digest délègue), LLM restreint à org/tech/paper/product, canonicalizeEntityName = miroir TS (lookups seulement).
+
+**A#4 — Pré-filtre mécanique disqualifiers** (`9f76152`) : les règles réelles étant SÉMANTIQUES, pas de regex-NLP sur prose (disqualification à tort = DÉFCON 1) → champ structuré optionnel `DisqualifierRule.mechanical` (source_in | text_matches | older_than_days vs signal_date). evaluateMechanicalDisqualifiers (pur, +8 tests) : matche → disqualifié AVANT tout appel LLM (coût 0) ; ne matche pas → consommée ; inévaluable → reversée au LLM. scoring-engine ne transmet que le résidu sémantique. rubric-architect peut émettre `mechanical`.
+
+**C#3 — signal-synthesizer** (`0a7cb48`) : `freshness_median_days` produit par le LLM était une hallucination pure (aucune date dans son input). computeTopicProvenance + computeCulturalWarnings en code (+5 tests), mono_source_warning réel, prompt allégé (« NE CALCULE AUCUNE MÉTRIQUE »).
+
+**Bilan tests** : 441 → **468/468** Deno. Gates locales + CI Linux vertes à chaque commit.
+
+**Piège documenté** : `ReturnType<typeof createClient>` en signature de helper casse deno check (10 erreurs never[]) → toujours typer `SupabaseClient` (3e occurrence du pattern).
