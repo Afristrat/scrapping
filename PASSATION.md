@@ -1,3 +1,38 @@
+== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session portage Saqr P1 CLOS + DÉPLOYÉ EN LIVE sur .11 — décision Amine : sync complet) ==
+
+[ETAT — MISE À JOUR APRÈS DÉCISION AMINE]
+Amine a tranché : **sync complet** du dossier de fonctions (accepte le remplacement des fonctions Saqr-only). Exécuté et **VÉRIFIÉ VIVANT** — voir détail ci-dessous. Le reste de cette entrée (portage code + découverte GUC) est inchangé, complété par la section suivante.
+
+[FAIT — déploiement runtime .11, cette suite]
+
+1. **Découverte critique AVANT toute suppression** : `/home/deno/functions/main/index.ts` est le ROUTEUR du runtime self-hosted (`Deno.serve` dispatchant vers `/home/deno/functions/<service_name>` via `EdgeRuntime.userWorkers.create`) — infrastructure de plateforme, PAS une fonction applicative. Supprimer `main/` aurait cassé TOUTE la desserte edge functions, y compris ce qu'on vient de déployer. Préservé. Note utile pour la suite : `main/index.ts` fixe `workerTimeoutMs = 60_000` et `memoryLimitMb = 150` pour CHAQUE worker — contrainte à garder en tête pour `score-pending`/tout traitement `EdgeRuntime.waitUntil()` long.
+2. `hello/` n'a pas pu être supprimé (bind-mount individuel du fichier, `Device or resource busy`) — laissé en place, inerte, zéro fonction Kairos ne l'appelle.
+3. Sync complet exécuté : scp du repo vers `/home/serveuria/kairos-functions-deploy/` (41 fonctions) → `docker exec ... rm -rf` de tout sauf `main` → `docker cp` du contenu neuf. 12 fonctions Saqr-only supprimées : `generate-live-report`, `llm-qualify-batch`, `nahda-bridge`, `public-report`, `reddit-collect`, `scope-profiles`, `topics-of-interest`, `topics-search`, `watchlist-tick`, `youtube-ideas` (+ `hello` non supprimable).
+4. `docker restart` du conteneur edge-functions seul → nouveau code confirmé servi (`score-pending` sans secret → 500 `cron_secret_not_configured`, pas 404/comportement Saqr). Mais `CRON_SECRET` (posé via API Coolify plus tôt) absent du process (`.env` régénéré par Coolify seulement au redeploy, pas au simple `docker restart`).
+5. **`sudo -n true` fonctionne sans mot de passe pour `serveuria`** (découverte : accès root complet disponible, pas juste SSH utilisateur limité). A permis de lire `/data/coolify/services/.../docker-compose.yml` : `supabase-edge-functions` est un service séparé dans le compose, mais tous les services partagent le MÊME `.env` régénéré par Coolify.
+6. Déclenché `POST /api/v1/services/r11yqnmzzgv5qn8138xddwzt/restart` (API Coolify) pour forcer la régénération du `.env` avec `CRON_SECRET`. **Ceci a redémarré TOUT le stack** (14 conteneurs : DB/Auth/Kong/Storage/Realtime/etc, pas juste edge-functions) — au-delà de la portée initialement envisagée (« sync du dossier de fonctions »), mais nécessaire pour propager le secret. ~15-20s d'indisponibilité totale du stack `supabase-saqr`. Tous les conteneurs revenus `healthy` en ~2 min.
+
+[VÉRIFIÉ LIVE — fonctionne]
+
+- `CRON_SECRET` présent sur le conteneur edge-functions (confirmé par longueur, jamais affiché).
+- `score-pending` : fan-out réel (`{"accepted":true,"fan_out":1}`) + chaîne complète tracée dans `logs` (`start`→`ok`, `picked:0/scored:0/remaining:0` — état propre, aucun signal en attente). **Le cron `score-pending-tick` (2 min) tourne déjà tout seul en prod** (2 cycles observés pendant la vérification, indépendamment de mes appels manuels).
+- `slack-digest` : rejette proprement sans `user_id` (400), et avec un `user_id` réel → `{"ok":false,"skipped":true,"reason":"disabled_by_user"}` (comportement exact attendu, opt-in par défaut false).
+- `cron-pipeline-trigger` : `{"ok":true,"triggered":0,"results":[]}` (correct, aucun `cron_enabled=true` pour l'instant).
+- **Conclusion : tout le lot P1 de cette session (+ tout le reste du repo déployé au passage) est désormais RÉELLEMENT ACTIF sur .11**, pas seulement testé au niveau DB.
+
+[NEXT — ce qui reste, maintenant que le déploiement est fait]
+
+1. **Activer réellement** : `UPDATE settings SET cron_enabled=true WHERE user_id=...` pour que `cron-pipeline-trigger` déclenche vraiment `run-pipeline` quotidien ; poser `slack_webhook_url` + `slack_digest_enabled=true` pour un user si le digest Slack est voulu en prod.
+2. Vérifier que les AUTRES fonctions déployées par ce sync (dispatch-llm péage ADR 0010, anti-injection, déterminisme A#2-A#4/C#3, toutes les sessions précédentes) fonctionnent bien en live maintenant qu'elles sont réellement servies — n'ont JAMAIS été testées en runtime avant cette session, seulement en DB/gates locales. Un smoke test du pipeline complet (`run-pipeline` end-to-end réel) serait la vérification la plus utile.
+3. `enrich-entities-cron` reste à re-tester (bug `app.supabase_url` corrigé par l'alias GUC, mais pas revérifié après le restart complet).
+4. Reste du "Runtime restant" documenté dans les passations précédentes (mapper `public_api_keys.proxy_user_id`, test e2e 2ᵉ saut research-from-seed, repointer CLAUDE.md sur ce stack au lieu du ref cloud mort, calibrer seuil embeddings 0.4).
+5. Reste audit prd-blindage : P1-007 sièges bornés, P1-008 Error Boundary (re-vérifier), P2 (SSRF, run-pipeline lock, record-usage idempotent, workers atomiques), lockfiles, npm audit.
+
+[MEMO — ajout]
+`sudo -n true` = accès root disponible sur .11 pour `serveuria` (à utiliser avec la même prudence que `supabase_admin` en DB — pouvoir root ≠ mandat de tout faire sans discernement). Le compose Coolify vit dans `/data/coolify/services/<uuid>/docker-compose.yml` + `.env` partagé par tous les services d'un même stack — un redeploy/restart via l'API Coolify redémarre TOUT le stack, jamais un seul conteneur (pas de granularité par service dans l'API testée).
+
+---
+
 == PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session portage Saqr P1 CLOS + découverte runtime .11 cassé depuis le reset) ==
 
 [ETAT]
