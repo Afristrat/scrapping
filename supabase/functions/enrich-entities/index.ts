@@ -1,5 +1,10 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError } from '../_shared/errors.ts'
+import {
+  buildInternalHeaders,
+  constantTimeEquals,
+  resolveUserIdForOrg,
+} from '../_shared/internal-auth.ts'
 import { extractAuthor, extractSignalText } from '../_shared/signal-text.ts'
 import { parseNerResponse, canonicalizeEntityName, type NerEntity } from './ner.ts'
 
@@ -7,7 +12,8 @@ import { parseNerResponse, canonicalizeEntityName, type NerEntity } from './ner.
  * enrich-entities — Traite la file d'attente NER (Named Entity Recognition) async.
  *
  * POST /enrich-entities
- * Auth : bearer token standard (appelé par pg_cron ou manuellement)
+ * Auth : x-cron-secret (service_role, appel cron system-wide toutes orgs) OU
+ * bearer JWT user standard (appel manuel dashboard).
  *
  * Logique :
  *   1. Récupère 50 pending_enrichments WHERE pass_kind='entities' AND status='pending'
@@ -65,23 +71,42 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
-  const auth = req.headers.get('Authorization')
-  if (!auth) return json({ error: 'missing_authorization' }, 401)
-
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  if (!supabaseUrl || !supabaseAnonKey) {
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
     return json({ error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: auth } },
-  })
+  // Auth : x-cron-secret (service_role, traite toutes les orgs, appel cron
+  // system-wide) OU bearer JWT user standard (appel manuel dashboard, une
+  // seule org via RLS). Le bypass cron doit court-circuiter getUser() même
+  // si un header Authorization est aussi présent (le cron envoie les deux,
+  // cf. cluster-signals — même piège déjà corrigé là-bas).
+  const cronSecretHeader = req.headers.get('x-cron-secret')
+  const expectedCronSecret = Deno.env.get('CRON_SECRET')
+  const isCronCall =
+    !!expectedCronSecret &&
+    !!cronSecretHeader &&
+    constantTimeEquals(cronSecretHeader, expectedCronSecret)
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ error: 'invalid_token' }, 401)
+  const auth = req.headers.get('Authorization')
+  let userId: string | null = null
+  let supabase: SupabaseClient
+
+  if (isCronCall) {
+    supabase = createClient(supabaseUrl, supabaseServiceKey)
+  } else {
+    if (!auth) return json({ error: 'missing_authorization' }, 401)
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: auth } },
+    })
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return json({ error: 'invalid_token' }, 401)
+    userId = user.id
+  }
 
   // 1. Récupérer 50 jobs pending
   const { data: jobs, error: jobsErr } = await supabase
@@ -123,7 +148,7 @@ Deno.serve(async (req) => {
       ok,
       cost,
       error: jobError,
-    } = await processEnrichmentJob(job, supabase, dispatchUrl, auth, user.id)
+    } = await processEnrichmentJob(job, supabase, dispatchUrl, isCronCall, auth, userId)
 
     if (ok) {
       totalProcessed++
@@ -142,9 +167,9 @@ Deno.serve(async (req) => {
     }
   }
 
-  // 4. Logger le résultat global
+  // 4. Logger le résultat global (user_id null pour les crons système)
   await supabase.from('logs').insert({
-    user_id: user.id,
+    user_id: userId,
     action: 'enrich:entities',
     status: 'ok',
     payload: {
@@ -160,13 +185,20 @@ Deno.serve(async (req) => {
 
 /**
  * Traite un job d'enrichissement NER pour un signal donné.
+ *
+ * En mode cron (isCronCall), l'appel aval à dispatch-llm doit utiliser
+ * buildInternalHeaders(userId de l'org du job) — pas le header Authorization
+ * reçu (un Bearer service_role, que dispatch-llm rejetterait via getUser()) —
+ * pour que la résolution BYOK (model_config/clés/budget) se fasse sur le bon
+ * user, org par org, même si le batch mélange plusieurs orgs.
  */
 async function processEnrichmentJob(
   job: PendingEnrichmentRow,
   supabase: SupabaseClient,
   dispatchUrl: string,
-  auth: string,
-  userId: string,
+  isCronCall: boolean,
+  auth: string | null,
+  userId: string | null,
 ): Promise<{ ok: boolean; cost?: number; error?: string }> {
   // a. Lire le signal
   const { data: signalData, error: signalErr } = await supabase
@@ -202,12 +234,21 @@ async function processEnrichmentJob(
     return { ok: true, cost: 0 }
   }
 
-  // b. Appel dispatch-llm (NER)
+  // b. Appel dispatch-llm (NER) — headers résolus selon le mode (cf. docstring)
+  let dispatchHeaders: Record<string, string>
+  if (isCronCall) {
+    const jobUserId = await resolveUserIdForOrg(supabase, job.org_id)
+    if (!jobUserId) return { ok: false, error: 'org_user_unresolved' }
+    dispatchHeaders = buildInternalHeaders(jobUserId)
+  } else {
+    dispatchHeaders = { Authorization: auth as string, 'Content-Type': 'application/json' }
+  }
+
   let dispatchResp: DispatchResponse
   try {
     const res = await fetch(dispatchUrl, {
       method: 'POST',
-      headers: { Authorization: auth, 'Content-Type': 'application/json' },
+      headers: dispatchHeaders,
       body: JSON.stringify({
         task: 'enrichment',
         cost_task: 'enrich:entities',
@@ -269,7 +310,7 @@ async function persistEntities(
   entities: NerEntity[],
   job: PendingEnrichmentRow,
   supabase: SupabaseClient,
-  userId: string,
+  userId: string | null,
 ): Promise<void> {
   for (const entity of entities) {
     // Upsert entity (ON CONFLICT DO NOTHING → récupère l'id existant)

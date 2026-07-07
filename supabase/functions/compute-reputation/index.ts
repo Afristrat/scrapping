@@ -1,5 +1,6 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError } from '../_shared/errors.ts'
+import { constantTimeEquals } from '../_shared/internal-auth.ts'
 import { computeReputationScore } from './reputation.ts'
 
 /**
@@ -7,7 +8,7 @@ import { computeReputationScore } from './reputation.ts'
  * en traitant la file d'attente pending_enrichments WHERE pass_kind='reputation'.
  *
  * POST /compute-reputation
- * Auth : bearer token standard (appelé par pg_cron ou manuellement)
+ * Auth : x-cron-secret (service_role, toutes orgs) OU bearer JWT user standard.
  *
  * Logique :
  *   1. Récupère jusqu'à 100 pending_enrichments WHERE pass_kind='reputation' AND status='pending'
@@ -63,23 +64,40 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
-  const auth = req.headers.get('Authorization')
-  if (!auth) return json({ error: 'missing_authorization' }, 401)
-
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  if (!supabaseUrl || !supabaseAnonKey) {
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
     return json({ error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: auth } },
-  })
+  // Auth : x-cron-secret (service_role, toutes orgs) OU bearer JWT user. Le
+  // bypass cron court-circuite getUser() même si Authorization est aussi
+  // présent (le cron envoie les deux — cf. cluster-signals, même piège).
+  const cronSecretHeader = req.headers.get('x-cron-secret')
+  const expectedCronSecret = Deno.env.get('CRON_SECRET')
+  const isCronCall =
+    !!expectedCronSecret &&
+    !!cronSecretHeader &&
+    constantTimeEquals(cronSecretHeader, expectedCronSecret)
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ error: 'invalid_token' }, 401)
+  let userId: string | null = null
+  let supabase: SupabaseClient
+
+  if (isCronCall) {
+    supabase = createClient(supabaseUrl, supabaseServiceKey)
+  } else {
+    const auth = req.headers.get('Authorization')
+    if (!auth) return json({ error: 'missing_authorization' }, 401)
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: auth } },
+    })
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return json({ error: 'invalid_token' }, 401)
+    userId = user.id
+  }
 
   // 1. Récupérer le batch de jobs pending
   const { data: jobs, error: jobsErr } = await supabase
@@ -113,7 +131,7 @@ Deno.serve(async (req) => {
 
   // 3. Traiter chaque job séquentiellement
   for (const job of batch) {
-    const result = await processReputationJob(job, supabase, user.id)
+    const result = await processReputationJob(job, supabase)
     if (result.ok) {
       totalProcessed++
     } else {
@@ -129,9 +147,9 @@ Deno.serve(async (req) => {
     }
   }
 
-  // 4. Logger le résultat global
+  // 4. Logger le résultat global (user_id null pour les crons système)
   await supabase.from('logs').insert({
-    user_id: user.id,
+    user_id: userId,
     action: 'compute:reputation',
     status: 'ok',
     payload: {
@@ -149,8 +167,7 @@ Deno.serve(async (req) => {
  */
 async function processReputationJob(
   job: PendingEnrichmentRow,
-  supabase: ReturnType<typeof createClient>,
-  _userId: string,
+  supabase: SupabaseClient,
 ): Promise<{ ok: boolean; error?: string }> {
   // a. Récupérer l'entité kind='person' liée à ce signal
   const { data: seData, error: seErr } = await supabase

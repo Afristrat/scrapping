@@ -129,6 +129,29 @@ export async function resolveOrgId(db: SupabaseClient, userId: string): Promise<
 }
 
 /**
+ * Sens inverse de resolveOrgId : premier membre (le plus ancien) d'un org.
+ * Utilisé par les workers cron system-wide qui traitent des jobs multi-orgs
+ * (enrich-entities, compute-reputation) et doivent résoudre un userId
+ * représentatif de l'org pour construire buildInternalHeaders lors d'un
+ * appel aval à dispatch-llm (BYOK : model_config/clés/budget sont résolus
+ * par user, pas par org).
+ */
+export async function resolveUserIdForOrg(
+  db: SupabaseClient,
+  orgId: string,
+): Promise<string | null> {
+  const { data, error } = await db
+    .from('organization_members')
+    .select('user_id')
+    .eq('org_id', orgId)
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (error || !data) return null
+  return (data as { user_id: string }).user_id
+}
+
+/**
  * Client Supabase service_role pour les queries en mode internal (bypass RLS —
  * on lit les settings/user_api_keys du proxy user). Recréé depuis env, jamais
  * dérivé du header entrant (indépendance vis-à-vis du gateway).
