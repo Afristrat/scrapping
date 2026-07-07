@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { DOMParser, type Element } from 'jsr:@b-fuze/deno-dom'
 import { buildSessionRow, isSessionMode, parseSessionRouting } from '../_shared/session-routing.ts'
 import { internalServiceClient, resolveCaller, resolveOrgId } from '../_shared/internal-auth.ts'
+import { buildGoogleNewsSearchUrl, type GoogleNewsLang } from './google-news.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,7 @@ const CORS = {
 }
 
 const MAX_FEEDS = 20
+const MAX_KEYWORDS = 8
 const FETCH_TIMEOUT_MS = 10_000
 
 interface RssFeed {
@@ -36,6 +38,14 @@ interface RequestBody {
   ttl_hours?: number
   /** Mode session : URLs RSS à scraper (pas de lookup `rss_feeds`). */
   feed_urls?: string[]
+  /**
+   * Mode session, alternative à feed_urls : mots-clés routés vers Google News
+   * RSS search (cf. google-news.ts). RSS n'a pas de mécanisme de recherche
+   * natif — c'est le seul moyen de transformer un rss_keyword de
+   * research_strategy en flux exploitable sans feed pré-souscrit.
+   */
+  keywords?: string[]
+  lang?: GoogleNewsLang
 }
 
 Deno.serve(async (req) => {
@@ -54,13 +64,18 @@ Deno.serve(async (req) => {
   if (!routing.ok) return json({ error: routing.error, detail: routing.detail }, routing.status)
   const sessionMode = isSessionMode(routing.config)
 
-  // Mode session : feed_urls obligatoire (pas de lookup rss_feeds car pas
-  // d'org rattachée à une session research-from-seed).
-  if (sessionMode && (!Array.isArray(body.feed_urls) || body.feed_urls.length === 0)) {
+  // Mode session : feed_urls OU keywords requis (pas de lookup rss_feeds car
+  // pas d'org rattachée à une session research-from-seed). keywords route
+  // vers Google News RSS search (google-news.ts) — RSS n'a pas de mécanisme
+  // de recherche natif, contrairement à feed_urls qui pointe des flux fixes.
+  const hasFeedUrls = Array.isArray(body.feed_urls) && body.feed_urls.length > 0
+  const hasKeywords = Array.isArray(body.keywords) && body.keywords.length > 0
+  if (sessionMode && !hasFeedUrls && !hasKeywords) {
     return json(
       {
-        error: 'feed_urls_required',
-        detail: 'target_table=signals_session requires a non-empty feed_urls[] in body',
+        error: 'feed_urls_or_keywords_required',
+        detail:
+          'target_table=signals_session requires a non-empty feed_urls[] or keywords[] in body',
       },
       400,
     )
@@ -80,14 +95,25 @@ Deno.serve(async (req) => {
       return json({ error: 'service_role_env_missing' }, 500)
     }
     supabase = createClient(supabaseUrl, serviceKey)
-    // Construire des "feeds" éphémères depuis feed_urls
-    feeds = (body.feed_urls ?? []).slice(0, MAX_FEEDS).map((url, idx) => ({
-      id: `session-${idx}`,
+    // Construire des "feeds" éphémères : feed_urls tels quels + keywords
+    // convertis en recherche Google News RSS (un keyword = un flux de
+    // résultats, cf. google-news.ts).
+    const urlFeeds = (body.feed_urls ?? []).slice(0, MAX_FEEDS).map((url, idx) => ({
+      id: `session-url-${idx}`,
       org_id: 'session',
       name: url,
       url,
       active: true,
     }))
+    const lang = body.lang ?? 'fr'
+    const keywordFeeds = (body.keywords ?? []).slice(0, MAX_KEYWORDS).map((keyword, idx) => ({
+      id: `session-kw-${idx}`,
+      org_id: 'session',
+      name: `google-news:${keyword}`,
+      url: buildGoogleNewsSearchUrl(keyword, lang),
+      active: true,
+    }))
+    feeds = [...urlFeeds, ...keywordFeeds]
   } else {
     // Auth dual-mode (ADR 0009) : JWT user OU appel interne (cron / orchestrateur)
     const authHeader = req.headers.get('Authorization')
