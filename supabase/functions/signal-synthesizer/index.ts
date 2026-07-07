@@ -781,6 +781,7 @@ async function callDispatch(
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       task: 'enrichment',
+      cost_task: 'synthesis',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

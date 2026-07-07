@@ -25,7 +25,7 @@
 //                llm_issue_count }
 // }
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 import {
   AuditIssue,
   checkBriefFormat,
@@ -39,114 +39,104 @@ import {
   ResearchStrategy,
   SignalRef,
   TopicsOutput,
-} from "./auditor.ts";
+} from './auditor.ts'
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
 interface RequestBody {
-  research_strategy: ResearchStrategy;
-  rubric: Record<string, unknown>;
-  topics_output: TopicsOutput;
-  lang: "fr" | "en" | "ar";
-  signals_input: SignalRef[];
+  research_strategy: ResearchStrategy
+  rubric: Record<string, unknown>
+  topics_output: TopicsOutput
+  lang: 'fr' | 'en' | 'ar'
+  signals_input: SignalRef[]
 }
 
 interface DispatchResponse {
-  ok: boolean;
-  error?: string;
-  content?: string;
+  ok: boolean
+  error?: string
+  content?: string
   usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    cost?: number;
-  };
-  model_used?: string;
-  provider_used?: string;
+    prompt_tokens?: number
+    completion_tokens?: number
+    cost?: number
+  }
+  model_used?: string
+  provider_used?: string
 }
 
-const VALID_LANGS = new Set(["fr", "en", "ar"]);
+const VALID_LANGS = new Set(['fr', 'en', 'ar'])
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS })
   }
-  if (req.method !== "POST") {
-    return json({ error: "method_not_allowed" }, 405);
+  if (req.method !== 'POST') {
+    return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const auth = req.headers.get("Authorization");
-  if (!auth) return json({ error: "missing_authorization" }, 401);
+  const auth = req.headers.get('Authorization')
+  if (!auth) return json({ error: 'missing_authorization' }, 401)
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
   if (!supabaseUrl || !supabaseAnonKey) {
-    return json({ error: "supabase_env_missing" }, 500);
+    return json({ error: 'supabase_env_missing' }, 500)
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
-  });
+  })
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return json({ error: "invalid_token" }, 401);
+  } = await supabase.auth.getUser()
+  if (!user) return json({ error: 'invalid_token' }, 401)
 
-  let body: RequestBody;
+  let body: RequestBody
   try {
-    body = (await req.json()) as RequestBody;
+    body = (await req.json()) as RequestBody
   } catch {
-    return json({ error: "invalid_json" }, 400);
+    return json({ error: 'invalid_json' }, 400)
   }
 
   // Body validation
-  if (!body.research_strategy || typeof body.research_strategy !== "object") {
-    return json({ error: "research_strategy_required" }, 400);
+  if (!body.research_strategy || typeof body.research_strategy !== 'object') {
+    return json({ error: 'research_strategy_required' }, 400)
   }
-  if (!body.rubric || typeof body.rubric !== "object") {
-    return json({ error: "rubric_required" }, 400);
+  if (!body.rubric || typeof body.rubric !== 'object') {
+    return json({ error: 'rubric_required' }, 400)
   }
-  if (!body.topics_output || typeof body.topics_output !== "object") {
-    return json({ error: "topics_output_required" }, 400);
+  if (!body.topics_output || typeof body.topics_output !== 'object') {
+    return json({ error: 'topics_output_required' }, 400)
   }
   if (!Array.isArray(body.topics_output.topics)) {
-    return json({ error: "topics_output_topics_required" }, 400);
+    return json({ error: 'topics_output_topics_required' }, 400)
   }
-  if (
-    !body.topics_output.coverage_map ||
-    typeof body.topics_output.coverage_map !== "object"
-  ) {
-    return json({ error: "coverage_map_required" }, 400);
+  if (!body.topics_output.coverage_map || typeof body.topics_output.coverage_map !== 'object') {
+    return json({ error: 'coverage_map_required' }, 400)
   }
   if (!body.lang || !VALID_LANGS.has(body.lang)) {
-    return json({ error: "lang_required" }, 400);
+    return json({ error: 'lang_required' }, 400)
   }
   if (!Array.isArray(body.signals_input)) {
-    return json({ error: "signals_input_required" }, 400);
+    return json({ error: 'signals_input_required' }, 400)
   }
 
-  const t0 = Date.now();
+  const t0 = Date.now()
 
   // ─── Phase 1 : deterministic checks (no LLM cost) ────────────────────
-  const hallucinationIssues = checkHallucination(
-    body.topics_output.topics,
-    body.signals_input,
-  );
-  const coverage = checkCoverage(body.topics_output.coverage_map);
-  const linguistic = checkLinguistic(
-    body.research_strategy,
-    body.topics_output.topics,
-  );
+  const hallucinationIssues = checkHallucination(body.topics_output.topics, body.signals_input)
+  const coverage = checkCoverage(body.topics_output.coverage_map)
+  const linguistic = checkLinguistic(body.research_strategy, body.topics_output.topics)
   const devilAdvocateIssues = checkDevilAdvocate(
     body.topics_output.topics,
     body.topics_output.devil_advocate_topic_id,
-  );
-  const briefFormat = checkBriefFormat(body.topics_output.topics);
+  )
+  const briefFormat = checkBriefFormat(body.topics_output.topics)
 
   const deterministicIssues: AuditIssue[] = [
     ...hallucinationIssues,
@@ -154,16 +144,16 @@ Deno.serve(async (req) => {
     ...linguistic.issues,
     ...devilAdvocateIssues,
     ...briefFormat.issues,
-  ];
+  ]
 
   // ─── Phase 2 : LLM audit (subjective axes : novelty / actionability /
   //              bias) — BYOK strict, task=enrichment, no model imposed.
-  const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`;
-  const llmStart = Date.now();
-  let llmIssues: AuditIssue[] = [];
-  let llmCost = 0;
-  let llmLatency = 0;
-  let llmError: string | null = null;
+  const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`
+  const llmStart = Date.now()
+  let llmIssues: AuditIssue[] = []
+  let llmCost = 0
+  let llmLatency = 0
+  let llmError: string | null = null
 
   try {
     const llmResp = await callLlmAudit(
@@ -173,35 +163,35 @@ Deno.serve(async (req) => {
       body.rubric,
       body.topics_output,
       body.lang,
-    );
-    llmLatency = Date.now() - llmStart;
+    )
+    llmLatency = Date.now() - llmStart
     if (llmResp.ok) {
-      llmIssues = parseLlmIssues(llmResp.content ?? "");
-      llmCost = llmResp.usage?.cost ?? 0;
+      llmIssues = parseLlmIssues(llmResp.content ?? '')
+      llmCost = llmResp.usage?.cost ?? 0
     } else {
-      llmError = llmResp.error ?? "dispatch_failed";
+      llmError = llmResp.error ?? 'dispatch_failed'
     }
   } catch (err) {
-    llmError = err instanceof Error ? err.message : String(err);
-    llmLatency = Date.now() - llmStart;
+    llmError = err instanceof Error ? err.message : String(err)
+    llmLatency = Date.now() - llmStart
   }
 
   // ─── Phase 3 : merge + verdict ────────────────────────────────────────
-  const allIssues = mergeIssues(deterministicIssues, llmIssues);
+  const allIssues = mergeIssues(deterministicIssues, llmIssues)
   const verdictResult = computeVerdict(
     allIssues,
     body.research_strategy,
     coverage.uncoveredSubjects,
-  );
+  )
 
-  const totalLatency = Date.now() - t0;
+  const totalLatency = Date.now() - t0
 
   // ─── Phase 4 : log + persist cost ────────────────────────────────────
   try {
-    await supabase.from("logs").insert({
+    await supabase.from('logs').insert({
       user_id: user.id,
-      action: "quality-auditor:run",
-      status: "ok",
+      action: 'quality-auditor:run',
+      status: 'ok',
       payload: {
         verdict: verdictResult.verdict,
         deterministic_issues: deterministicIssues.length,
@@ -215,23 +205,14 @@ Deno.serve(async (req) => {
         llm_error: llmError,
         total_latency_ms: totalLatency,
       },
-    });
+    })
   } catch {
     // Logging failure should not break the audit response.
   }
 
-  if (llmCost > 0) {
-    try {
-      await supabase.from("llm_costs").insert({
-        user_id: user.id,
-        task: "quality-auditor",
-        cost: llmCost,
-        latency_ms: llmLatency,
-      });
-    } catch {
-      // Silent — telemetry only.
-    }
-  }
+  // Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010). L'ancien
+  // insert local échouait de toute façon en silence (colonne latency_ms
+  // inexistante sur llm_costs) — la latence reste tracée dans logs ci-dessus.
 
   return json(
     {
@@ -251,8 +232,8 @@ Deno.serve(async (req) => {
       },
     },
     200,
-  );
-});
+  )
+})
 
 /**
  * Call dispatch-llm with task=enrichment to ask the model to audit the
@@ -267,36 +248,38 @@ async function callLlmAudit(
   strategy: ResearchStrategy,
   rubric: Record<string, unknown>,
   topicsOutput: TopicsOutput,
-  lang: "fr" | "en" | "ar",
+  lang: 'fr' | 'en' | 'ar',
 ): Promise<DispatchResponse> {
-  const systemPrompt = buildSystemPrompt(lang);
-  const userPayload = buildUserPayload(strategy, rubric, topicsOutput);
+  const systemPrompt = buildSystemPrompt(lang)
+  const userPayload = buildUserPayload(strategy, rubric, topicsOutput)
 
   const res = await fetch(dispatchUrl, {
-    method: "POST",
-    headers: { Authorization: auth, "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      task: "enrichment",
+      task: 'enrichment',
+      cost_task: 'quality-auditor',
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPayload },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPayload },
       ],
       options: {
         max_tokens: 1200,
         temperature: 0.2,
-        response_format: { type: "json_object" },
+        response_format: { type: 'json_object' },
       },
     }),
-  });
-  return (await res.json()) as DispatchResponse;
+  })
+  return (await res.json()) as DispatchResponse
 }
 
-function buildSystemPrompt(lang: "fr" | "en" | "ar"): string {
-  const langLabel = lang === "fr"
-    ? "français (accents majuscules obligatoires : É È À Ç Ê Ô Î Ù Û)"
-    : lang === "ar"
-    ? "arabe (RTL respecté)"
-    : "english";
+function buildSystemPrompt(lang: 'fr' | 'en' | 'ar'): string {
+  const langLabel =
+    lang === 'fr'
+      ? 'français (accents majuscules obligatoires : É È À Ç Ê Ô Î Ù Û)'
+      : lang === 'ar'
+        ? 'arabe (RTL respecté)'
+        : 'english'
 
   return `Tu es un auditeur de chaîne de recherche prospective Bassira/Kairos.
 Tu reçois 3 outputs combinés : research_strategy + rubric + topics
@@ -341,7 +324,7 @@ SCHEMA OUTPUT STRICT :
   ]
 }
 
-Si aucun défaut détecté sur ces 3 axes : retourne {"issues": []}.`;
+Si aucun défaut détecté sur ces 3 axes : retourne {"issues": []}.`
 }
 
 function buildUserPayload(
@@ -361,7 +344,7 @@ function buildUserPayload(
       framework_hint: bv.framework_hint,
       brief: bv.brief,
     })),
-  }));
+  }))
 
   const payload = {
     research_strategy: {
@@ -374,21 +357,19 @@ function buildUserPayload(
     },
     rubric_summary: {
       criteria: (rubric as Record<string, unknown>).criteria,
-      disqualifiers: Array.isArray(
-          (rubric as Record<string, unknown>).disqualifiers,
-        )
+      disqualifiers: Array.isArray((rubric as Record<string, unknown>).disqualifiers)
         ? (rubric as { disqualifiers: unknown[] }).disqualifiers.length
         : 0,
     },
     topics: compactTopics,
     devil_advocate_topic_id: topicsOutput.devil_advocate_topic_id,
-  };
-  return JSON.stringify(payload);
+  }
+  return JSON.stringify(payload)
 }
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  })
 }

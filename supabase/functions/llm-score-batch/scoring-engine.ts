@@ -47,6 +47,8 @@ export type DispatchCaller = (args: {
   task: 'scoring' | 'enrichment'
   prompt: string
   maxTokens: number
+  /** Label fin llm_costs.task écrit par le péage dispatch-llm (défaut : task). */
+  costTask?: string
 }) => Promise<DispatchResponse>
 
 /**
@@ -56,13 +58,14 @@ export function makeFetchDispatchCaller(args: {
   supabaseUrl: string
   auth: string
 }): DispatchCaller {
-  return async ({ task, prompt, maxTokens }) => {
+  return async ({ task, prompt, maxTokens, costTask }) => {
     try {
       const res = await fetch(`${args.supabaseUrl}/functions/v1/dispatch-llm`, {
         method: 'POST',
         headers: { Authorization: args.auth, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           task,
+          ...(costTask ? { cost_task: costTask } : {}),
           messages: [{ role: 'user', content: prompt }],
           options: {
             max_tokens: maxTokens,
@@ -118,7 +121,12 @@ export async function scoreSignalWithRubric(args: {
       softBoosts: rubric.soft_boosts,
       signal,
     })
-    const gatePromise = dispatch({ task: 'enrichment', prompt: gatePrompt, maxTokens: 200 })
+    const gatePromise = dispatch({
+      task: 'enrichment',
+      costTask: 'scoring:gates',
+      prompt: gatePrompt,
+      maxTokens: 200,
+    })
 
     const [criteriaRes, gateRes] = await Promise.all([criteriaPromise, gatePromise])
 
@@ -130,7 +138,15 @@ export async function scoreSignalWithRubric(args: {
     if (gateRes.usage?.cost) totalCost += gateRes.usage.cost
     if (gateRes.model_used) lastModel = gateRes.model_used
 
-    return finalize({ signal, rubric, criteriaRes, disqualifiedId, appliedBoostIds, costSoFar: totalCost, modelSoFar: lastModel })
+    return finalize({
+      signal,
+      rubric,
+      criteriaRes,
+      disqualifiedId,
+      appliedBoostIds,
+      costSoFar: totalCost,
+      modelSoFar: lastModel,
+    })
   }
 
   // ─── Mode split : 2 appels gates séparés ─────────────────────────────────
@@ -140,7 +156,12 @@ export async function scoreSignalWithRubric(args: {
       disqualifiers: rubric.disqualifiers,
       signal,
     })
-    dqPromise = dispatch({ task: 'enrichment', prompt: dqPrompt, maxTokens: 100 })
+    dqPromise = dispatch({
+      task: 'enrichment',
+      costTask: 'scoring:gates',
+      prompt: dqPrompt,
+      maxTokens: 100,
+    })
   }
 
   let sbPromise: Promise<DispatchResponse> | null = null
@@ -149,12 +170,18 @@ export async function scoreSignalWithRubric(args: {
       softBoosts: rubric.soft_boosts,
       signal,
     })
-    sbPromise = dispatch({ task: 'enrichment', prompt: sbPrompt, maxTokens: 150 })
+    sbPromise = dispatch({
+      task: 'enrichment',
+      costTask: 'scoring:gates',
+      prompt: sbPrompt,
+      maxTokens: 150,
+    })
   }
 
   const [criteriaRes, dqRes, sbRes] = await Promise.all([
     criteriaPromise,
-    dqPromise ?? Promise.resolve<DispatchResponse>({ ok: true, content: '{"disqualified_id": null}' }),
+    dqPromise ??
+      Promise.resolve<DispatchResponse>({ ok: true, content: '{"disqualified_id": null}' }),
     sbPromise ?? Promise.resolve<DispatchResponse>({ ok: true, content: '{"applied": []}' }),
   ])
 
@@ -172,7 +199,15 @@ export async function scoreSignalWithRubric(args: {
   if (sbRes.usage?.cost) totalCost += sbRes.usage.cost
   if (sbRes.model_used) lastModel = sbRes.model_used
 
-  return finalize({ signal, rubric, criteriaRes, disqualifiedId, appliedBoostIds, costSoFar: totalCost, modelSoFar: lastModel })
+  return finalize({
+    signal,
+    rubric,
+    criteriaRes,
+    disqualifiedId,
+    appliedBoostIds,
+    costSoFar: totalCost,
+    modelSoFar: lastModel,
+  })
 }
 
 function finalize(args: {

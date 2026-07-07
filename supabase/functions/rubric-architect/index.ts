@@ -520,6 +520,7 @@ async function callDispatch(args: DispatchArgs): Promise<DispatchResponse> {
     headers: { Authorization: args.auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       task: 'enrichment',
+      cost_task: 'rubric:architect',
       messages: [
         { role: 'system', content: args.systemPrompt },
         { role: 'user', content: args.userPrompt },

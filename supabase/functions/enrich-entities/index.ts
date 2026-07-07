@@ -1,4 +1,4 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError } from '../_shared/errors.ts'
 import { parseNerResponse } from './ner.ts'
 
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     return json({ error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
   })
 
@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
  */
 async function processEnrichmentJob(
   job: PendingEnrichmentRow,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   dispatchUrl: string,
   auth: string,
   userId: string,
@@ -198,6 +198,7 @@ async function processEnrichmentJob(
       headers: { Authorization: auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         task: 'enrichment',
+        cost_task: 'enrich:entities',
         messages: [
           {
             role: 'system',
@@ -228,20 +229,8 @@ async function processEnrichmentJob(
   }
 
   const cost = dispatchResp.usage?.cost ?? 0
-  const promptTokens = dispatchResp.usage?.prompt_tokens ?? 0
-  const completionTokens = dispatchResp.usage?.completion_tokens ?? 0
-  const modelUsed = dispatchResp.model_used ?? HAIKU_MODEL
 
-  // 5. Track coûts dans llm_costs
-  await supabase.from('llm_costs').insert({
-    user_id: userId,
-    org_id: job.org_id,
-    task: 'enrich:entities',
-    model: modelUsed,
-    prompt_tokens: promptTokens,
-    completion_tokens: completionTokens,
-    cost,
-  })
+  // 5. Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010).
 
   // c. Parser la réponse NER
   const raw = dispatchResp.content ?? ''

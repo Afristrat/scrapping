@@ -145,3 +145,25 @@ PRD ouverte 2026-05-01T18:00 par brief utilisateur ambitieux : delete inline/bul
 **Déploiement** : `supabase db push` OK (4 migrations) · `supabase functions deploy cluster-signals` OK.
 
 **Pattern réutilisable** : pour les fonctions pures critiques (calculs mathématiques, parseurs), les extraire dans un module `.ts` séparé et les couvrir avec Deno tests — garantit testabilité sans mock Supabase.
+
+### 2026-07-07 — Péage argent unique dispatch-llm (ADR 0010) ✓
+
+**Converge 4 findings** : consensus factice (L99 A#1), coûts non écrits (P1-010), budget jamais appliqué (P0-004), auth mono-mode (P0-005 partiel).
+
+**Cause racine P1-010 prouvée live** : `llm_costs.task` était l'ENUM `llm_task(scraping|scoring|monitoring)` alors que les callers écrivaient 'digest', 'enrich:topic', 'admin_prompt:<kind>'… → violation d'enum silencieuse sur chaque insert → **0 ligne dans llm_costs** (vérifié sur db.saqr.ma avant fix).
+
+**Fichiers** :
+
+- `supabase/migrations/20260511000001_llm_costs_task_text.sql` — task ENUM→TEXT + CHECK 1-64, DROP TYPE llm_task, costs_by_day recréée (task TEXT + search_path épinglé). **Appliquée live sur .11 et prouvée** (insert 'enrich:topic' OK).
+- `supabase/functions/_shared/budget-check.ts` (+10 tests) — repêché du repo Saqr de l'associé (fail-open, skip à spent >= budget).
+- `supabase/functions/dispatch-llm/resolve.ts` (+16 tests) — résolution pure override > model_config > défaut, validation couple d'overrides tout-ou-rien, sanitizeCostTask.
+- `supabase/functions/dispatch-llm/index.ts` — resolveCaller dual-mode (ADR 0009), overrides honorés (consensus redevient réel), budget guard → 402 AVANT l'appel, org_id résolu explicitement (NOT NULL en service_role), écriture llm_costs unique + cost_recorded en réponse.
+- 12 callers nettoyés : 9 inserts llm_costs supprimés (llm-score-batch ×2, digest, llm-score, enrich-signal ×2, enrich-entities, run-admin-prompt, suggest-personas, quality-auditor) + labels cost_task partout (enrich:topic/persona/entities, admin_prompt:<kind>, suggest:personas, quality-auditor, backtest:rubric, research:strategist, rubric:architect, synthesis, topic:classify, scoring:gates).
+- `src/types/database.ts` patché à la main (précédent Wave 6.1 — pas de gen types câblé sur .11) : task string, enum llm_task purgé.
+- ADR : `docs/architecture/adrs/0010-peage-argent-unique-dispatch-llm.md`. README dispatch-llm réécrit.
+
+**Préexistants corrigés en passant (règle n°3)** : providers.ts (2 erreurs TS génériques never[]), enrich-signal/enrich-entities (typage client `ReturnType<typeof createClient>` → `SupabaseClient`, pattern llm-score-batch), run-admin-prompt (detail null→undefined), scope.test.ts digest (fixture bogué : filtre >=60 ne laissait passer que 11 candidats sur les 25 requis).
+
+**Validation** : deno check 14/14 fonctions touchées · deno test **415/415** (dont 26 nouveaux) · typecheck 0 err · lint 0 warning · build OK · vitest ciblé 56/56 (suite pleine non collectable localement — flake OneDrive documenté, CI Linux = gate).
+
+**Piège documenté** : le runner vitest local collecte parfois 0 ou 1 fichier de test (timeouts pool OneDrive) — ne JAMAIS conclure d'un run local pathologique, cibler des fichiers explicites ou lire la CI.

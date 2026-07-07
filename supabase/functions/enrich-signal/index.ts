@@ -1,4 +1,4 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError } from '../_shared/errors.ts'
 import { parseTopicsResponse, parsePersonasResponse } from './enrich.ts'
 
@@ -14,7 +14,7 @@ import { parseTopicsResponse, parsePersonasResponse } from './enrich.ts'
  *   - Lance 2 appels LLM parallèles (Haiku) : classification topics + pertinence personas
  *   - Insère dans signal_topics + signal_personas (ON CONFLICT DO UPDATE)
  *   - Met à jour signals.enriched_at
- *   - Track les coûts dans llm_costs (task='enrich:topic' et 'enrich:persona')
+ *   - Coûts tracés par dispatch-llm (péage unique, cost_task='enrich:topic'/'enrich:persona')
  */
 
 const CORS = {
@@ -22,8 +22,6 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
-
-const HAIKU_MODEL = 'anthropic/claude-haiku-4-5-20251001'
 
 interface RequestBody {
   signal_ids: string[]
@@ -85,7 +83,7 @@ Deno.serve(async (req) => {
     return json({ error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: auth } },
   })
 
@@ -227,7 +225,7 @@ async function enrichSignal(
   personasList: string,
   dispatchUrl: string,
   auth: string,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   userId: string,
   orgId: string,
 ): Promise<EnrichResult> {
@@ -246,7 +244,7 @@ async function enrichSignal(
           `Taxonomie disponible:\n${topicsList}\n` +
           `Retourne: [{ "slug": "...", "confidence": 0.0-1.0 }] — max 3 topics, confidence > 0.5 seulement. JSON pur, pas de markdown.`,
       },
-      { max_tokens: 300 },
+      { max_tokens: 300, cost_task: 'enrich:topic' },
     ),
     callDispatch(
       dispatchUrl,
@@ -260,7 +258,7 @@ async function enrichSignal(
           `Personas disponibles:\n${personasList}\n` +
           `Retourne: [{ "persona_key": "...", "relevance": 0.0-1.0, "reasoning": "1 phrase" }] — max 3 personas, relevance > 0.4 seulement. JSON pur.`,
       },
-      { max_tokens: 400 },
+      { max_tokens: 400, cost_task: 'enrich:persona' },
     ),
   ])
 
@@ -271,19 +269,7 @@ async function enrichSignal(
     const dispatchResp = topicsCallResult.value
     const raw = dispatchResp.content ?? ''
     topicCost = dispatchResp.usage?.cost ?? 0
-    const promptTokens = dispatchResp.usage?.prompt_tokens ?? 0
-    const completionTokens = dispatchResp.usage?.completion_tokens ?? 0
-
-    // Track coûts
-    await supabase.from('llm_costs').insert({
-      user_id: userId,
-      org_id: orgId,
-      task: 'enrich:topic',
-      model: dispatchResp.model_used ?? HAIKU_MODEL,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      cost: topicCost,
-    })
+    // Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010).
 
     const classified = parseTopicsResponse(raw)
     if (classified.length > 0) {
@@ -350,19 +336,7 @@ async function enrichSignal(
     const dispatchResp = personasCallResult.value
     const raw = dispatchResp.content ?? ''
     personaCost = dispatchResp.usage?.cost ?? 0
-    const promptTokens = dispatchResp.usage?.prompt_tokens ?? 0
-    const completionTokens = dispatchResp.usage?.completion_tokens ?? 0
-
-    // Track coûts
-    await supabase.from('llm_costs').insert({
-      user_id: userId,
-      org_id: orgId,
-      task: 'enrich:persona',
-      model: dispatchResp.model_used ?? HAIKU_MODEL,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      cost: personaCost,
-    })
+    // Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010).
 
     const relevant = parsePersonasResponse(raw)
     if (relevant.length > 0) {
@@ -478,13 +452,14 @@ async function callDispatch(
   dispatchUrl: string,
   auth: string,
   messages: { system: string; user: string },
-  options: { max_tokens?: number },
+  options: { max_tokens?: number; cost_task?: string },
 ): Promise<DispatchResponse> {
   const res = await fetch(dispatchUrl, {
     method: 'POST',
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       task: 'enrichment',
+      ...(options.cost_task ? { cost_task: options.cost_task } : {}),
       messages: [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user },

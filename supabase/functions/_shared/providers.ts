@@ -25,9 +25,14 @@ async function loadProviders(supabase: SupabaseClient): Promise<Map<string, Prov
 
   const map = new Map<string, ProviderConfig>()
   for (const row of (data ?? []) as Array<{
-    id: string; label: string; default_base_url: string; auth_scheme: AuthScheme;
-    models_endpoint: string; extra_headers: Record<string, string>;
-    base_url_overridable: boolean; models_requires_auth: boolean;
+    id: string
+    label: string
+    default_base_url: string
+    auth_scheme: AuthScheme
+    models_endpoint: string
+    extra_headers: Record<string, string>
+    base_url_overridable: boolean
+    models_requires_auth: boolean
   }>) {
     map.set(row.id, {
       id: row.id,
@@ -44,7 +49,10 @@ async function loadProviders(supabase: SupabaseClient): Promise<Map<string, Prov
   return map
 }
 
-export async function getProviderConfig(supabase: SupabaseClient, id: string): Promise<ProviderConfig | null> {
+export async function getProviderConfig(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<ProviderConfig | null> {
   const map = await loadProviders(supabase)
   return map.get(id) ?? null
 }
@@ -54,7 +62,10 @@ export async function getAllProviders(supabase: SupabaseClient): Promise<Provide
   return Array.from(map.values())
 }
 
-export function buildAuthHeaders(provider: ProviderConfig, apiKey: string | null): Record<string, string> {
+export function buildAuthHeaders(
+  provider: ProviderConfig,
+  apiKey: string | null,
+): Record<string, string> {
   const headers: Record<string, string> = { ...provider.extraHeaders }
   if (provider.authScheme === 'bearer' && apiKey) headers['Authorization'] = `Bearer ${apiKey}`
   else if (provider.authScheme === 'x-api-key' && apiKey) headers['x-api-key'] = apiKey
@@ -79,7 +90,7 @@ export function normalizeModelsResponse(provider: string, raw: unknown): Normali
   const data = (raw as { data?: unknown[] })?.data
   if (!Array.isArray(data)) return []
   return data
-    .map((m) => {
+    .map((m): NormalizedModel | null => {
       const obj = m as Record<string, unknown>
       const id = (obj.id ?? obj.name) as string | undefined
       if (!id) return null
@@ -92,9 +103,7 @@ export function normalizeModelsResponse(provider: string, raw: unknown): Normali
         (obj.max_context_length as number | undefined) ??
         null
       const displayName =
-        (obj.name as string | undefined) ??
-        (obj.display_name as string | undefined) ??
-        null
+        (obj.name as string | undefined) ?? (obj.display_name as string | undefined) ?? null
       return {
         id,
         displayName,

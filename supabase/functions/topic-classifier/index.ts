@@ -48,7 +48,9 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: auth } },
   })
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return json({ error: 'invalid_token' }, 401)
 
   let body: RequestBody
@@ -65,7 +67,8 @@ Deno.serve(async (req) => {
     supabase.from('topics').select('id, name, slug').eq('user_id', user.id),
   ])
 
-  if (settingsResult.error) return json({ error: 'settings_fetch_failed', detail: settingsResult.error.message }, 500)
+  if (settingsResult.error)
+    return json({ error: 'settings_fetch_failed', detail: settingsResult.error.message }, 500)
   if (!settingsResult.data) return json({ error: 'settings_not_found' }, 404)
   const settings = settingsResult.data
   const existingTopics = topicsResult.data
@@ -104,21 +107,27 @@ Deno.serve(async (req) => {
   }
 
   // ---- Agréger par topic
-  const topicMap = new Map<string, {
-    signalIds: string[]
-    sources: Record<string, { count: number; total_score: number }>
-    topSignal: { title: string; score: number; source: string } | null
-    topicId?: string
-    topicName?: string
-    isSeed?: boolean
-    firstSeenAt?: string
-  }>()
+  const topicMap = new Map<
+    string,
+    {
+      signalIds: string[]
+      sources: Record<string, { count: number; total_score: number }>
+      topSignal: { title: string; score: number; source: string } | null
+      topicId?: string
+      topicName?: string
+      isSeed?: boolean
+      firstSeenAt?: string
+    }
+  >()
 
   // Récupérer les scores des signaux pour calculer avg + top
   const { data: scoresData } = await supabase
     .from('scores')
     .select('signal_id, score')
-    .in('signal_id', signals.map((s) => s.id))
+    .in(
+      'signal_id',
+      signals.map((s) => s.id),
+    )
     .eq('user_id', user.id)
   const scoreById = new Map<string, number>(
     (scoresData ?? []).map((s: { signal_id: string; score: number }) => [s.signal_id, s.score]),
@@ -168,79 +177,95 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     try {
-      await retryWithBackoff(async () => {
-        let topicId: string
-        let baseline = { mean: 0, m2: 0, n: 0 }
-        if (existingSnapshot) {
-          topicId = existingSnapshot.id
-          baseline = {
-            mean: existingSnapshot.baseline_mean,
-            m2: existingSnapshot.baseline_m2,
-            n: existingSnapshot.baseline_n,
+      await retryWithBackoff(
+        async () => {
+          let topicId: string
+          let baseline = { mean: 0, m2: 0, n: 0 }
+          if (existingSnapshot) {
+            topicId = existingSnapshot.id
+            baseline = {
+              mean: existingSnapshot.baseline_mean,
+              m2: existingSnapshot.baseline_m2,
+              n: existingSnapshot.baseline_n,
+            }
+          } else {
+            // Upsert handles the race where a previous retry created the row
+            const { data: upserted, error: upErr } = await supabase
+              .from('topics')
+              .upsert(
+                {
+                  user_id: user.id,
+                  name: topicName,
+                  slug,
+                  is_seed: isSeed,
+                  is_emerging: !isSeed,
+                },
+                { onConflict: 'user_id,slug' },
+              )
+              .select('id')
+              .single()
+            if (upErr || !upserted) throw new Error(`topic_insert_failed: ${upErr?.message}`)
+            topicId = upserted.id
           }
-        } else {
-          // Upsert handles the race where a previous retry created the row
-          const { data: upserted, error: upErr } = await supabase
-            .from('topics')
-            .upsert({
-              user_id: user.id, name: topicName, slug,
-              is_seed: isSeed, is_emerging: !isSeed,
-            }, { onConflict: 'user_id,slug' })
-            .select('id')
-            .single()
-          if (upErr || !upserted) throw new Error(`topic_insert_failed: ${upErr?.message}`)
-          topicId = upserted.id
-        }
 
-        const newBaseline = welfordUpdate(baseline, bucket.signalIds.length)
-        const trend = computeTrend(bucket.signalIds.length, newBaseline)
+          const newBaseline = welfordUpdate(baseline, bucket.signalIds.length)
+          const trend = computeTrend(bucket.signalIds.length, newBaseline)
 
-        const sourcesJson: Record<string, { count: number; avg_score: number }> = {}
-        for (const [src, agg] of Object.entries(bucket.sources)) {
-          sourcesJson[src] = {
-            count: agg.count,
-            avg_score: agg.count > 0 ? agg.total_score / agg.count : 0,
+          const sourcesJson: Record<string, { count: number; avg_score: number }> = {}
+          for (const [src, agg] of Object.entries(bucket.sources)) {
+            sourcesJson[src] = {
+              count: agg.count,
+              avg_score: agg.count > 0 ? agg.total_score / agg.count : 0,
+            }
           }
-        }
 
-        const { error: runErr } = await supabase
-          .from('topic_runs')
-          .upsert({
-            topic_id: topicId, user_id: user.id, run_at: body.run_at,
-            signal_count: bucket.signalIds.length,
-            sources: sourcesJson,
-            top_signal_title: bucket.topSignal?.title ?? null,
-            top_signal_score: bucket.topSignal?.score ?? null,
-          }, { onConflict: 'topic_id,run_at', ignoreDuplicates: true })
-        if (runErr) throw new Error(`topic_run_insert_failed: ${runErr.message}`)
-
-        const { error: updateErr } = await supabase
-          .from('topics')
-          .update({
-            baseline_mean: newBaseline.mean,
-            baseline_m2: newBaseline.m2,
-            baseline_n: newBaseline.n,
-            trend, last_seen_at: body.run_at,
-            total_signal_count: (existingSnapshot?.total_signal_count ?? 0) + bucket.signalIds.length,
-          })
-          .eq('id', topicId)
-        if (updateErr) throw new Error(`topic_update_failed: ${updateErr.message}`)
-
-        if (bucket.signalIds.length > 0) {
-          const { error: sigErr } = await supabase.from('topic_signals').upsert(
-            bucket.signalIds.map((sid) => ({
-              topic_id: topicId, signal_id: sid, user_id: user.id,
-            })),
-            { onConflict: 'topic_id,signal_id', ignoreDuplicates: true },
+          const { error: runErr } = await supabase.from('topic_runs').upsert(
+            {
+              topic_id: topicId,
+              user_id: user.id,
+              run_at: body.run_at,
+              signal_count: bucket.signalIds.length,
+              sources: sourcesJson,
+              top_signal_title: bucket.topSignal?.title ?? null,
+              top_signal_score: bucket.topSignal?.score ?? null,
+            },
+            { onConflict: 'topic_id,run_at', ignoreDuplicates: true },
           )
-          if (sigErr) throw new Error(`topic_signals_insert_failed: ${sigErr.message}`)
-        }
+          if (runErr) throw new Error(`topic_run_insert_failed: ${runErr.message}`)
 
-        bucket.topicId = topicId
-        bucket.topicName = topicName
-        bucket.isSeed = isSeed
-        bucket.firstSeenAt = existingSnapshot?.first_seen_at ?? body.run_at
-      }, { maxAttempts: 3, baseDelayMs: 1000 })
+          const { error: updateErr } = await supabase
+            .from('topics')
+            .update({
+              baseline_mean: newBaseline.mean,
+              baseline_m2: newBaseline.m2,
+              baseline_n: newBaseline.n,
+              trend,
+              last_seen_at: body.run_at,
+              total_signal_count:
+                (existingSnapshot?.total_signal_count ?? 0) + bucket.signalIds.length,
+            })
+            .eq('id', topicId)
+          if (updateErr) throw new Error(`topic_update_failed: ${updateErr.message}`)
+
+          if (bucket.signalIds.length > 0) {
+            const { error: sigErr } = await supabase.from('topic_signals').upsert(
+              bucket.signalIds.map((sid) => ({
+                topic_id: topicId,
+                signal_id: sid,
+                user_id: user.id,
+              })),
+              { onConflict: 'topic_id,signal_id', ignoreDuplicates: true },
+            )
+            if (sigErr) throw new Error(`topic_signals_insert_failed: ${sigErr.message}`)
+          }
+
+          bucket.topicId = topicId
+          bucket.topicName = topicName
+          bucket.isSeed = isSeed
+          bucket.firstSeenAt = existingSnapshot?.first_seen_at ?? body.run_at
+        },
+        { maxAttempts: 3, baseDelayMs: 1000 },
+      )
       persistedTopics++
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -280,10 +305,13 @@ Deno.serve(async (req) => {
     }>) {
       try {
         await appendTopicEntry({
-          client: minioClient, bucket: minioCfg.bucket,
+          client: minioClient,
+          bucket: minioCfg.bucket,
           userId: user.id,
-          slug: p.topics.slug, topicName: p.topics.name,
-          isSeed: p.topics.is_seed, entry: p.content,
+          slug: p.topics.slug,
+          topicName: p.topics.name,
+          isSeed: p.topics.is_seed,
+          entry: p.content,
           firstSeenAt: p.topics.first_seen_at,
         })
         await supabase.from('pending_minio_writes').delete().eq('id', p.id)
@@ -318,8 +346,10 @@ Deno.serve(async (req) => {
 
       try {
         await appendTopicEntry({
-          client: minioClient, bucket: minioCfg.bucket,
-          userId: user.id, slug,
+          client: minioClient,
+          bucket: minioCfg.bucket,
+          userId: user.id,
+          slug,
           topicName: bucket.topicName ?? slug,
           isSeed: bucket.isSeed ?? false,
           entry,
@@ -343,7 +373,8 @@ Deno.serve(async (req) => {
           action: 'topic-classifier:error',
           status: 'error',
           payload: {
-            phase: 'minio_append', slug,
+            phase: 'minio_append',
+            slug,
             error: err instanceof Error ? err.message : String(err),
           },
         })
@@ -364,13 +395,16 @@ Deno.serve(async (req) => {
     },
   })
 
-  return json({
-    ok: true,
-    classified: classifications.length,
-    topics_persisted: persistedTopics,
-    minio_appended: minioAppended,
-    minio_queued: minioQueued,
-  }, 202)
+  return json(
+    {
+      ok: true,
+      classified: classifications.length,
+      topics_persisted: persistedTopics,
+      minio_appended: minioAppended,
+      minio_queued: minioQueued,
+    },
+    202,
+  )
 })
 
 async function classifyBatch(
@@ -383,7 +417,10 @@ async function classifyBatch(
   // This anti-prompt-injection sanitization stays in the caller — dispatch-llm
   // is intentionally generic and does not sanitize content.
   const sanitize = (s: string): string =>
-    s.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim()
+    s
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
 
   const list = signals
     .map((s, idx) => {
@@ -412,6 +449,7 @@ Réponds en JSON strict :
         headers: { Authorization: auth, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           task: 'scraping',
+          cost_task: 'topic:classify',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `Signaux à classifier :\n${list}` },

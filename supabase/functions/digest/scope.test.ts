@@ -206,10 +206,12 @@ Deno.test('Extension fenêtre : déduplique les signaux existants', () => {
     makeSignal({ id: `existing-${i}`, score: 90 - i }),
   )
 
-  // Candidats étendus (inclut doublons + nouveaux)
+  // Candidats étendus (inclut doublons + nouveaux). Scores 85→61 : les 25
+  // passent le filtre >= 60, sinon le remplissage à SIGNAL_LIMIT est impossible
+  // (bug historique du fixture : 70-i n'en laissait passer que 11 → merged=21).
   const extendedCandidates: SignalForPrompt[] = [
     ...existingTop, // doublons
-    ...Array.from({ length: 25 }, (_, i) => makeSignal({ id: `new-${i}`, score: 70 - i })),
+    ...Array.from({ length: 25 }, (_, i) => makeSignal({ id: `new-${i}`, score: 85 - i })),
   ]
 
   const existingIds = new Set(existingTop.map((s) => s.id))

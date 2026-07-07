@@ -463,7 +463,7 @@ export type Database = {
           model: string
           org_id: string
           prompt_tokens: number
-          task: Database["public"]["Enums"]["llm_task"]
+          task: string
           ts: string
           user_id: string
         }
@@ -474,7 +474,7 @@ export type Database = {
           model: string
           org_id?: string
           prompt_tokens?: number
-          task: Database["public"]["Enums"]["llm_task"]
+          task: string
           ts?: string
           user_id: string
         }
@@ -485,7 +485,7 @@ export type Database = {
           model?: string
           org_id?: string
           prompt_tokens?: number
-          task?: Database["public"]["Enums"]["llm_task"]
+          task?: string
           ts?: string
           user_id?: string
         }
@@ -2021,7 +2021,7 @@ export type Database = {
         Args: { days?: number }
         Returns: {
           day: string
-          task: Database["public"]["Enums"]["llm_task"]
+          task: string
           total_cost: number
         }[]
       }
@@ -2149,7 +2149,6 @@ export type Database = {
         | "product"
       health_service: "db" | "minio" | "llm" | "apify"
       health_status: "ok" | "degraded" | "down"
-      llm_task: "scraping" | "scoring" | "monitoring"
       org_plan: "solo" | "pro" | "enterprise"
       org_role: "owner" | "admin" | "member" | "viewer"
       org_segment:
@@ -2324,7 +2323,6 @@ export const Constants = {
       entity_kind: ["person", "organization", "technology", "paper", "product"],
       health_service: ["db", "minio", "llm", "apify"],
       health_status: ["ok", "degraded", "down"],
-      llm_task: ["scraping", "scoring", "monitoring"],
       org_plan: ["solo", "pro", "enterprise"],
       org_role: ["owner", "admin", "member", "viewer"],
       org_segment: ["vc_pe", "legal", "newsletter", "brand", "cto_sme", "solo"],

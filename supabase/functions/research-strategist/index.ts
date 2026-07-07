@@ -83,6 +83,7 @@ async function callDispatchOnce(
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       task: 'enrichment',
+      cost_task: 'research:strategist',
       messages,
       options: {
         response_format: { type: 'json_object' },
