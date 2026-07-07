@@ -204,3 +204,15 @@ PRD ouverte 2026-05-01T18:00 par brief utilisateur ambitieux : delete inline/bul
 **Bilan tests** : 441 → **468/468** Deno. Gates locales + CI Linux vertes à chaque commit.
 
 **Piège documenté** : `ReturnType<typeof createClient>` en signature de helper casse deno check (10 erreurs never[]) → toujours typer `SupabaseClient` (3e occurrence du pattern).
+
+### 2026-07-07 — Portage Saqr P1 : cron-pipeline-trigger (EN COURS, 1/4) — `c85b802`
+
+Auth dual-mode (ADR 0009) câblée sur toute la chaîne scrape→score→topics : run-pipeline, llm-score, topic-classifier, scraper-reddit/arxiv/x/rss acceptent désormais `resolveCaller` (JWT user OU `x-internal-secret`+`x-proxy-user-id`). `resolveOrgId` factorisé depuis dispatch-llm vers `_shared/internal-auth.ts` (org_id explicite requis — les DEFAULT SQL org-scoped reposent sur `auth.uid()`, nul en service_role).
+
+Nouvelle fn `cron-pipeline-trigger` (portée de `C:\projets\Saqr`) : x-cron-secret constant-time, cible `user_id` unique ou tous les `settings.cron_enabled=true`, retry 3x sur 5xx/429 via `buildInternalHeaders`, trace `cron_last_run_at/status`.
+
+Migration `20260512000002` : `settings.cron_enabled/cron_last_run_at/cron_last_run_status`, `unscored_signals_for(p_user_id, lim)` (variante service_role de `unscored_signals`, EXECUTE réservé), job `pg_cron` quotidien 05:00 UTC. **NON appliquée sur .11**.
+
+Restant du lot P1 (non commencé) : `score-pending` (chaîne de batchs auto-ré-invoquée), `slack-digest` (zéro LLM), chaînon RSS Google News dans research-from-seed/lib.ts.
+
+Gates : deno test 468/468 · deno check 8/8 fns touchées · tsc 0 · lint 0 · build OK.
