@@ -118,9 +118,11 @@ COMMENT ON COLUMN signals.enriched_at IS 'Timestamp du dernier enrichissement (t
 
 -- =============================================================================
 -- Vue signals_enriched : signals + agrégats d'enrichissement
+-- security_invoker=on : applique la RLS org-scopée de `signals` avec les droits
+-- de l'appelant (sinon la vue bypass la RLS et expose tous les tenants).
 -- =============================================================================
 
-CREATE OR REPLACE VIEW signals_enriched AS
+CREATE OR REPLACE VIEW signals_enriched WITH (security_invoker = on) AS
 SELECT
   s.*,
   ARRAY(

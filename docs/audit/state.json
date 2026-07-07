@@ -1,0 +1,46 @@
+{
+  "dernierFullISO": "2026-07-07",
+  "dernierAuditISO": "2026-07-07",
+  "mode": "full",
+  "branch": "ralph/k06-orchestrator",
+  "head": "030a021",
+  "iterationsExecutees": 1,
+  "runtimeDegrade": true,
+  "runtimeRaison": "Supabase du projet déconnecté — base en recréation sur serveur .11 ; répro HTTP impossible",
+  "canaryRecall": null,
+  "canaryRecallNote": "Non chiffré (runtime indisponible). Classes canoniques toutes surfacées par findings réels ; confiance qualitative élevée, à re-mesurer en incrémental post-provision .11.",
+  "dimensions": {
+    "securite": "COUVERTE (statique uniquement)",
+    "rls-db": "COUVERTE (statique uniquement)",
+    "crash": "COUVERTE (statique uniquement)",
+    "metier": "COUVERTE (statique uniquement)",
+    "dette": "COUVERTE",
+    "cache": "COUVERTE (SPA — cache serveur non applicable ; cache client TanStack sain)",
+    "conformite": "NON ACTIVEE"
+  },
+  "findings": { "P0": 5, "P1": 5, "P2": 10, "P3": 12 },
+  "findingsCorrigesSession": [
+    "BLD-2026-07-07-001",
+    "BLD-2026-07-07-002",
+    "BLD-2026-07-07-003",
+    "BLD-2026-07-07-006",
+    "BLD-2026-07-07-009"
+  ],
+  "chantierOptimisation": {
+    "adr": "docs/architecture/adrs/0009-auth-interne-service-to-service.md",
+    "pilier2_auth_interne": "Helper _shared/internal-auth.ts + 12 tests Deno verts (linchpin). Câblage des 6 fns aval + config.toml verify_jwt + secret INTERNAL_FN_SECRET = à faire et à valider en runtime sur .11.",
+    "pilier1_argent": "Design tranché (péage unique dispatch-llm) — non câblé (double-comptage non vérifiable sans runtime).",
+    "verifs": "typecheck 0, lint 0, build 0, deno 19/19, vitest RubricBacktest 7/7"
+  },
+  "identite": "Marque=Saqr · code=Kairos · domaine=db.saqr.ma · repo=Afristrat/scrapping. Kairos et Saqr sont le MÊME projet (Kairos = nom de code). L'ancien schéma db.saqr.ma était une régression d'un associé ; remplacé le 2026-07-07 par les migrations Kairos de ce repo (décision Amine).",
+  "baseProvisionnee": {
+    "stack": "supabase-db-r11yqnmzzgv5qn8138xddwzt (.11, Coolify)",
+    "domaine": "db.saqr.ma",
+    "migrations_appliquees": 61,
+    "tables": 43,
+    "rls_on": 43,
+    "p0_rls_verifies_absents": true,
+    "backup_ancien_schema": "/home/serveuria/kairos-r11y-BEFORE-RESET.sql (régression associé — conservée pour repêche youtube-ideas/slack-digest)"
+  },
+  "prochaineAction": "Repointer CLAUDE.md sur le stack db.saqr.ma (self-hosted) ; déployer les edge functions de ce repo sur le stack ; poser INTERNAL_FN_SECRET + câbler le pipeline sur internal-auth ; puis /blindage incrémental (répro runtime P0-004/005 + canaryRecall)."
+}
