@@ -1,3 +1,49 @@
+== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session blindage + reset base .11 + deep-explore L99) ==
+
+[IDENTITE] (corrige les entrées plus anciennes de ce fichier)
+Kairos = **nom de code** ; Saqr = **nom de marque** → MÊME projet. Domaine base = `db.saqr.ma`. Repo GitHub = `Afristrat/scrapping` (remote origin). Le `CLAUDE.md` du repo pointe encore un mauvais ref cloud MORT (`crplceoptyeslqyfcqvj`) + mauvais repo (`meydeey/theresa-scrap`) → À REPOINTER sur le stack self-hosted .11 (cf. [NEXT]). L'ancienne base cloud est morte ; la base vit maintenant sur le serveur .11.
+
+[ETAT]
+Branche de travail = `ralph/k06-orchestrator` (22 commits devant `main`=b51841f, ligne divergente « Bassira/devil-advocate » NON mergée — décision produit à trancher par Amine, NE PAS auto-merger). PR ouverte = **#11** (https://github.com/Afristrat/scrapping/pull/11) où Amine suit tout en remote. 4 commits poussés cette session (b927069, 584e0e2, fdb3ef0 + le head courant). Build/lint/typecheck VERTS. Base .11 reconstruite et saine.
+
+[FAIT] (tout prouvé par commande)
+
+- Audit blindage full 5 dimensions → `docs/audit/2026-07-07-rapport-blindage-full.md` + `.ralph/prd-blindage.json` (5 P0, 5 P1, ~10 P2, ~12 P3).
+- 3 P0 corrigés : IDOR RPC `enriched_signals` (garde org + search_path), vue `signals_enriched` (security_invoker), build cassé `command.tsx` (import radix).
+- 2 P1 : régression score=0 (`llm-score/parse-single.ts` + 7 tests, skip write) ; gate tests verte (exclude e2e + MemoryRouter, 7/7).
+- Pilier auth interne (ADR 0009) : `_shared/internal-auth.ts` (resolveCaller + buildInternalHeaders) + 12 tests ; migration `public_api_keys.proxy_user_id`.
+- Pilier isolation : migration `20260510000001_harden_definer_functions` (search_path + REVOKE PUBLIC sur 5 DEFINER) — appliqué live, 0 DEFINER sans search_path.
+- Fix `backtest-rubric` : format JSON imposé + parse-score + skip sur illisible + 3 `.catch()` cassés sur builders Supabase réparés. Fix `suggest-personas` : « (2026) » hardcodé → date runtime + cast unknown.
+- **BASE .11 (`db.saqr.ma`, stack Coolify `supabase-db-r11yqnmzzgv5qn8138xddwzt`) RESET + reconstruite** : DROP schema public de l'ancienne version (régression d'un associé) → rejeu des 62 migrations CORRIGÉES → RLS 43/43, 2 P0 absents (vérifié live), REST 200/401 OK, seeds 10 providers/37 topics. Bug de rejouabilité corrigé (migration `compute_signal_weight` avait un bloc de test mutant retiré). **Backup de l'ancienne version associé** : `/home/serveuria/kairos-r11y-BEFORE-RESET.sql` (contient son travail : youtube-ideas, slack-digest, etc. — à repêcher).
+- Deep-explore des 2 versions (3 agents) → `docs/audit/2026-07-07-l99-optimisation.md` (axes déterminisme / prompts / portage Saqr).
+
+[ALERTE]
+
+- `main` (b51841f) et cette branche = 2 LIGNES DIVERGENTES (34 vs 1 commits). Intégration = décision produit d'Amine. `main` est checkout dans un AUTRE worktree (`C:\Users\amans\OneDrive\Projets\claudia-zlatan-scrap-main`) → ne pas forcer main d'ici.
+- 7 stacks Supabase sur .11 (rami/saqr/nahda/taqwim/ania/miroshark/sawt). NE TOUCHER QUE `r11y` (=saqr/kairos). Les autres sont d'autres projets.
+- Env de test vitest pathologiquement lent (OneDrive + node_modules/.deno). `deno test` casse `tsc -b` → `bun install` restaure. Le poste dev est lent, la CI Linux est saine.
+- Anti-leak : les clés (ANON/SERVICE_ROLE/JWT/INTERNAL_FN_SECRET) restent dans l'env Coolify du stack — jamais affichées.
+
+[BLOQUE]
+
+- Rien de bloquant. Mandat runtime PLEIN accordé par Amine (déployer edge fns, poser secrets, tester en runtime sur .11 en autonomie). Objectif = excellence structurelle d'abord PUIS runtime. Git = commit+push+PR (merge main = décision Amine).
+
+[NEXT] (ordre L99 retenu — détail dans `docs/audit/2026-07-07-l99-optimisation.md`)
+
+1. **Refactor `dispatch-llm` en péage unique** (LE nœud) : accepter provider/model overrides (fixe le CONSENSUS FACTICE — overrides ignorés, variance bidon, N× coût), écrire `llm_costs` (péage unique), budget guard EN REPÊCHANT `_shared/budget-check.ts` de l'associé (dans le backup .11), câbler `resolveCaller`, transmettre `temperature`. Runtime-testable maintenant.
+2. Gardes anti-injection + délimiteurs sur scoring/gates ; factoriser `_shared/{signal-text,llm-json,llm-guards}.ts` (duplication massive).
+3. Déterminisme : classification topics par embeddings (infra `cluster-signals` déjà là, 50-100× moins cher) ; entités `person` en code (déjà dans raw_payload) + canonicalisation ; pré-filtre disqualifiers mécaniques.
+4. `signal-synthesizer` : sortir les calculs déterministes du prompt (longueur brief, provenance).
+5. Portage P1 depuis Saqr : `cron-pipeline-trigger` (pipeline 100% manuel aujourd'hui !), `score-pending` (scoring cappé 50/run), `slack-digest`, chaînon RSS Google News (~30 l, rss_keywords jamais exploités). + pépites : backoff 429 arXiv, welford.test.ts.
+6. Runtime : deploy des edge functions de CE repo sur le stack + poser `INTERNAL_FN_SECRET` + mapper `public_api_keys.proxy_user_id` + câbler pipeline K06 + test end-to-end (le 2ᵉ saut llm-score-batch→dispatch-llm en mode interne = le test qui manquait). + repointer `CLAUDE.md` sur .11 + skills à mobiliser (prompt-engineer-pro sur prompts, moat-hunter run réel, SOP de déploiement).
+7. Reste audit : P1-007 sièges bornés, P1-010 coûts, P2 (SSRF validate-api-key, run-pipeline lock, record-usage idempotent, workers atomiques), lockfiles, npm audit.
+
+[CTX] Accès .11 : `ssh -i ~/.ssh/serveurai_mnemo serveuria@192.168.100.11`. Base = `docker exec supabase-db-r11yqnmzzgv5qn8138xddwzt psql -U postgres`. Migrations serveur = `/home/serveuria/kairos-migrations/`, script reset = `/home/serveuria/kairos-reset-apply.sh`. Repo Saqr (lecture seule) = `C:\projets\Saqr` + doc portage `docs/bridges/prompt-portage-saqr-vers-kairos.md`. Tests Deno : `deno test --allow-env <file>`. deno check par fonction : `deno check supabase/functions/<fn>/index.ts`.
+
+[MEMO] Règle CTO n°1 : déterministe ≠ LLM (fil rouge L99). Purger, ne pas overrider. « Fait » = re-vérifié à l'instant par commande. Ne jamais afficher un secret. Pin `claude-fable-5` = dernier jour ; demain bascule opusplan (`switch-to-opusplan.ps1`).
+
+---
+
 == PASSATION Kairos (ex-zlatan-scrap / theresa-scrap) 2026-05-02T01:30Z ==
 
 [REBRAND]
@@ -29,7 +75,7 @@ infra=Coolify app jhg5pwiyul9r992k8qg2lkx6 | tunnel CF nahda-tunnel → ingress 
 - 20260502000001_orgs.sql (325 l) : 6 nouvelles tables (organizations, organization_members, subscriptions, subscription_seats, invitations, usage_records) + 5 ENUMs (org_segment, org_plan, billing_mode, org_role, subscription_status) + RLS policies + trigger updated_at
 - 20260502000002_org_id_columns.sql (54 l) : ajout colonne `org_id uuid REFERENCES organizations(id)` sur **15 tables** (l'agent a découvert provider_models en plus des 14 listées dans le PRD initial) + 15 indexes
 - 20260502000003_backfill_orgs.sql (149 l) : DO block créant 1 org/user existant + organization_members.role=owner + populate org_id partout + trigger `create_default_org_for_user` AFTER INSERT auth.users
-- 20260502000004*rls_org_rewrite.sql (541 l) : drop 39 policies own*_, create 57 policies org\__ qui filtrent via `organization_members`, helper `user_default_org_id()` (STABLE, SECURITY INVOKER) posé en DEFAULT sur org_id pour rétrocompat frontend Wave 6.3 pas encore livrée, SET DEFAULT puis SET NOT NULL sur 15 tables
+- 20260502000004*rls_org_rewrite.sql (541 l) : drop 39 policies own*\_, create 57 policies org\_\_ qui filtrent via `organization_members`, helper `user_default_org_id()` (STABLE, SECURITY INVOKER) posé en DEFAULT sur org_id pour rétrocompat frontend Wave 6.3 pas encore livrée, SET DEFAULT puis SET NOT NULL sur 15 tables
 - src/types/database.ts étendu manuellement (pas accès Supabase live) : 6 nouvelles tables Row/Insert/Update + org_id ajouté dans Row+Update de chaque table tenant + 5 nouveaux ENUMs (Types + Constants)
 
 [WAVE_6_PRD_PLANIFIE] (`.ralph/wave-6-prd.md`)
