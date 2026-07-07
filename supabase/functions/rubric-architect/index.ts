@@ -163,6 +163,12 @@ SCHEMA OUTPUT (JSON STRICT, AUCUN CHAMP SUPPLÉMENTAIRE) :
   "disqualifiers": [
     { "id": "dq_001", "rule": "string règle testable", "rationale": "string courte" }
   ],
+  // Champ OPTIONNEL "mechanical" sur un disqualifier, UNIQUEMENT si la règle
+  // est purement mécanique (elle sera alors évaluée en code, sans LLM) :
+  //   { "kind": "source_in", "sources": ["reddit"] }            → exclure des sources
+  //   { "kind": "text_matches", "pattern": "regex insensible" } → motif titre+texte
+  //   { "kind": "older_than_days", "days": 30 }                 → contenu trop ancien
+  // Une règle sémantique (jugement) ne doit JAMAIS porter de "mechanical".
   "soft_boosts": [
     { "id": "sb_001", "rule": "string règle", "boost": int, "rationale": "string courte" }
   ],

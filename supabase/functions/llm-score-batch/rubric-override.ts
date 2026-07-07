@@ -16,17 +16,30 @@
  */
 
 import { parseLlmJson } from '../_shared/llm-json.ts'
-import { renderSignalBlock } from '../_shared/signal-text.ts'
+import { extractSignalText, renderSignalBlock } from '../_shared/signal-text.ts'
 import { DATA_GUARD_FR, JSON_STRICT_GUARD_FR } from '../_shared/llm-guards.ts'
 
 // =============================================================================
 // Types
 // =============================================================================
 
+/**
+ * Condition mécanique optionnelle d'un disqualifier — évaluée EN CODE avant
+ * tout appel LLM (déterministe, gratuit — L99 A#4). Une règle déclarée
+ * mécanique est entièrement consommée en code : elle disqualifie immédiatement
+ * si elle matche, et n'est PAS soumise au LLM si elle ne matche pas.
+ * Les règles sémantiques restent en texte libre (rule) et vont au LLM.
+ */
+export type MechanicalCondition =
+  | { kind: 'source_in'; sources: string[] }
+  | { kind: 'text_matches'; pattern: string }
+  | { kind: 'older_than_days'; days: number }
+
 export interface DisqualifierRule {
   id: string
   rule: string
   rationale: string
+  mechanical?: MechanicalCondition
 }
 
 export interface SoftBoostRule {
@@ -58,6 +71,8 @@ export interface ScoredSignalInput {
   title?: string
   raw_payload?: Record<string, unknown>
   lang?: string
+  /** Date du contenu source (signals.signal_date) — sert aux règles older_than_days. */
+  signal_date?: string | null
 }
 
 export interface ScoredSignalOutput {
@@ -173,6 +188,9 @@ export function validateRubricOverride(rubric: unknown): ValidationResult {
       if (typeof d.rule !== 'string' || d.rule.trim().length === 0) {
         errors.push({ code: 'disqualifier_rule', message: `disqualifiers[${i}].rule missing` })
       }
+      if (d.mechanical !== undefined) {
+        errors.push(...validateMechanicalCondition(d.mechanical, i))
+      }
     }
   }
 
@@ -212,6 +230,116 @@ export function validateRubricOverride(rubric: unknown): ValidationResult {
   }
 
   return { valid: errors.length === 0, errors }
+}
+
+/** Valide la forme d'une MechanicalCondition (contrat déclaré strict). */
+function validateMechanicalCondition(m: unknown, i: number): ValidationError[] {
+  const bad = (msg: string): ValidationError[] => [
+    { code: 'disqualifier_mechanical', message: `disqualifiers[${i}].mechanical ${msg}` },
+  ]
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return bad('must be object')
+  const c = m as Record<string, unknown>
+  switch (c.kind) {
+    case 'source_in':
+      return Array.isArray(c.sources) &&
+        c.sources.length > 0 &&
+        c.sources.every((s) => typeof s === 'string' && s.length > 0)
+        ? []
+        : bad('sources must be a non-empty string array')
+    case 'text_matches': {
+      if (typeof c.pattern !== 'string' || c.pattern.length === 0) {
+        return bad('pattern must be a non-empty string')
+      }
+      try {
+        new RegExp(c.pattern, 'iu')
+      } catch {
+        return bad('pattern is not a valid regex')
+      }
+      return []
+    }
+    case 'older_than_days':
+      return typeof c.days === 'number' && Number.isFinite(c.days) && c.days > 0
+        ? []
+        : bad('days must be a positive number')
+    default:
+      return bad(`kind unknown: ${String(c.kind)}`)
+  }
+}
+
+// =============================================================================
+// Pré-filtre mécanique des disqualifiers (L99 A#4)
+// =============================================================================
+
+export interface MechanicalGateResult {
+  /** Id du premier disqualifier mécanique qui matche, sinon null. */
+  fired_id: string | null
+  /** Disqualifiers restant à évaluer par le LLM (sans condition mécanique évaluable). */
+  residual: DisqualifierRule[]
+}
+
+/**
+ * Évalue les conditions mécaniques déclarées, AVANT tout appel LLM.
+ *
+ * Prudence DÉFCON : toute condition inévaluable (regex invalide, date absente
+ * ou illisible, forme inattendue) est REVERSÉE au LLM (residual) — un raté
+ * coûte un appel LLM, jamais une disqualification à tort.
+ * `nowMs` injectable pour les tests.
+ */
+export function evaluateMechanicalDisqualifiers(
+  disqualifiers: DisqualifierRule[],
+  signal: ScoredSignalInput,
+  nowMs: number = Date.now(),
+): MechanicalGateResult {
+  const residual: DisqualifierRule[] = []
+
+  for (const d of disqualifiers) {
+    const m = d.mechanical
+    if (!m) {
+      residual.push(d)
+      continue
+    }
+    switch (m.kind) {
+      case 'source_in': {
+        if (
+          Array.isArray(m.sources) &&
+          m.sources.some(
+            (s) => typeof s === 'string' && s.toLowerCase() === signal.source.toLowerCase(),
+          )
+        ) {
+          return { fired_id: d.id, residual: [] }
+        }
+        continue // condition évaluée et non matchée → règle consommée
+      }
+      case 'text_matches': {
+        let re: RegExp
+        try {
+          re = new RegExp(m.pattern, 'iu')
+        } catch {
+          residual.push(d)
+          continue
+        }
+        const text = `${signal.title ?? ''}\n${extractSignalText(signal.raw_payload)}`
+        if (re.test(text)) return { fired_id: d.id, residual: [] }
+        continue
+      }
+      case 'older_than_days': {
+        if (typeof m.days !== 'number' || !Number.isFinite(m.days) || m.days <= 0) {
+          residual.push(d)
+          continue
+        }
+        const t = signal.signal_date ? Date.parse(signal.signal_date) : NaN
+        if (Number.isNaN(t)) {
+          residual.push(d)
+          continue
+        }
+        if (nowMs - t > m.days * 86_400_000) return { fired_id: d.id, residual: [] }
+        continue
+      }
+      default:
+        residual.push(d)
+    }
+  }
+  return { fired_id: null, residual }
 }
 
 export function validateScoredSignalInput(input: unknown): ValidationResult {

@@ -20,6 +20,7 @@ import {
   buildCriteriaPrompt,
   buildDisqualifierPrompt,
   buildSoftBoostPrompt,
+  evaluateMechanicalDisqualifiers,
   parseGateResponse,
   parseLLMScoreResponse,
   type RubricOverride,
@@ -101,7 +102,26 @@ export async function scoreSignalWithRubric(args: {
   dispatch: DispatchCaller
 }): Promise<ScoredSignalOutput> {
   const { signal, rubric, dispatch } = args
-  const combined = shouldCombineGates(rubric.disqualifiers, rubric.soft_boosts)
+
+  // ─── Pré-filtre mécanique (L99 A#4) : zéro appel LLM si une condition
+  // déclarée disqualifie. Les règles mécaniques non matchées sont consommées
+  // en code ; seules les règles sémantiques (residual) vont au LLM.
+  const mech = evaluateMechanicalDisqualifiers(rubric.disqualifiers, signal)
+  if (mech.fired_id !== null) {
+    return {
+      signal_id: signal.id,
+      score: 0,
+      raw_score: 0,
+      reasoning: `Signal disqualifié par règle ${mech.fired_id} (pré-filtre mécanique, sans LLM).`,
+      disqualified: true,
+      applied_disqualifier: mech.fired_id,
+      applied_boosts: [],
+      cost: 0,
+      model_used: 'mechanical-prefilter',
+    }
+  }
+  const disqualifiers = mech.residual
+  const combined = shouldCombineGates(disqualifiers, rubric.soft_boosts)
 
   let totalCost = 0
   let lastModel = 'unknown'
@@ -125,7 +145,7 @@ export async function scoreSignalWithRubric(args: {
   if (combined) {
     // 1 appel pour disqualifier + boost simultanément
     const gatePrompt = buildCombinedGatePrompt({
-      disqualifiers: rubric.disqualifiers,
+      disqualifiers,
       softBoosts: rubric.soft_boosts,
       signal,
     })
@@ -163,9 +183,9 @@ export async function scoreSignalWithRubric(args: {
 
   // ─── Mode split : 2 appels gates séparés ─────────────────────────────────
   let dqPromise: Promise<DispatchResponse> | null = null
-  if (rubric.disqualifiers.length > 0) {
+  if (disqualifiers.length > 0) {
     const dqPrompt = buildDisqualifierPrompt({
-      disqualifiers: rubric.disqualifiers,
+      disqualifiers,
       signal,
     })
     dqPromise = dispatch({
