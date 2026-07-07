@@ -1,9 +1,16 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError } from '../_shared/errors.ts'
-import { parseTopicsResponse, parsePersonasResponse } from './enrich.ts'
+import {
+  fetchEmbeddingsBatch,
+  rankBySimilarity,
+  resolveEmbeddingKeys,
+  type EmbeddingKeys,
+} from '../_shared/embeddings.ts'
+import { extractSignalText } from '../_shared/signal-text.ts'
+import { parseTopicsResponse, parsePersonasResponse, type TopicClassification } from './enrich.ts'
 
 /**
- * enrich-signal — Enrichit les signaux avec des topics et des personas via 2 appels LLM parallèles.
+ * enrich-signal — Enrichit les signaux avec des topics et des personas.
  *
  * POST /enrich-signal
  * Body: { signal_ids: string[], org_id: string }
@@ -11,10 +18,14 @@ import { parseTopicsResponse, parsePersonasResponse } from './enrich.ts'
  * Pour chaque signal :
  *   - Récupère les topics de l'org depuis topics_taxonomy
  *   - Récupère les personas actives de l'org depuis personas
- *   - Lance 2 appels LLM parallèles (Haiku) : classification topics + pertinence personas
+ *   - Topics : classification DÉTERMINISTE par similarité d'embeddings
+ *     (signal ↔ nom+description du topic) ; le LLM ne sert que de fallback
+ *     quand aucune clé embeddings n'est disponible (L99 axe déterminisme)
+ *   - Personas : pertinence évaluée par LLM (subjectif, reasoning demandé)
  *   - Insère dans signal_topics + signal_personas (ON CONFLICT DO UPDATE)
  *   - Met à jour signals.enriched_at
- *   - Coûts tracés par dispatch-llm (péage unique, cost_task='enrich:topic'/'enrich:persona')
+ *   - Coûts LLM tracés par dispatch-llm (péage unique, ADR 0010) ;
+ *     les embeddings ne sont pas tracés (précédent cluster-signals)
  */
 
 const CORS = {
@@ -27,6 +38,10 @@ interface RequestBody {
   signal_ids: string[]
   org_id: string
 }
+
+// ponytail: seuils par défaut non calibrés — à ajuster après mesure sur données réelles (.11)
+const TOPIC_SIMILARITY_THRESHOLD = 0.4
+const TOPIC_MAX_PER_SIGNAL = 3
 
 interface DispatchResponse {
   ok: boolean
@@ -163,6 +178,16 @@ Deno.serve(async (req) => {
 
   const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`
 
+  // --- Topics : classification déterministe par embeddings (batch unique) ---
+  // null = pas de clé ou API embeddings KO → fallback LLM signal par signal.
+  let topicsBySignal: Map<string, TopicClassification[]> | null = null
+  if (topics.length > 0) {
+    const embKeys = await resolveEmbeddingKeys(supabase, user.id)
+    if (embKeys.openAiKey ?? embKeys.openRouterKey) {
+      topicsBySignal = await classifyTopicsByEmbedding(signals, topics, embKeys)
+    }
+  }
+
   let totalEnriched = 0
   let totalFailed = 0
   let totalTopicCost = 0
@@ -176,6 +201,7 @@ Deno.serve(async (req) => {
       personas,
       topicsList,
       personasList,
+      topicsBySignal?.get(signal.id) ?? null,
       dispatchUrl,
       auth,
       supabase,
@@ -223,29 +249,33 @@ async function enrichSignal(
   personas: PersonaRow[],
   topicsList: string,
   personasList: string,
+  precomputedTopics: TopicClassification[] | null,
   dispatchUrl: string,
   auth: string,
   supabase: SupabaseClient,
   userId: string,
   orgId: string,
 ): Promise<EnrichResult> {
-  const signalText = extractSignalText(signal)
+  const signalText = extractSignalText(signal.raw_payload, 500)
 
-  // Lancer les 2 appels LLM en parallèle
+  // Topics déjà classifiés par embeddings → pas d'appel LLM topics ;
+  // sinon fallback LLM. Personas : toujours LLM (pertinence subjective).
   const [topicsCallResult, personasCallResult] = await Promise.allSettled([
-    callDispatch(
-      dispatchUrl,
-      auth,
-      {
-        system: 'Tu es un classifieur de contenu IA. Retourne UNIQUEMENT un JSON array.',
-        user:
-          `Signal: ${signal.title ?? ''} ${signal.url ?? ''}\n` +
-          (signalText ? `Contenu: ${signalText.slice(0, 500)}\n` : '') +
-          `Taxonomie disponible:\n${topicsList}\n` +
-          `Retourne: [{ "slug": "...", "confidence": 0.0-1.0 }] — max 3 topics, confidence > 0.5 seulement. JSON pur, pas de markdown.`,
-      },
-      { max_tokens: 300, cost_task: 'enrich:topic' },
-    ),
+    precomputedTopics !== null
+      ? Promise.resolve<DispatchResponse>({ ok: true })
+      : callDispatch(
+          dispatchUrl,
+          auth,
+          {
+            system: 'Tu es un classifieur de contenu IA. Retourne UNIQUEMENT un JSON array.',
+            user:
+              `Signal: ${signal.title ?? ''} ${signal.url ?? ''}\n` +
+              (signalText ? `Contenu: ${signalText.slice(0, 500)}\n` : '') +
+              `Taxonomie disponible:\n${topicsList}\n` +
+              `Retourne: [{ "slug": "...", "confidence": 0.0-1.0 }] — max 3 topics, confidence > 0.5 seulement. JSON pur, pas de markdown.`,
+          },
+          { max_tokens: 300, cost_task: 'enrich:topic' },
+        ),
     callDispatch(
       dispatchUrl,
       auth,
@@ -271,7 +301,7 @@ async function enrichSignal(
     topicCost = dispatchResp.usage?.cost ?? 0
     // Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010).
 
-    const classified = parseTopicsResponse(raw)
+    const classified = precomputedTopics ?? parseTopicsResponse(raw)
     if (classified.length > 0) {
       // Résoudre les topic_id depuis les slugs
       const topicRows = classified
@@ -283,7 +313,7 @@ async function enrichSignal(
             topic_id: topic.id,
             org_id: orgId,
             confidence: c.confidence,
-            source: 'llm' as const,
+            source: precomputedTopics !== null ? ('embedding' as const) : ('llm' as const),
           }
         })
         .filter((r): r is NonNullable<typeof r> => r !== null)
@@ -431,18 +461,48 @@ async function enrichSignal(
 }
 
 /**
- * Extrait le texte d'un signal depuis raw_payload.
+ * Classification topics déterministe : similarité cosinus entre l'embedding
+ * du signal (titre + contenu) et celui de chaque topic (nom + description).
+ * Un seul appel API embeddings pour tout le batch (topics + signaux).
+ *
+ * Retourne null si l'API embeddings est indisponible (→ fallback LLM global).
+ * Un signal dont l'embedding individuel a échoué est absent de la map
+ * (→ fallback LLM ciblé pour ce signal). Une entrée [] est un résultat
+ * déterministe légitime : aucun topic assez proche, pas d'appel LLM.
  */
-function extractSignalText(signal: SignalRow): string {
-  const payload = signal.raw_payload
-  if (!payload) return ''
-  const text =
-    (payload.text as string | undefined) ??
-    (payload.body as string | undefined) ??
-    (payload.selftext as string | undefined) ??
-    (payload.summary as string | undefined) ??
-    ''
-  return typeof text === 'string' ? text : ''
+async function classifyTopicsByEmbedding(
+  signals: SignalRow[],
+  topics: TopicTaxonomyRow[],
+  keys: EmbeddingKeys,
+): Promise<Map<string, TopicClassification[]> | null> {
+  const topicTexts = topics.map((t) => `${t.name}. ${t.description ?? ''}`.trim())
+  const signalTexts = signals.map((s) =>
+    `${s.title ?? ''}. ${extractSignalText(s.raw_payload, 500)}`.trim(),
+  )
+
+  const embeddings = await fetchEmbeddingsBatch(
+    [...topicTexts, ...signalTexts],
+    keys.openRouterKey,
+    keys.openAiKey,
+  )
+
+  const topicEmbeddings = topics.map((t, i) => ({ key: t.slug, embedding: embeddings[i] }))
+  if (topicEmbeddings.every((t) => !t.embedding)) return null
+
+  const bySignal = new Map<string, TopicClassification[]>()
+  signals.forEach((s, i) => {
+    const signalEmbedding = embeddings[topics.length + i]
+    if (!signalEmbedding) return
+    const matches = rankBySimilarity(signalEmbedding, topicEmbeddings, {
+      threshold: TOPIC_SIMILARITY_THRESHOLD,
+      limit: TOPIC_MAX_PER_SIGNAL,
+    })
+    bySignal.set(
+      s.id,
+      matches.map((m) => ({ slug: m.key, confidence: Math.round(m.similarity * 100) / 100 })),
+    )
+  })
+  return bySignal
 }
 
 /**
