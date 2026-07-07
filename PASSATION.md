@@ -1,3 +1,45 @@
+== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session déterminisme L99 + CI ressuscitée) ==
+
+[ETAT]
+Branche `ralph/k06-orchestrator`, head `0a7cb48` poussé (PR #11 https://github.com/Afristrat/scrapping/pull/11). Gates locales VERTES : deno test **468/468** · tsc 0 · lint 0 · build OK. **CI GitHub RESSUSCITÉE et verte** (runs success sur 7177567/1cf756f/a34974a — vitest Linux + suite Deno complète). Base .11 (`db.saqr.ma`, stack Coolify `supabase-db-r11yqnmzzgv5qn8138xddwzt`) : migrations `20260511000001` + `20260512000001` APPLIQUÉES et prouvées live. `main` (b51841f) = ligne divergente Bassira NON mergée — décision Amine, ne pas auto-merger (checkout dans le worktree `claudia-zlatan-scrap-main`).
+
+[FAIT] (tout prouvé par commande, 5 commits : 7177567, 1cf756f, a34974a, 9f76152, 0a7cb48 — détail complet dans `.ralph/progress.md`)
+
+1. **CI morte → cause racine + fix** : PR #11 `CONFLICTING` vs main → GitHub ne construit pas la ref de merge → triggers `pull_request` ne partent JAMAIS (83 runs historiques, tous `push` main). Fix : trigger `push` sur `ralph/**` + gate Deno élargie (minio seul → suite complète). Prouvé vert 3 fois.
+2. **A#2 Topics par embeddings** : `_shared/embeddings.ts` (fetchEmbeddingsBatch+chunking, cosineSimilarity, rankBySimilarity +6t, resolveEmbeddingKeys). enrich-signal (source='embedding', fallback LLM sans clé) + topic-classifier (LLM réservé aux signaux sans correspondance = nouveaux topics). ⚠ seuil 0.4 = knob NON calibré (ponytail annoté ×2) — à mesurer sur données réelles .11.
+3. **A#3 Entités person en code + canonicalisation** : migration `20260512000001` (trigger DB `normalized_name` = autorité unique lower+unaccent+[a-z0-9], fusion doublons, index UNIQUE) — prouvée live (« Öpen AÏ »→openai, « open ai » absorbé). enrich-entities : person = auteur raw_payload en code (extractAuthor factorisé \_shared/signal-text.ts, digest délègue), LLM restreint org/tech/paper/product. Types DB patchés main (normalized_name).
+4. **A#4 Pré-filtre mécanique disqualifiers** : les règles réelles sont SÉMANTIQUES → pas de regex-NLP (disqualification à tort = DÉFCON 1) ; champ structuré optionnel `mechanical` (source_in|text_matches|older_than_days vs signal_date transporté). Matche → zéro appel LLM (criteria compris, coût 0) ; inévaluable → reversé au LLM. +8 tests. rubric-architect peut l'émettre.
+5. **C#3 signal-synthesizer** : `freshness_median_days` LLM = hallucination pure (aucune date dans son input) → computeTopicProvenance + computeCulturalWarnings + mono_source réel EN CODE (+5 tests), prompt allégé (« NE CALCULE AUCUNE MÉTRIQUE »).
+6. Préexistants corrigés (règle n°3) : cluster-signals typait ses helpers `ReturnType<typeof createClient>` (10 erreurs deno check) → `SupabaseClient` (3e occurrence du pattern) ; const morte HAIKU_MODEL purgée ; 2 extractSignalText locaux divergents purgés (enrich-signal, enrich-entities) → canonique \_shared.
+
+[ALERTE]
+
+- Seuil similarité topics **0.4 non calibré** (2 sites, annotés ponytail) — calibrer dès que le pipeline tourne sur .11 avec vraies données.
+- Coûts embeddings NON tracés dans llm_costs (hors péage dispatch-llm — précédent cluster-signals assumé, ~50-100× moins cher que le génératif remplacé).
+- freshness_median_days désormais null tant que signal_date n'est pas threadé dans research-from-seed→synthesizer (chaîne topSignals sans dates — honnête, plus d'invention).
+- Vitest local pathologique (OneDrive) : ne jamais conclure d'un run pleine-suite local — la CI Linux est redevenue LA gate.
+- Piège hook pre-commit : timeout 10 min sur `git commit` (tsc du hook lent).
+- 7 stacks Supabase sur .11 — ne toucher QUE `r11y`. Anti-leak : clés dans l'env Coolify, jamais affichées.
+- `CLAUDE.md` du repo pointe toujours le ref cloud MORT (`crplceoptyeslqyfcqvj`) + repo `meydeey/theresa-scrap` → à repointer (item Runtime).
+
+[BLOQUE]
+
+- Rien. Mandat runtime PLEIN (deploy edge fns, secrets, tests sur .11 en autonomie). Git = commit+push+PR ; merge main = décision Amine.
+
+[NEXT] (ordre L99 — déterminisme et synthesizer FAITS)
+
+1. **Portage P1 Saqr** : `cron-pipeline-trigger` (pipeline 100 % manuel !), `score-pending` (chaîne de batchs auto-ré-invoquée), `slack-digest` (zéro LLM), chaînon RSS Google News (~30 l, rss_keywords jamais exploités). + pépites : backoff 429 arXiv, welford.test.ts. Repo Saqr lecture seule : `C:\projets\Saqr` ; doc portage `docs/bridges/prompt-portage-saqr-vers-kairos.md`. Règles : callLiteLLM→dispatch-llm, bassira-auth→internal-auth.ts, mono-user→org_id.
+2. **Runtime** : deploy edge fns sur .11 + `INTERNAL_FN_SECRET` + mapper `public_api_keys.proxy_user_id` + test e2e 2ᵉ saut (llm-score-batch→dispatch-llm interne) + repointer CLAUDE.md + gen types --db-url propre + calibrer le seuil embeddings.
+3. Reste audit : P1-007 sièges bornés, P1-008 Error Boundary (flag tâche #11 « completed » à re-vérifier — prd-blindage 008 encore passes=false), P2 (SSRF validate-api-key, run-pipeline lock, record-usage idempotent, workers atomiques, cascade non plafonnée), lockfiles, npm audit.
+
+[CTX]
+Accès .11 : `ssh -i ~/.ssh/serveurai_mnemo serveuria@192.168.100.11`. Base : `docker exec supabase-db-r11yqnmzzgv5qn8138xddwzt psql -U postgres`. Migrations serveur : `/home/serveuria/kairos-migrations/` (scp puis `psql -v ON_ERROR_STOP=1 --single-transaction < fichier`). Tests : `deno test --allow-env --node-modules-dir=auto supabase/functions/` (468) ; après deno → `bun install` avant tsc. CI : `gh api "repos/Afristrat/scrapping/actions/runs?branch=ralph/k06-orchestrator&per_page=3"`. Backup associé : `/home/serveuria/kairos-r11y-BEFORE-RESET.sql`. Docs L99 : `docs/audit/2026-07-07-l99-optimisation.md`.
+
+[MEMO]
+Déterministe ≠ LLM (fil rouge L99). Purger, ne pas overrider. « Fait » = re-vérifié à l'instant. Jamais afficher un secret. **Pin `claude-fable-5` = DERNIER JOUR — demain 2026-07-08 bascule opusplan via `switch-to-opusplan.ps1` (le rappeler à Amine en fin de session).**
+
+---
+
 == PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session péage ADR 0010 + anti-injection LLM01) ==
 
 [ETAT]
