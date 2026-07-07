@@ -2,6 +2,12 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { retryWithBackoff } from '../_shared/retry.ts'
 import { welfordUpdate, computeTrend } from '../_shared/welford.ts'
 import {
+  fetchEmbeddingsBatch,
+  rankBySimilarity,
+  resolveEmbeddingKeys,
+  type EmbeddingKeys,
+} from '../_shared/embeddings.ts'
+import {
   appendTopicEntry,
   createMinioClient,
   formatEntry,
@@ -16,6 +22,8 @@ const CORS = {
 }
 const BATCH_SIZE = 10
 const CONCURRENCY = 3
+// ponytail: seuil de similarité non calibré — à ajuster après mesure sur données réelles (.11)
+const TOPIC_SIMILARITY_THRESHOLD = 0.4
 
 interface RequestBody {
   signal_ids: string[]
@@ -88,13 +96,30 @@ Deno.serve(async (req) => {
 
   if (!signals || signals.length === 0) return json({ ok: true, classified: 0 }, 202)
 
-  // ---- Classifier par batch avec concurrence limitée (via dispatch-llm)
+  // ---- Classifier : embeddings d'abord (déterministe), LLM pour le reste
   type Classification = { signal_id: string; topics: string[] }
   const classifications: Classification[] = []
   const dispatchUrl = `${supabaseUrl}/functions/v1/dispatch-llm`
 
-  for (let i = 0; i < signals.length; i += BATCH_SIZE * CONCURRENCY) {
-    const slice = signals.slice(i, i + BATCH_SIZE * CONCURRENCY)
+  // Assignation déterministe aux topics CONNUS par similarité d'embeddings.
+  // Le LLM ne voit que les signaux sans correspondance assez proche
+  // (proposition de nouveaux topics) — L99 axe déterminisme.
+  let toClassifyByLlm = signals
+  if (knownList.length > 0) {
+    const embKeys = await resolveEmbeddingKeys(supabase, user.id)
+    if (embKeys.openAiKey ?? embKeys.openRouterKey) {
+      const { assigned, unmatched } = await assignKnownTopicsByEmbedding(
+        signals,
+        knownList,
+        embKeys,
+      )
+      classifications.push(...assigned)
+      toClassifyByLlm = unmatched
+    }
+  }
+
+  for (let i = 0; i < toClassifyByLlm.length; i += BATCH_SIZE * CONCURRENCY) {
+    const slice = toClassifyByLlm.slice(i, i + BATCH_SIZE * CONCURRENCY)
     const promises: Promise<Classification[]>[] = []
     for (let j = 0; j < slice.length; j += BATCH_SIZE) {
       const batch = slice.slice(j, j + BATCH_SIZE)
@@ -406,6 +431,61 @@ Deno.serve(async (req) => {
     202,
   )
 })
+
+type ClassifiableSignal = {
+  id: string
+  source: string
+  title: string | null
+  raw_payload: unknown
+}
+
+/**
+ * Assignation déterministe aux topics connus : similarité cosinus entre
+ * l'embedding du signal (titre + extrait payload) et celui du nom du topic.
+ * 1-2 topics par signal (même contrat que le prompt LLM historique).
+ * Les signaux sans correspondance ≥ seuil (ou dont l'embedding a échoué)
+ * repartent vers le LLM ; API embeddings KO → tout repart vers le LLM.
+ */
+async function assignKnownTopicsByEmbedding(
+  signals: ClassifiableSignal[],
+  knownTopics: string[],
+  keys: EmbeddingKeys,
+): Promise<{
+  assigned: Array<{ signal_id: string; topics: string[] }>
+  unmatched: ClassifiableSignal[]
+}> {
+  const signalTexts = signals.map((s) => {
+    const title = (s.title ?? '').trim()
+    const payload = JSON.stringify(s.raw_payload ?? '').slice(0, 200)
+    return `${title} ${payload}`.trim()
+  })
+
+  const embeddings = await fetchEmbeddingsBatch(
+    [...knownTopics, ...signalTexts],
+    keys.openRouterKey,
+    keys.openAiKey,
+  )
+
+  const topicEmbeddings = knownTopics.map((name, i) => ({ key: name, embedding: embeddings[i] }))
+  if (topicEmbeddings.every((t) => !t.embedding)) {
+    return { assigned: [], unmatched: signals }
+  }
+
+  const assigned: Array<{ signal_id: string; topics: string[] }> = []
+  const unmatched: ClassifiableSignal[] = []
+  signals.forEach((s, i) => {
+    const matches = rankBySimilarity(embeddings[knownTopics.length + i], topicEmbeddings, {
+      threshold: TOPIC_SIMILARITY_THRESHOLD,
+      limit: 2,
+    })
+    if (matches.length > 0) {
+      assigned.push({ signal_id: s.id, topics: matches.map((m) => m.key) })
+    } else {
+      unmatched.push(s)
+    }
+  })
+  return { assigned, unmatched }
+}
 
 async function classifyBatch(
   dispatchUrl: string,

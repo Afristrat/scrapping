@@ -1,7 +1,11 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError } from '../_shared/errors.ts'
-import { getUserApiKey } from '../_shared/api-keys.ts'
-import { cosineSimilarity, isSimilar } from './cluster.ts'
+import {
+  cosineSimilarity,
+  isSimilar,
+  fetchEmbeddingsBatch,
+  resolveEmbeddingKeys,
+} from '../_shared/embeddings.ts'
 
 /**
  * cluster-signals — Clustering cross-source de signaux via embeddings.
@@ -32,8 +36,6 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const EMBEDDING_MODEL = 'text-embedding-3-small'
-const EMBEDDING_DIMS = 256
 const CLUSTERING_THRESHOLD = 0.8
 const BATCH_SIZE = 30
 const WINDOW_HOURS = 48
@@ -60,11 +62,6 @@ interface ClusterRow {
   last_seen_at: string
   /** Embedding du centroid — stocké en mémoire pendant le run, pas en DB */
   _embedding?: number[]
-}
-
-interface EmbeddingResponse {
-  data: Array<{ embedding: number[] }>
-  usage?: { prompt_tokens?: number; total_tokens?: number }
 }
 
 Deno.serve(async (req) => {
@@ -140,17 +137,8 @@ Deno.serve(async (req) => {
     ((signalsData ?? []) as SignalRow[]).map((s) => [s.id, s]),
   )
 
-  // Résoudre la clé API embedding (OpenRouter → OpenAI fallback)
-  // On prend la clé de l'org du premier pending (toutes les orgs peuvent ne pas avoir de clé)
-  // → on résout par org_id en utilisant le premier user de l'org disponible
-  // Simplification : on tente OpenRouter (proxy) puis OpenAI directement via env
-  const openRouterKey = userId
-    ? await getUserApiKey(supabase, userId, 'openrouter')
-    : (Deno.env.get('OPENROUTER_API_KEY') ?? null)
-
-  const openAiKey = userId
-    ? await getUserApiKey(supabase, userId, 'openai')
-    : (Deno.env.get('OPENAI_API_KEY') ?? null)
+  // Résoudre la clé API embedding (clé user BYOK → fallback env Maison)
+  const { openRouterKey, openAiKey } = await resolveEmbeddingKeys(supabase, userId)
 
   const hasEmbeddingKey = Boolean(openRouterKey ?? openAiKey)
 
@@ -390,57 +378,9 @@ Deno.serve(async (req) => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Génère les embeddings pour un batch de textes via l'API OpenAI (ou OpenRouter comme proxy).
- * Retourne un tableau d'embeddings dans le même ordre que `texts`.
- * Retourne un tableau de `undefined` si l'appel échoue.
- */
-async function fetchEmbeddingsBatch(
-  texts: string[],
-  openRouterKey: string | null,
-  openAiKey: string | null,
-): Promise<(number[] | undefined)[]> {
-  if (texts.length === 0) return []
-
-  // Préférer OpenAI directement pour les embeddings (OpenRouter les proxifie aussi)
-  const apiKey = openAiKey ?? openRouterKey
-  if (!apiKey) return texts.map(() => undefined)
-
-  // OpenAI direct ou OpenRouter selon la clé disponible
-  const baseUrl = openAiKey ? 'https://api.openai.com/v1' : 'https://openrouter.ai/api/v1'
-
-  try {
-    const resp = await fetch(`${baseUrl}/embeddings`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: EMBEDDING_MODEL,
-        input: texts,
-        dimensions: EMBEDDING_DIMS,
-        encoding_format: 'float',
-      }),
-    })
-
-    if (!resp.ok) {
-      console.error(`[cluster-signals] embedding API error: ${resp.status} ${resp.statusText}`)
-      return texts.map(() => undefined)
-    }
-
-    const body = (await resp.json()) as EmbeddingResponse
-    // L'API retourne data[] dans l'ordre de l'input (garanti par OpenAI)
-    return body.data.map((d) => d.embedding)
-  } catch (err) {
-    console.error(`[cluster-signals] embedding fetch exception:`, err)
-    return texts.map(() => undefined)
-  }
-}
-
 /** Marque un job pending comme 'completed' ou 'failed'. */
 async function markPendingStatus(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   jobId: string,
   status: 'completed' | 'failed',
   error?: string,
@@ -454,10 +394,7 @@ async function markPendingStatus(
 }
 
 /** Marque un batch de jobs comme 'completed' en une seule requête. */
-async function markBatchCompleted(
-  supabase: ReturnType<typeof createClient>,
-  jobIds: string[],
-): Promise<void> {
+async function markBatchCompleted(supabase: SupabaseClient, jobIds: string[]): Promise<void> {
   if (jobIds.length === 0) return
   await supabase
     .from('pending_enrichments')
