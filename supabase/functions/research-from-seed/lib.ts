@@ -92,10 +92,7 @@ export function validateRequestBody(raw: unknown): BodyValidationResult {
   if (trimmed.length > SEED_MAX) return { ok: false, error: 'seed_too_long' }
 
   const lang = obj.lang
-  if (
-    typeof lang !== 'string' ||
-    !(SUPPORTED_LANGS as readonly string[]).includes(lang)
-  ) {
+  if (typeof lang !== 'string' || !(SUPPORTED_LANGS as readonly string[]).includes(lang)) {
     return { ok: false, error: 'lang_unsupported' }
   }
 
@@ -382,12 +379,20 @@ export interface ScrapeJob {
  * agrégeant les hints. Un même scraper appelé une seule fois avec l'union
  * des hints = limite la latence et évite les doublons.
  *
+ * rss_keywords → job 'rss' routé vers Google News RSS search (scraper-rss
+ * mode session, cf. scraper-rss/google-news.ts) — RSS n'a pas de mécanisme
+ * de recherche natif comme x/reddit/arxiv, Google News est le seul
+ * agrégateur gratuit permettant de transformer un mot-clé en flux RSS
+ * exploitable sans feed_url pré-souscrite.
+ *
  * V1 : on ignore le scrape "web" (Perplexity) — délégué à US-K07 séparé
  * ou a ajouter en V2. Documenté dans research-from-seed/README.md.
  *
+ * @param lang Langue de la research_strategy — pilote le locale (hl/gl/ceid)
+ *   des recherches Google News.
  * @returns liste de jobs vide si la stratégie n'a aucun hint exploitable.
  */
-export function buildScrapeJobs(strategy: Record<string, unknown>): ScrapeJob[] {
+export function buildScrapeJobs(strategy: Record<string, unknown>, lang: Lang = 'fr'): ScrapeJob[] {
   const subjects = Array.isArray(strategy.subjects) ? (strategy.subjects as SubjectShape[]) : []
 
   const xHandles = new Set<string>()
@@ -438,12 +443,6 @@ export function buildScrapeJobs(strategy: Record<string, unknown>): ScrapeJob[] 
 
   const jobs: ScrapeJob[] = []
 
-  // RSS : V1 = pas de feed lookup (mode session attend feed_urls). On émet
-  // un job RSS UNIQUEMENT si on a au moins un keyword (sinon scraper-rss
-  // refusera). Pour rester safe en V1 on skip RSS sans feed_urls explicites.
-  // → Acceptable car la spec autorise V1 minimal sur web/RSS sans feeds.
-  // (Note future : Bassira passera ses propres feed_urls via body si besoin.)
-
   if (xHandles.size > 0) {
     jobs.push({
       scraper: 'x',
@@ -471,6 +470,16 @@ export function buildScrapeJobs(strategy: Record<string, unknown>): ScrapeJob[] 
     })
   }
 
+  if (rssKeywords.size > 0) {
+    jobs.push({
+      scraper: 'rss',
+      body: {
+        keywords: Array.from(rssKeywords).slice(0, 8),
+        lang,
+      },
+    })
+  }
+
   return jobs
 }
 
@@ -488,10 +497,7 @@ export interface ScoredSignalLike {
  * Filtre les signaux disqualified=true et trie par score décroissant,
  * tronque à `limit`. Stable : signaux sans score finissent en bas.
  */
-export function selectTopSignals<T extends ScoredSignalLike>(
-  signals: T[],
-  limit = 50,
-): T[] {
+export function selectTopSignals<T extends ScoredSignalLike>(signals: T[], limit = 50): T[] {
   const retained = signals.filter((s) => s && s.disqualified !== true)
   retained.sort((a, b) => {
     const sa = typeof a.score === 'number' ? a.score : -1

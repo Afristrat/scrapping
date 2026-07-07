@@ -279,7 +279,7 @@ export const handler = async (req: Request): Promise<Response> => {
   telemetry.total_cost_usd += rubricRes.data.telemetry?.usage?.cost ?? 0
 
   // ─── Stage 3 : PARALLEL scrape ───────────────────────────────────────
-  const jobs: ScrapeJob[] = buildScrapeJobs(researchStrategy)
+  const jobs: ScrapeJob[] = buildScrapeJobs(researchStrategy, body.lang)
   const scrapeStart = Date.now()
   if (jobs.length === 0) {
     pushStage(telemetry, 'scrape', scrapeStart, {
@@ -304,9 +304,7 @@ export const handler = async (req: Request): Promise<Response> => {
       ),
     )
 
-    const successCount = scrapeSettled.filter(
-      (r) => r.status === 'fulfilled' && r.value.ok,
-    ).length
+    const successCount = scrapeSettled.filter((r) => r.status === 'fulfilled' && r.value.ok).length
 
     pushStage(telemetry, 'scrape', scrapeStart, {
       ok: successCount > 0,
@@ -568,12 +566,7 @@ interface StageRecord {
   error?: string
 }
 
-function pushStage(
-  tel: PipelineTelemetry,
-  stage: string,
-  startMs: number,
-  res: StageRecord,
-): void {
+function pushStage(tel: PipelineTelemetry, stage: string, startMs: number, res: StageRecord): void {
   tel.stages.push({
     stage,
     duration_ms: res.durationMs ?? Date.now() - startMs,
