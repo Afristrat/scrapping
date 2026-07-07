@@ -15,6 +15,10 @@
  * disqualifiers.length + soft_boosts.length ≤ 12 règles. Sinon split.
  */
 
+import { parseLlmJson } from '../_shared/llm-json.ts'
+import { renderSignalBlock } from '../_shared/signal-text.ts'
+import { DATA_GUARD_FR, JSON_STRICT_GUARD_FR } from '../_shared/llm-guards.ts'
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -68,6 +72,8 @@ export interface ScoredSignalOutput {
   applied_boosts: string[]
   cost: number
   model_used: string
+  /** true si une réponse de gate était illisible (gates neutralisées). */
+  gate_parse_failed?: boolean
 }
 
 export interface ValidationError {
@@ -284,54 +290,9 @@ export function shouldCombineGates(
 // Parse helpers (réponses LLM gates et scoring)
 // =============================================================================
 
-const MARKDOWN_FENCE_RE = /^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i
-
-function stripFence(input: string): string {
-  const trimmed = input.trim()
-  const m = trimmed.match(MARKDOWN_FENCE_RE)
-  return (m ? m[1] : trimmed).trim()
-}
-
-function tryParseJson(raw: string): unknown {
-  if (!raw) throw new Error('empty_response')
-  const stripped = stripFence(raw)
-  try {
-    return JSON.parse(stripped)
-  } catch {
-    // Try to find first balanced object
-    const start = stripped.indexOf('{')
-    if (start === -1) throw new Error('no_json_object')
-    let depth = 0
-    let inString = false
-    let escape = false
-    for (let i = start; i < stripped.length; i++) {
-      const ch = stripped[i]
-      if (escape) {
-        escape = false
-        continue
-      }
-      if (ch === '\\' && inString) {
-        escape = true
-        continue
-      }
-      if (ch === '"') {
-        inString = !inString
-        continue
-      }
-      if (inString) continue
-      if (ch === '{') depth++
-      else if (ch === '}') {
-        depth--
-        if (depth === 0) {
-          return JSON.parse(stripped.slice(start, i + 1))
-        }
-      }
-    }
-    throw new Error('unbalanced_json')
-  }
-}
-
 export interface ParsedGateResponse {
+  /** false = réponse LLM illisible → gates neutres PAR DÉFAUT, à tracer. */
+  parse_ok?: boolean
   disqualified_id: string | null
   applied_boosts: string[]
 }
@@ -346,12 +307,14 @@ export interface ParsedGateResponse {
 export function parseGateResponse(raw: string): ParsedGateResponse {
   let obj: unknown
   try {
-    obj = tryParseJson(raw)
+    obj = parseLlmJson(raw)
   } catch {
-    return { disqualified_id: null, applied_boosts: [] }
+    // Gate illisible ≠ « non disqualifié » : le caller doit pouvoir le tracer
+    // (sinon faux négatifs invisibles — finding L99 C#4).
+    return { disqualified_id: null, applied_boosts: [], parse_ok: false }
   }
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
-    return { disqualified_id: null, applied_boosts: [] }
+    return { disqualified_id: null, applied_boosts: [], parse_ok: false }
   }
   const o = obj as Record<string, unknown>
 
@@ -367,7 +330,7 @@ export function parseGateResponse(raw: string): ParsedGateResponse {
     boosts = boostsRaw.filter((x): x is string => typeof x === 'string' && x.length > 0)
   }
 
-  return { disqualified_id: dqId, applied_boosts: boosts }
+  return { disqualified_id: dqId, applied_boosts: boosts, parse_ok: true }
 }
 
 export interface ParsedCriteriaResponse {
@@ -386,7 +349,7 @@ export interface ParsedCriteriaResponse {
 export function parseLLMScoreResponse(raw: string): ParsedCriteriaResponse | null {
   let obj: unknown
   try {
-    obj = tryParseJson(raw)
+    obj = parseLlmJson(raw)
   } catch {
     return null
   }
@@ -434,22 +397,21 @@ export function buildCriteriaPrompt(args: {
   scoringPrompt: string
   criteria: Array<[string, number]>
   signal: ScoredSignalInput
-}): string {
+}): PromptPair {
   const criteriaLines = args.criteria.map(([label, weight]) => `- ${label} (poids ${weight})`)
-  const summary = extractSignalSummary(args.signal)
-  return `${args.scoringPrompt}
+  return {
+    system: `${args.scoringPrompt}
 
 Critères pondérés (somme = 100) :
 ${criteriaLines.join('\n')}
 
-SIGNAL À SCORER :
-id=${args.signal.id}
-source=${args.signal.source}${args.signal.url ? `\nurl=${args.signal.url}` : ''}
-title=${args.signal.title ?? '(sans titre)'}
-extrait=${summary}
+${DATA_GUARD_FR}
 
-Réponds UNIQUEMENT en JSON strict :
-{"score": <0-100>, "reasoning": "<1-2 phrases>", "per_criterion": {"<label>": <0-100>, ...}}`
+${JSON_STRICT_GUARD_FR}
+Format attendu :
+{"score": <0-100>, "reasoning": "<1-2 phrases>", "per_criterion": {"<label>": <0-100>, ...}}`,
+    user: `SIGNAL À SCORER :\n${renderSignalBlockForScoring(args.signal)}`,
+  }
 }
 
 /**
@@ -460,12 +422,12 @@ export function buildCombinedGatePrompt(args: {
   disqualifiers: DisqualifierRule[]
   softBoosts: SoftBoostRule[]
   signal: ScoredSignalInput
-}): string {
+}): PromptPair {
   const dqLines = args.disqualifiers.map((d) => `- ${d.id} : ${d.rule}`)
   const sbLines = args.softBoosts.map((b) => `- ${b.id} (+${b.boost}) : ${b.rule}`)
-  const summary = extractSignalSummary(args.signal)
-  return `Tu es un classificateur strict. Pour le signal ci-dessous, identifie :
-1. Si le signal matche UN disqualifier (et un seul, le plus fort) → renvoie son id ; sinon null.
+  return {
+    system: `Tu es un classificateur strict. Pour le signal fourni, identifie :
+1. S'il matche UN disqualifier (et un seul, le plus fort) → renvoie son id ; sinon null.
 2. Quels soft_boosts s'appliquent (peut être vide ou multiple).
 
 DISQUALIFIERS (règles binaires, match → signal écarté) :
@@ -474,66 +436,71 @@ ${dqLines.length > 0 ? dqLines.join('\n') : '(aucun)'}
 SOFT_BOOSTS (règles binaires, match → bonus appliqué) :
 ${sbLines.length > 0 ? sbLines.join('\n') : '(aucun)'}
 
-SIGNAL :
-id=${args.signal.id}
-source=${args.signal.source}${args.signal.url ? `\nurl=${args.signal.url}` : ''}
-title=${args.signal.title ?? '(sans titre)'}
-extrait=${summary}
+${DATA_GUARD_FR}
 
-Réponds UNIQUEMENT en JSON strict :
-{"disqualified_id": "<id ou null>", "applied": ["<sb_id>", ...]}`
+${JSON_STRICT_GUARD_FR}
+Format attendu :
+{"disqualified_id": "<id ou null>", "applied": ["<sb_id>", ...]}`,
+    user: `SIGNAL :\n${renderSignalBlockForScoring(args.signal)}`,
+  }
 }
 
 export function buildDisqualifierPrompt(args: {
   disqualifiers: DisqualifierRule[]
   signal: ScoredSignalInput
-}): string {
+}): PromptPair {
   const dqLines = args.disqualifiers.map((d) => `- ${d.id} : ${d.rule}`)
-  const summary = extractSignalSummary(args.signal)
-  return `Tu es un classificateur strict. Le signal ci-dessous matche-t-il l'un des disqualifiers ?
+  return {
+    system: `Tu es un classificateur strict. Le signal fourni matche-t-il l'un des disqualifiers ?
 Si oui, renvoie l'id du disqualifier le plus fort. Sinon null.
 
 DISQUALIFIERS :
 ${dqLines.length > 0 ? dqLines.join('\n') : '(aucun)'}
 
-SIGNAL :
-id=${args.signal.id}
-source=${args.signal.source}${args.signal.url ? `\nurl=${args.signal.url}` : ''}
-title=${args.signal.title ?? '(sans titre)'}
-extrait=${summary}
+${DATA_GUARD_FR}
 
-Réponds UNIQUEMENT en JSON strict :
-{"disqualified_id": "<id ou null>"}`
+${JSON_STRICT_GUARD_FR}
+Format attendu :
+{"disqualified_id": "<id ou null>"}`,
+    user: `SIGNAL :\n${renderSignalBlockForScoring(args.signal)}`,
+  }
 }
 
 export function buildSoftBoostPrompt(args: {
   softBoosts: SoftBoostRule[]
   signal: ScoredSignalInput
-}): string {
+}): PromptPair {
   const sbLines = args.softBoosts.map((b) => `- ${b.id} (+${b.boost}) : ${b.rule}`)
-  const summary = extractSignalSummary(args.signal)
-  return `Tu es un classificateur strict. Quels soft_boosts s'appliquent au signal ci-dessous ?
+  return {
+    system: `Tu es un classificateur strict. Quels soft_boosts s'appliquent au signal fourni ?
 
 SOFT_BOOSTS :
 ${sbLines.length > 0 ? sbLines.join('\n') : '(aucun)'}
 
-SIGNAL :
-id=${args.signal.id}
-source=${args.signal.source}${args.signal.url ? `\nurl=${args.signal.url}` : ''}
-title=${args.signal.title ?? '(sans titre)'}
-extrait=${summary}
+${DATA_GUARD_FR}
 
-Réponds UNIQUEMENT en JSON strict :
-{"applied": ["<sb_id>", ...]}`
+${JSON_STRICT_GUARD_FR}
+Format attendu :
+{"applied": ["<sb_id>", ...]}`,
+    user: `SIGNAL :\n${renderSignalBlockForScoring(args.signal)}`,
+  }
 }
 
-function extractSignalSummary(signal: ScoredSignalInput): string {
-  const p = signal.raw_payload ?? {}
-  const summary =
-    (typeof p.summary === 'string' && p.summary) ||
-    (typeof p.selftext === 'string' && p.selftext) ||
-    (typeof p.text === 'string' && p.text) ||
-    (typeof p.description === 'string' && p.description) ||
-    ''
-  return String(summary).slice(0, 800)
+/** Couple system/user produit par les builders (system = consignes + gardes). */
+export interface PromptPair {
+  system: string
+  user: string
+}
+
+function renderSignalBlockForScoring(signal: ScoredSignalInput): string {
+  return renderSignalBlock(
+    {
+      id: signal.id,
+      source: signal.source,
+      url: signal.url,
+      title: signal.title,
+      raw_payload: signal.raw_payload,
+    },
+    800,
+  )
 }

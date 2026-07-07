@@ -3,6 +3,8 @@
  * Exported for unit testing (ner.test.ts).
  */
 
+import { parseLlmJson } from '../_shared/llm-json.ts'
+
 export type EntityKind = 'person' | 'organization' | 'technology' | 'paper' | 'product'
 
 export interface NerEntity {
@@ -31,15 +33,9 @@ const VALID_KINDS: ReadonlySet<string> = new Set([
 export function parseNerResponse(raw: string): NerEntity[] {
   if (!raw || typeof raw !== 'string') return []
 
-  // Strip markdown code fences if present (e.g. ```json ... ``` or ``` ... ```)
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim()
-
   let parsed: unknown
   try {
-    parsed = JSON.parse(cleaned)
+    parsed = parseLlmJson(raw)
   } catch {
     return []
   }

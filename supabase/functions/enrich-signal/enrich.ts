@@ -3,6 +3,8 @@
  * Exported for unit testing (enrich.test.ts).
  */
 
+import { parseLlmJson } from '../_shared/llm-json.ts'
+
 export interface TopicClassification {
   slug: string
   confidence: number
@@ -22,15 +24,9 @@ export interface PersonaRelevance {
 export function parseTopicsResponse(raw: string): TopicClassification[] {
   if (!raw || typeof raw !== 'string') return []
 
-  // Strip markdown code fences if present
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim()
-
   let parsed: unknown
   try {
-    parsed = JSON.parse(cleaned)
+    parsed = parseLlmJson(raw)
   } catch {
     return []
   }
@@ -63,15 +59,9 @@ export function parseTopicsResponse(raw: string): TopicClassification[] {
 export function parsePersonasResponse(raw: string): PersonaRelevance[] {
   if (!raw || typeof raw !== 'string') return []
 
-  // Strip markdown code fences if present
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim()
-
   let parsed: unknown
   try {
-    parsed = JSON.parse(cleaned)
+    parsed = parseLlmJson(raw)
   } catch {
     return []
   }

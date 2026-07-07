@@ -7,6 +7,8 @@
  * settings (settings.model_config['enrichment']).
  */
 
+import { extractBalancedJson, sanitizeLlmJson } from '../_shared/llm-json.ts'
+
 const SEED_MIN = 50
 const SEED_MAX = 3000
 export const SUPPORTED_LANGS = ['fr', 'en', 'ar'] as const
@@ -45,10 +47,7 @@ export function validateRequestBody(raw: unknown): ValidationResult {
   if (trimmed.length > SEED_MAX) return { ok: false, error: 'seed_too_long' }
 
   const lang = obj.lang
-  if (
-    typeof lang !== 'string' ||
-    !(SUPPORTED_LANGS as readonly string[]).includes(lang)
-  ) {
+  if (typeof lang !== 'string' || !(SUPPORTED_LANGS as readonly string[]).includes(lang)) {
     return { ok: false, error: 'lang_unsupported' }
   }
 
@@ -76,71 +75,23 @@ export function validateRequestBody(raw: unknown): ValidationResult {
 
 /**
  * Purge contre BYOK : certains modèles (DeepSeek, Qwen, parfois GPT) lâchent
- * des balises de chain-of-thought ou tool-call autour du JSON. On strip avant
- * le JSON.parse, jamais en supposant que le modèle obéit (critique BYOK).
+ * des balises de chain-of-thought ou tool-call autour du JSON.
+ * Implémentation consolidée dans _shared/llm-json.ts — ré-exports conservés
+ * pour compatibilité (index.ts + tests).
  */
-const XML_NOISE_TAGS = ['tool_call', 'thinking', 'scratchpad', 'reasoning', 'reflection']
-
-export function stripXmlNoise(s: string): string {
-  let out = s
-  for (const tag of XML_NOISE_TAGS) {
-    const re = new RegExp(`<${tag}[\\s\\S]*?</${tag}>`, 'gi')
-    out = out.replace(re, '')
-    // balises orphelines auto-fermantes ou non-fermées
-    const orphan = new RegExp(`</?${tag}[^>]*>`, 'gi')
-    out = out.replace(orphan, '')
-  }
-  return out
-}
-
-/** Strip caractères de contrôle (sauf \n, \r, \t qui sont valides en JSON). */
-export function stripControlChars(s: string): string {
-  // deno-lint-ignore no-control-regex
-  return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-}
+export { stripControlChars, stripXmlNoise } from '../_shared/llm-json.ts'
 
 /** Pipeline de sanitization complet pour content LLM avant JSON.parse. */
 export function sanitizeLlmJsonContent(s: string): string {
-  let out = stripXmlNoise(s)
-  out = stripControlChars(out)
-  // strip ```json ... ``` fences si présents
-  out = out.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
-  return out.trim()
+  return sanitizeLlmJson(s)
 }
 
 /**
- * Extrait le 1er bloc JSON équilibré du contenu, pour le cas où le modèle
- * ajoute un préambule ou un suffixe malgré response_format=json_object.
- * Retourne null si pas trouvé.
+ * Extrait le 1er bloc JSON équilibré du contenu (préambule/suffixe malgré
+ * response_format=json_object). Retourne null si pas trouvé.
  */
 export function extractJsonObject(s: string): string | null {
-  const start = s.indexOf('{')
-  if (start === -1) return null
-  let depth = 0
-  let inStr = false
-  let escape = false
-  for (let i = start; i < s.length; i++) {
-    const c = s[i]
-    if (escape) {
-      escape = false
-      continue
-    }
-    if (c === '\\' && inStr) {
-      escape = true
-      continue
-    }
-    if (c === '"') {
-      inStr = !inStr
-      continue
-    }
-    if (inStr) continue
-    if (c === '{') depth++
-    else if (c === '}') {
-      depth--
-      if (depth === 0) return s.slice(start, i + 1)
-    }
-  }
-  return null
+  return extractBalancedJson(s)
 }
 
 // ---------------------------------------------------------------------------
