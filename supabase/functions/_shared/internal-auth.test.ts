@@ -9,6 +9,8 @@ import {
   isUuid,
   PROXY_USER_HEADER,
   resolveCaller,
+  resolveOrgId,
+  resolveUserIdForOrg,
 } from './internal-auth.ts'
 
 const UUID = '11111111-2222-4333-8444-555555555555'
@@ -127,4 +129,38 @@ Deno.test('buildInternalHeaders — lève si secrets env manquants', () => {
   Deno.env.delete('INTERNAL_FN_SECRET')
   Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'service-role-xyz')
   assertThrows(() => buildInternalHeaders(UUID))
+})
+
+/** Fake supabase mockant .from(table).select().eq(col, val).order().limit().maybeSingle(). */
+function fakeMembersTable(row: Record<string, unknown> | null): SupabaseClient {
+  const builder = {
+    select: () => builder,
+    eq: () => builder,
+    order: () => builder,
+    limit: () => builder,
+    maybeSingle: () => Promise.resolve({ data: row, error: null }),
+  }
+  return { from: () => builder } as unknown as SupabaseClient
+}
+
+const ORG_UUID = '99998888-7777-4666-8555-444433332222'
+
+Deno.test('resolveOrgId — retourne org_id du premier membership trouvé', async () => {
+  const db = fakeMembersTable({ org_id: ORG_UUID })
+  assertEquals(await resolveOrgId(db, UUID), ORG_UUID)
+})
+
+Deno.test('resolveOrgId — aucun membership → null', async () => {
+  const db = fakeMembersTable(null)
+  assertEquals(await resolveOrgId(db, UUID), null)
+})
+
+Deno.test('resolveUserIdForOrg — retourne user_id du premier membre de l’org', async () => {
+  const db = fakeMembersTable({ user_id: UUID })
+  assertEquals(await resolveUserIdForOrg(db, ORG_UUID), UUID)
+})
+
+Deno.test('resolveUserIdForOrg — org sans membre → null', async () => {
+  const db = fakeMembersTable(null)
+  assertEquals(await resolveUserIdForOrg(db, ORG_UUID), null)
 })

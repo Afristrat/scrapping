@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError } from '../_shared/errors.ts'
+import { constantTimeEquals } from '../_shared/internal-auth.ts'
 import {
   cosineSimilarity,
   isSimilar,
@@ -73,7 +74,8 @@ Deno.serve(async (req) => {
   const expectedSecret = Deno.env.get('CRON_SECRET')
   const auth = req.headers.get('Authorization')
 
-  const isCronCall = expectedSecret && cronSecret === expectedSecret
+  const isCronCall =
+    !!expectedSecret && !!cronSecret && constantTimeEquals(cronSecret, expectedSecret)
   if (!isCronCall && !auth) {
     return json({ error: 'missing_authorization' }, 401)
   }
@@ -91,9 +93,12 @@ Deno.serve(async (req) => {
     global: { headers: auth ? { Authorization: auth } : {} },
   })
 
-  // Récupérer userId pour les logs (null si appel cron service_role)
+  // Récupérer userId pour les logs (null si appel cron service_role). Le
+  // bypass x-cron-secret doit court-circuiter getUser() même si un header
+  // Authorization est aussi présent (le cron envoie systématiquement les
+  // deux) — sinon getUser() sur un token service_role échoue (401).
   let userId: string | null = null
-  if (auth) {
+  if (auth && !isCronCall) {
     const {
       data: { user },
     } = await supabase.auth.getUser()

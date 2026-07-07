@@ -116,6 +116,16 @@ Deno.serve(async (req) => {
   const dispatchResults: DispatchResult[] = []
 
   const serviceRoleHeader = `Bearer ${serviceRoleKey}`
+  // x-cron-secret : les 3 fns avales (enrich-entities/compute-reputation/
+  // cluster-signals) exigent ce header pour bypasser getUser() en mode
+  // system-wide (un Bearer service_role seul échoue leur auth : service_role
+  // n'est pas un JWT user valide pour supabase.auth.getUser()).
+  const cronSecret = Deno.env.get('CRON_SECRET')
+  const dispatchHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: serviceRoleHeader,
+    ...(cronSecret ? { 'x-cron-secret': cronSecret } : {}),
+  }
 
   for (const kind of toDispatch) {
     const fnPath = PASS_KIND_TO_FN[kind]
@@ -128,10 +138,7 @@ Deno.serve(async (req) => {
 
       const resp = await fetch(fnUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: serviceRoleHeader,
-        },
+        headers: dispatchHeaders,
         body: '{}',
         signal: controller.signal,
       })
