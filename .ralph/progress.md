@@ -254,3 +254,15 @@ Gates : deno test 468/468 · deno check 8/8 fns touchées · tsc 0 · lint 0 · 
 **Vérifié live post-restart** : `CRON_SECRET` présent (longueur seulement, jamais affiché) · `score-pending` fan-out réel + chaîne tracée dans `logs` (le cron 2 min tournait déjà tout seul, 2 cycles observés indépendamment des appels manuels) · `slack-digest` rejette sans user_id (400) et retourne `disabled_by_user` avec un vrai user (comportement exact attendu) · `cron-pipeline-trigger` répond `triggered:0` (correct, aucun opt-in encore). **Tout le lot P1 + tout le reste du repo (dispatch-llm péage, anti-injection, déterminisme L99) est désormais réellement actif sur .11** — jamais testé en runtime avant cette session, seulement en DB/gates locales.
 
 **Reste à faire** : activer `cron_enabled`/`slack_digest_enabled` pour un vrai user si souhaité en prod, smoke-test `run-pipeline` end-to-end complet (jamais fait en live), re-vérifier `enrich-entities-cron` après le restart complet.
+
+### 2026-07-08 — Fix auth cron enrich-entities/compute-reputation/cluster-signals — `0f258cc`, vérifié live
+
+Suite de la re-vérification `enrich-entities-cron` post-déploiement : 401 systémique sur les 3 fns d'enrichissement, cassé depuis TOUJOURS (bug de code, indépendant du reset). `process-pending-enrichments` envoie `Authorization: Bearer <service_role>` ; les 3 fns faisaient `getUser()` dessus → échec garanti (service_role ≠ JWT user). `cluster-signals` avait déjà un bypass `x-cron-secret` mais `if (auth)` s'exécutait quand même si `isCronCall=true` (le cron envoie toujours les deux headers) → bypass neutralisé.
+
+**Fix** : `cluster-signals` → `if (auth && !isCronCall)` + `constantTimeEquals`. `enrich-entities`/`compute-reputation` → ajout du bypass x-cron-secret (absent). `enrich-entities` (2e saut vers dispatch-llm pour le NER) résout un user représentatif via `resolveUserIdForOrg(org_id)` (nouveau, miroir `resolveOrgId`, +4 tests) puis `buildInternalHeaders` — évite de forward un Bearer service_role que dispatch-llm rejetterait aussi, et facture le BON user par job (batch multi-orgs). `process-pending-enrichments` envoie désormais x-cron-secret vers ses 3 dispatches. Migration `20260514000001` : supprime `enrich-entities-cron` (doublon exact, jamais fonctionnel).
+
+**Déployé + vérifié live** : scp+docker cp des 4 fns + `_shared`, `docker restart` edge-functions (suffisant, CRON_SECRET déjà en place), migration appliquée. Test avec les EXACTS headers de `process-pending-enrichments` (Bearer service_role + x-cron-secret) : les 3 fns répondent **200** (au lieu de 401). `process-pending-enrichments` lui-même : 200, `dispatched:[]` (pas de backlog actuel, normal). `enrich-entities-cron` confirmé disparu de `cron.job`.
+
+**Piège à retenir** : un bypass x-cron-secret peut être invisible/inopérant si le code fait encore `if (auth) { getUser() }` sans exclure `isCronCall` — le cron envoie systématiquement les DEUX headers (jamais un seul), donc ce bug ne se voit qu'en testant avec les deux en même temps (tester avec x-cron-secret SEUL aurait donné un faux positif).
+
+Gates : deno test 482/482 (+4) · deno check OK · tsc 0 · lint 0 · build OK.

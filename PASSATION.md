@@ -1,3 +1,34 @@
+== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-08 (suite : fix auth cron enrich-entities/compute-reputation/cluster-signals, VÉRIFIÉ LIVE) ==
+
+[ETAT]
+Suite directe de la session précédente (même journée, tard). En smoke-testant `enrich-entities-cron` juste après le déploiement, découverte d'un 401 systémique touchant 3 fonctions (`enrich-entities`, `compute-reputation`, `cluster-signals`) — tout le pipeline d'enrichissement post-scoring (NER, réputation auteur, clustering cross-source) était cassé côté cron depuis TOUJOURS (bug de code, pas un effet du reset). Corrigé, testé, déployé, **vérifié 200 en live**. Commit `0f258cc` poussé.
+
+[FAIT]
+
+**Cause racine** : `process-pending-enrichments` (orchestrateur 30 min, correct) dispatche vers les 3 fns avec `Authorization: Bearer <service_role>`. Ces 3 fns faisaient toutes `supabase.auth.getUser()` sur ce Bearer → échec (service_role n'est pas un JWT user) → 401 à chaque tentative, pour toujours (pas de trace de succès antérieur trouvée). `cluster-signals` avait DÉJÀ un bypass `x-cron-secret` mais un bug le neutralisait : le `if (auth)` s'exécutait même quand `isCronCall=true`, or le cron envoie TOUJOURS les deux headers (Authorization + x-cron-secret) → même échec malgré le bypass censé exister.
+
+**Fix (4 fichiers + 1 migration)** :
+
+- `cluster-signals` : `if (auth)` → `if (auth && !isCronCall)` + `constantTimeEquals` au lieu de `===`.
+- `enrich-entities` + `compute-reputation` : ajout du bypass `x-cron-secret` (absent). `enrich-entities` fait un 2e saut vers `dispatch-llm` (NER) : en mode cron, résout un `userId` représentatif via `resolveUserIdForOrg(supabase, job.org_id)` (nouveau helper, miroir de `resolveOrgId`, `_shared/internal-auth.ts` +4 tests) puis `buildInternalHeaders(userId)` — le batch traite potentiellement plusieurs orgs, chaque job doit facturer le BON user (BYOK), pas juste forward le Bearer service_role reçu (que dispatch-llm aurait aussi rejeté).
+- `process-pending-enrichments` : envoie désormais `x-cron-secret` en plus du Bearer vers ses 3 dispatches (sinon les 3 fixes ci-dessus sont inutiles pour ce call-site précis).
+- Migration `20260514000001` : supprime `enrich-entities-cron`, doublon exact de `process-pending-enrichments-30min` (même cadence, même pass_kind), jamais fonctionnel depuis sa création (mauvais noms de GUC dès le départ, cf. session précédente).
+
+**Déployé et vérifié live** : scp + `docker cp` des 4 fonctions + `_shared` → `docker restart` edge-functions (suffisant, `CRON_SECRET` déjà dans l'environnement depuis la session précédente, pas besoin de redéploiement Coolify complet cette fois) → migration appliquée → test avec EXACTEMENT les headers envoyés par `process-pending-enrichments` (Bearer service_role + x-cron-secret simultanés) : `cluster-signals`/`enrich-entities`/`compute-reputation` répondent tous **200** (`processed:0`, base propre, aucun backlog actuellement — comportement correct, pas un échec). `process-pending-enrichments` lui-même testé end-to-end : 200, `dispatched:[]` (rien en attente). Cron `enrich-entities-cron` confirmé disparu (0 rows).
+
+Gates : deno test 482/482 (+4 `resolveOrgId`/`resolveUserIdForOrg`) · deno check OK sur les 5 fichiers touchés · tsc 0 · lint 0 · build OK.
+
+[NEXT]
+
+1. Le pipeline d'enrichissement (entities/reputation/clustering) est maintenant réellement actif — à surveiller sur le prochain vrai backlog (quand `run-pipeline`/`cron_enabled` seront activés pour un user réel, cf. passation précédente) : vérifier `logs` action `enrich:entities`/`compute:reputation`/`cluster:signals` avec de vraies données, pas juste `processed:0`.
+2. Items encore ouverts de la passation précédente : activer `cron_enabled`/`slack_digest_enabled` pour un vrai user, smoke-test `run-pipeline` complet, mapper `public_api_keys.proxy_user_id`, repointer CLAUDE.md, calibrer seuil embeddings 0.4.
+3. Étendre l'audit : d'autres fonctions cron-invoquées pourraient avoir le même bug de pattern (getUser() sur service_role sans bypass) — pas vérifié exhaustivement au-delà des 3 corrigées ici + celles déjà dual-mode ADR 0009 (run-pipeline, llm-score, topic-classifier, scrapers).
+
+[MEMO]
+Piège répété deux fois cette session (cluster-signals) : un bypass `x-cron-secret` correctement écrit peut être neutralisé par un `if (auth)` qui ne teste pas aussi `!isCronCall` — le cron envoie System TOUJOURS les deux headers, jamais un seul. Vérifier ce pattern exact sur toute future fonction acceptant x-cron-secret.
+
+---
+
 == PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session portage Saqr P1 CLOS + DÉPLOYÉ EN LIVE sur .11 — décision Amine : sync complet) ==
 
 [ETAT — MISE À JOUR APRÈS DÉCISION AMINE]
