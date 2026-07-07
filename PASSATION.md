@@ -1,116 +1,41 @@
-== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-08 (suite : fix auth cron enrich-entities/compute-reputation/cluster-signals, VÉRIFIÉ LIVE) ==
+== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-08 (portage Saqr P1 CLOS + DÉPLOYÉ EN LIVE sur .11 + pipeline d'enrichissement réparé — synthèse consolidée) ==
 
 [ETAT]
-Suite directe de la session précédente (même journée, tard). En smoke-testant `enrich-entities-cron` juste après le déploiement, découverte d'un 401 systémique touchant 3 fonctions (`enrich-entities`, `compute-reputation`, `cluster-signals`) — tout le pipeline d'enrichissement post-scoring (NER, réputation auteur, clustering cross-source) était cassé côté cron depuis TOUJOURS (bug de code, pas un effet du reset). Corrigé, testé, déployé, **vérifié 200 en live**. Commit `0f258cc` poussé.
+Branche `ralph/k06-orchestrator`, HEAD `113a069` poussé, CI verte sur `0f258cc`. **Portage Saqr P1 = TERMINÉ (4/4 : cron-pipeline-trigger, score-pending, slack-digest, chaînon RSS Google News) ET RÉELLEMENT DÉPLOYÉ EN LIVE sur .11** (décision Amine : sync complet du dossier de fonctions). Au passage : réparé un bug de prod dormant (GUC cron cassés depuis un reset antérieur) + un 401 systémique cassant tout le pipeline d'enrichissement post-scoring depuis TOUJOURS. Gates locales à chaque commit : deno test 482/482 · deno check OK · tsc 0 · lint 0 · build OK.
 
 [FAIT]
 
-**Cause racine** : `process-pending-enrichments` (orchestrateur 30 min, correct) dispatche vers les 3 fns avec `Authorization: Bearer <service_role>`. Ces 3 fns faisaient toutes `supabase.auth.getUser()` sur ce Bearer → échec (service_role n'est pas un JWT user) → 401 à chaque tentative, pour toujours (pas de trace de succès antérieur trouvée). `cluster-signals` avait DÉJÀ un bypass `x-cron-secret` mais un bug le neutralisait : le `if (auth)` s'exécutait même quand `isCronCall=true`, or le cron envoie TOUJOURS les deux headers (Authorization + x-cron-secret) → même échec malgré le bypass censé exister.
+**1. Portage code (commits `24c7177`/`a64a79f`/`a001c49`, s'ajoutant à `c85b802` de la session d'avant)** :
 
-**Fix (4 fichiers + 1 migration)** :
+- `score-pending` : rattrapage backlog scoring (run-pipeline plafonne à 50/run). Multi-tenant natif, score via `llm-score` (pas `llm-score-batch`, non dual-mode). Cron 2 min.
+- `slack-digest` : digest Slack top 10 ≥60/24h, zéro LLM, opt-in par user, cron DST-proof natif Postgres (`AT TIME ZONE 'Europe/Paris'`).
+- Chaînon RSS Google News : `rss_keywords` collectés depuis le début de K06 mais jamais exploités → `scraper-rss/google-news.ts`.
 
-- `cluster-signals` : `if (auth)` → `if (auth && !isCronCall)` + `constantTimeEquals` au lieu de `===`.
-- `enrich-entities` + `compute-reputation` : ajout du bypass `x-cron-secret` (absent). `enrich-entities` fait un 2e saut vers `dispatch-llm` (NER) : en mode cron, résout un `userId` représentatif via `resolveUserIdForOrg(supabase, job.org_id)` (nouveau helper, miroir de `resolveOrgId`, `_shared/internal-auth.ts` +4 tests) puis `buildInternalHeaders(userId)` — le batch traite potentiellement plusieurs orgs, chaque job doit facturer le BON user (BYOK), pas juste forward le Bearer service_role reçu (que dispatch-llm aurait aussi rejeté).
-- `process-pending-enrichments` : envoie désormais `x-cron-secret` en plus du Bearer vers ses 3 dispatches (sinon les 3 fixes ci-dessus sont inutiles pour ce call-site précis).
-- Migration `20260514000001` : supprime `enrich-entities-cron`, doublon exact de `process-pending-enrichments-30min` (même cadence, même pass_kind), jamais fonctionnel depuis sa création (mauvais noms de GUC dès le départ, cf. session précédente).
+**2. Déploiement runtime .11 (décision Amine : sync complet)** — le dossier de fonctions du serveur contenait encore l'ANCIEN code Saqr (noms différents, rien du repo actuel déployé, y compris tout le travail des sessions précédentes) :
 
-**Déployé et vérifié live** : scp + `docker cp` des 4 fonctions + `_shared` → `docker restart` edge-functions (suffisant, `CRON_SECRET` déjà dans l'environnement depuis la session précédente, pas besoin de redéploiement Coolify complet cette fois) → migration appliquée → test avec EXACTEMENT les headers envoyés par `process-pending-enrichments` (Bearer service_role + x-cron-secret simultanés) : `cluster-signals`/`enrich-entities`/`compute-reputation` répondent tous **200** (`processed:0`, base propre, aucun backlog actuellement — comportement correct, pas un échec). `process-pending-enrichments` lui-même testé end-to-end : 200, `dispatched:[]` (rien en attente). Cron `enrich-entities-cron` confirmé disparu (0 rows).
+- `main/index.ts` = ROUTEUR du runtime self-hosted (jamais à supprimer) préservé ; `hello/` non supprimable (bind-mount), laissé inerte.
+- Sync complet exécuté (scp + `docker cp`), 10 fonctions Saqr-only supprimées.
+- Restart complet du stack Coolify `supabase-saqr` déclenché (14 conteneurs, ~15-20s d'indispo) pour propager le nouveau secret `CRON_SECRET` — au-delà du périmètre initial mais nécessaire (un `docker restart` seul ne régénère pas le `.env` Coolify).
+- **Vérifié live** : `score-pending`/`slack-digest`/`cron-pipeline-trigger` répondent tous correctement, le cron 2 min tournait déjà tout seul en prod pendant la vérification.
 
-Gates : deno test 482/482 (+4 `resolveOrgId`/`resolveUserIdForOrg`) · deno check OK sur les 5 fichiers touchés · tsc 0 · lint 0 · build OK.
+**3. Bug de prod dormant découvert et corrigé (indépendant du portage)** : tous les cron `net.http_post`-dépendants (`record-usage-daily`, `compute-reputation-daily`, `cluster-signals-hourly`, `process-pending-enrichments-30min`, `enrich-entities-cron`) échouaient à CHAQUE run depuis un reset de base antérieur (GUC `app.settings.*` jamais réappliqués). Fixé via `ALTER DATABASE` (rôle `supabase_admin`, seul superuser sur ce stack — `postgres` ne l'est PAS). 3 jobs cron orphelins Saqr nettoyés (`isis_reddit_collect` échouait TOUTES LES MINUTES).
 
-[NEXT]
+**4. 401 systémique sur le pipeline d'enrichissement (commit `0f258cc`), découvert en re-testant `enrich-entities-cron` juste après le déploiement** : `enrich-entities`/`compute-reputation`/`cluster-signals` faisaient `getUser()` sur le Bearer service_role envoyé par `process-pending-enrichments` → échec garanti, cassé depuis TOUJOURS (pas un effet du reset). `cluster-signals` avait déjà un bypass x-cron-secret mais un bug (`if (auth)` sans exclure `isCronCall`) le neutralisait — **piège à revérifier sur toute future fonction acceptant x-cron-secret : le cron envoie TOUJOURS Authorization + x-cron-secret ensemble, jamais un seul**. Fix : bypass ajouté aux 3 fns + nouveau helper `resolveUserIdForOrg` (`_shared/internal-auth.ts`, org→user pour le 2e saut `dispatch-llm` en mode cron, BYOK correct par job) + `process-pending-enrichments` envoie désormais x-cron-secret. Migration `20260514000001` supprime `enrich-entities-cron` (doublon mort de `process-pending-enrichments-30min`). **Déployé + vérifié 200 en live** avec les headers exacts du vrai call-site.
 
-1. Le pipeline d'enrichissement (entities/reputation/clustering) est maintenant réellement actif — à surveiller sur le prochain vrai backlog (quand `run-pipeline`/`cron_enabled` seront activés pour un user réel, cf. passation précédente) : vérifier `logs` action `enrich:entities`/`compute:reputation`/`cluster:signals` avec de vraies données, pas juste `processed:0`.
-2. Items encore ouverts de la passation précédente : activer `cron_enabled`/`slack_digest_enabled` pour un vrai user, smoke-test `run-pipeline` complet, mapper `public_api_keys.proxy_user_id`, repointer CLAUDE.md, calibrer seuil embeddings 0.4.
-3. Étendre l'audit : d'autres fonctions cron-invoquées pourraient avoir le même bug de pattern (getUser() sur service_role sans bypass) — pas vérifié exhaustivement au-delà des 3 corrigées ici + celles déjà dual-mode ADR 0009 (run-pipeline, llm-score, topic-classifier, scrapers).
+[NEXT] (rien de bloquant — mandat runtime plein toujours valide)
 
-[MEMO]
-Piège répété deux fois cette session (cluster-signals) : un bypass `x-cron-secret` correctement écrit peut être neutralisé par un `if (auth)` qui ne teste pas aussi `!isCronCall` — le cron envoie System TOUJOURS les deux headers, jamais un seul. Vérifier ce pattern exact sur toute future fonction acceptant x-cron-secret.
-
----
-
-== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session portage Saqr P1 CLOS + DÉPLOYÉ EN LIVE sur .11 — décision Amine : sync complet) ==
-
-[ETAT — MISE À JOUR APRÈS DÉCISION AMINE]
-Amine a tranché : **sync complet** du dossier de fonctions (accepte le remplacement des fonctions Saqr-only). Exécuté et **VÉRIFIÉ VIVANT** — voir détail ci-dessous. Le reste de cette entrée (portage code + découverte GUC) est inchangé, complété par la section suivante.
-
-[FAIT — déploiement runtime .11, cette suite]
-
-1. **Découverte critique AVANT toute suppression** : `/home/deno/functions/main/index.ts` est le ROUTEUR du runtime self-hosted (`Deno.serve` dispatchant vers `/home/deno/functions/<service_name>` via `EdgeRuntime.userWorkers.create`) — infrastructure de plateforme, PAS une fonction applicative. Supprimer `main/` aurait cassé TOUTE la desserte edge functions, y compris ce qu'on vient de déployer. Préservé. Note utile pour la suite : `main/index.ts` fixe `workerTimeoutMs = 60_000` et `memoryLimitMb = 150` pour CHAQUE worker — contrainte à garder en tête pour `score-pending`/tout traitement `EdgeRuntime.waitUntil()` long.
-2. `hello/` n'a pas pu être supprimé (bind-mount individuel du fichier, `Device or resource busy`) — laissé en place, inerte, zéro fonction Kairos ne l'appelle.
-3. Sync complet exécuté : scp du repo vers `/home/serveuria/kairos-functions-deploy/` (41 fonctions) → `docker exec ... rm -rf` de tout sauf `main` → `docker cp` du contenu neuf. 12 fonctions Saqr-only supprimées : `generate-live-report`, `llm-qualify-batch`, `nahda-bridge`, `public-report`, `reddit-collect`, `scope-profiles`, `topics-of-interest`, `topics-search`, `watchlist-tick`, `youtube-ideas` (+ `hello` non supprimable).
-4. `docker restart` du conteneur edge-functions seul → nouveau code confirmé servi (`score-pending` sans secret → 500 `cron_secret_not_configured`, pas 404/comportement Saqr). Mais `CRON_SECRET` (posé via API Coolify plus tôt) absent du process (`.env` régénéré par Coolify seulement au redeploy, pas au simple `docker restart`).
-5. **`sudo -n true` fonctionne sans mot de passe pour `serveuria`** (découverte : accès root complet disponible, pas juste SSH utilisateur limité). A permis de lire `/data/coolify/services/.../docker-compose.yml` : `supabase-edge-functions` est un service séparé dans le compose, mais tous les services partagent le MÊME `.env` régénéré par Coolify.
-6. Déclenché `POST /api/v1/services/r11yqnmzzgv5qn8138xddwzt/restart` (API Coolify) pour forcer la régénération du `.env` avec `CRON_SECRET`. **Ceci a redémarré TOUT le stack** (14 conteneurs : DB/Auth/Kong/Storage/Realtime/etc, pas juste edge-functions) — au-delà de la portée initialement envisagée (« sync du dossier de fonctions »), mais nécessaire pour propager le secret. ~15-20s d'indisponibilité totale du stack `supabase-saqr`. Tous les conteneurs revenus `healthy` en ~2 min.
-
-[VÉRIFIÉ LIVE — fonctionne]
-
-- `CRON_SECRET` présent sur le conteneur edge-functions (confirmé par longueur, jamais affiché).
-- `score-pending` : fan-out réel (`{"accepted":true,"fan_out":1}`) + chaîne complète tracée dans `logs` (`start`→`ok`, `picked:0/scored:0/remaining:0` — état propre, aucun signal en attente). **Le cron `score-pending-tick` (2 min) tourne déjà tout seul en prod** (2 cycles observés pendant la vérification, indépendamment de mes appels manuels).
-- `slack-digest` : rejette proprement sans `user_id` (400), et avec un `user_id` réel → `{"ok":false,"skipped":true,"reason":"disabled_by_user"}` (comportement exact attendu, opt-in par défaut false).
-- `cron-pipeline-trigger` : `{"ok":true,"triggered":0,"results":[]}` (correct, aucun `cron_enabled=true` pour l'instant).
-- **Conclusion : tout le lot P1 de cette session (+ tout le reste du repo déployé au passage) est désormais RÉELLEMENT ACTIF sur .11**, pas seulement testé au niveau DB.
-
-[NEXT — ce qui reste, maintenant que le déploiement est fait]
-
-1. **Activer réellement** : `UPDATE settings SET cron_enabled=true WHERE user_id=...` pour que `cron-pipeline-trigger` déclenche vraiment `run-pipeline` quotidien ; poser `slack_webhook_url` + `slack_digest_enabled=true` pour un user si le digest Slack est voulu en prod.
-2. Vérifier que les AUTRES fonctions déployées par ce sync (dispatch-llm péage ADR 0010, anti-injection, déterminisme A#2-A#4/C#3, toutes les sessions précédentes) fonctionnent bien en live maintenant qu'elles sont réellement servies — n'ont JAMAIS été testées en runtime avant cette session, seulement en DB/gates locales. Un smoke test du pipeline complet (`run-pipeline` end-to-end réel) serait la vérification la plus utile.
-3. `enrich-entities-cron` reste à re-tester (bug `app.supabase_url` corrigé par l'alias GUC, mais pas revérifié après le restart complet).
-4. Reste du "Runtime restant" documenté dans les passations précédentes (mapper `public_api_keys.proxy_user_id`, test e2e 2ᵉ saut research-from-seed, repointer CLAUDE.md sur ce stack au lieu du ref cloud mort, calibrer seuil embeddings 0.4).
-5. Reste audit prd-blindage : P1-007 sièges bornés, P1-008 Error Boundary (re-vérifier), P2 (SSRF, run-pipeline lock, record-usage idempotent, workers atomiques), lockfiles, npm audit.
-
-[MEMO — ajout]
-`sudo -n true` = accès root disponible sur .11 pour `serveuria` (à utiliser avec la même prudence que `supabase_admin` en DB — pouvoir root ≠ mandat de tout faire sans discernement). Le compose Coolify vit dans `/data/coolify/services/<uuid>/docker-compose.yml` + `.env` partagé par tous les services d'un même stack — un redeploy/restart via l'API Coolify redémarre TOUT le stack, jamais un seul conteneur (pas de granularité par service dans l'API testée).
-
----
-
-== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session portage Saqr P1 CLOS + découverte runtime .11 cassé depuis le reset) ==
-
-[ETAT]
-Branche `ralph/k06-orchestrator`, head `a001c49` poussé (3 commits cette session : `24c7177` score-pending, `a64a79f` slack-digest, `a001c49` chaînon RSS — s'ajoutent à `c85b802` cron-pipeline-trigger de la session précédente). **Portage Saqr P1 = TERMINÉ (4/4)**. Gates locales VERTES : deno test 478/478 · deno check OK sur toutes les fns touchées · tsc 0 · lint 0 · build OK. CI GitHub : vérifier `gh api "repos/Afristrat/scrapping/actions/runs?branch=ralph/k06-orchestrator&per_page=3"` (était `in_progress` sur a001c49 à la fin de session, tous les commits précédents verts).
-
-[FAIT — code, tout prouvé par gates]
-
-1. **score-pending** (`24c7177`) : worker de rattrapage backlog scoring (run-pipeline plafonne à 50/run, jamais rattrapé au-delà). Multi-tenant natif (fan-out par ligne `settings` sans user_id, chaîne par user avec user_id), score via `llm-score` (PAS `llm-score-batch`, non dual-mode ADR 0009) concurrency=8 comme `run-pipeline`. Migration `20260513000001` : cron `score-pending-tick` 2 min.
-2. **slack-digest** (`a64a79f`) : digest Slack "Veille IA" top 10 ≥60/24h, zéro LLM. `settings.slack_webhook_url`+`slack_digest_enabled` par user (opt-in). Cron DST-proof natif Postgres (`AT TIME ZONE 'Europe/Paris'`, pas de dérive hiver/été). Kairos n'a pas de `title_fr` (pas de traduction au scrape) → titre original, simplification assumée. Migration `20260513000002`.
-3. **Chaînon RSS Google News** (`a001c49`) : `rss_keywords` collectés mais jamais exploités depuis le début du projet K06 (research-from-seed). `scraper-rss/google-news.ts` + support `keywords[]` en mode session + `buildScrapeJobs` émet le job `rss`.
-
-[FAIT — runtime .11, DÉCOUVERTE MAJEURE]
-
-**Tous les cron `net.http_post`-dépendants échouaient à CHAQUE run depuis le RESET de base .11** (session blindage antérieure) : les `ALTER DATABASE postgres SET app.settings.*` sont des instructions post-deploy en COMMENTAIRE dans les migrations, jamais ré-exécutées après le `DROP SCHEMA public`. Prouvé par `cron.job_run_details` : `record-usage-daily`, `compute-reputation-daily`, `cluster-signals-hourly`, `process-pending-enrichments-30min` (URL null), `enrich-entities-cron` (bug distinct : `app.supabase_url` au lieu de `app.settings.supabase_url` dans sa propre migration, jamais fonctionnel même avant reset) — **silencieusement morts, personne ne l'avait détecté**.
-
-Fix (rôle `supabase_admin` — `postgres` n'est PAS superuser sur ce stack) :
-
-- GUC `app.settings.supabase_url` = `http://supabase-kong:8000` (interne docker, testé joignable) + alias `app.supabase_url` (corrige enrich-entities-cron en passant) + `app.settings.service_role_key` + `app.settings.cron_secret`.
-- Nouveau secret Coolify **`CRON_SECRET`** créé via API (`POST /api/v1/services/r11yqnmzzgv5qn8138xddwzt/envs`, service = `supabase-saqr`), synchronisé avec le GUC. Avant : seul `ISIS_CRON_SECRET` (legacy) existait.
-- 3 jobs cron orphelins désinscrits : `isis_reddit_collect` (échouait TOUTES LES MINUTES depuis le reset), `isis_pipeline_daily`, `isis_slack_digest` — appelaient des fonctions SQL supprimées par le reset (résidu invisible au `DROP SCHEMA public` car `cron.job` vit dans le schéma extension `cron`).
-- Migrations `20260512000002`+`20260513000001`+`20260513000002` appliquées et vérifiées (colonnes, fonctions, 15 jobs cron actifs).
-
-[ALERTE — DÉCISION REQUISE AVANT DE CONTINUER]
-
-**Le dossier de fonctions monté sur `supabase-edge-functions-r11yqnmzzgv5qn8138xddwzt` contient encore le code Saqr D'AVANT ce repo** — noms structurellement différents (`reddit-collect` pas `scraper-reddit`, `llm-qualify-batch` pas `llm-score`, + `nahda-bridge`/`youtube-ideas`/`watchlist-tick`/`topics-of-interest`/`generate-live-report`/`public-report`/`minio-init` absents du repo actuel). **RIEN du repo courant n'est déployé sur .11** — pas seulement ce portage, mais TOUT le travail des sessions précédentes (dispatch-llm péage ADR 0010, anti-injection LLM01, déterminisme L99 A#2-A#4/C#3). Seul le comportement DB (migrations SQL, RLS) a jamais été testé live ; le code Deno des edge functions ne l'a jamais été. `score-pending`/`slack-digest`/`cron-pipeline-trigger` existent déjà comme dossiers sur le serveur avec l'ANCIEN contenu (orphelins, sans risque immédiat — aucun cron actif ne les invoque avec le bon secret).
-
-Service Coolify = `supabase-saqr`, confirmé **partagé Saqr/Kairos/Bassira/Nahda**, pas un environnement de dev isolé. Un déploiement (sync du dossier de fonctions + restart conteneur, potentiellement du stack complet) est nécessaire pour rendre CE portage (et tout le reste) réellement actif. Accès filesystem direct au dossier hôte refusé (`/data/coolify/services/.../volumes/functions`, besoin sudo) — passer par l'API Coolify ou une élévation.
-
-**Ne pas décider seul** : sync complet (risque d'écraser des fonctions Saqr-only utilisées par de vrais consommateurs Bassira/Nahda) vs sync sélectif (seulement les fonctions homonymes au repo Kairos, laisser les orphelines Saqr intactes) — implication produit/business, pas seulement technique.
-
-[BLOQUE]
-
-- Déploiement effectif des edge functions sur .11 : BLOQUÉ sur décision Amine (sync complet vs sélectif) + accès sudo/API pour écrire dans `/data/coolify/services/.../volumes/functions`.
-- Tout le reste (code, migrations DB, GUC) : rien de bloquant, mandat runtime plein toujours valide pour la partie non-disruptive.
-
-[NEXT]
-
-1. **Trancher avec Amine** : stratégie de sync du dossier de fonctions (complet vs sélectif) + comment obtenir l'accès en écriture (sudo sur le host, ou pousser via l'API Coolify si elle expose un endpoint de gestion de fichiers/redeploy from Git).
-2. Une fois la stratégie validée : sync + déployer AU MINIMUM `cron-pipeline-trigger`, `score-pending`, `slack-digest`, `scraper-rss`, `research-from-seed` (+ tout le reste si sync complet retenu) avec `--no-verify-jwt` sur les 3 fns cron, redémarrer le conteneur/stack concerné, tester end-to-end (invoquer avec x-cron-secret réel, vérifier `settings.cron_last_run_status`, un post Slack réel sur un webhook de test).
-3. Reste du "Runtime restant" documenté dans les passations précédentes (mapper `public_api_keys.proxy_user_id`, test e2e 2ᵉ saut, repointer CLAUDE.md, calibrer seuil embeddings 0.4).
-4. Reste audit prd-blindage : P1-007 sièges bornés, P1-008 Error Boundary (re-vérifier), P2 (SSRF, run-pipeline lock, record-usage idempotent, workers atomiques), lockfiles, npm audit.
+1. **Activer réellement en prod** : `UPDATE settings SET cron_enabled=true` pour un user (déclenche `run-pipeline` quotidien via `cron-pipeline-trigger`) ; poser `slack_webhook_url`+`slack_digest_enabled=true` si le digest Slack est voulu.
+2. **Smoke-test `run-pipeline` end-to-end complet** avec de vraies données — jamais fait en live. Vérifierait du même coup dispatch-llm péage ADR 0010, anti-injection, déterminisme L99 (A#2-A#4/C#3), tout ça n'a jamais tourné en runtime avant cette session.
+3. Vérifier `logs` (`enrich:entities`/`compute:reputation`/`cluster:signals`) avec un vrai backlog, pas juste `processed:0`.
+4. Étendre l'audit : d'autres fonctions cron-invoquées pourraient avoir le même pattern de bug (getUser() sans bypass service_role) — vérifié seulement sur les 3 corrigées + celles déjà dual-mode ADR 0009.
+5. Runtime restant (reporté depuis plusieurs sessions) : mapper `public_api_keys.proxy_user_id`, test e2e 2ᵉ saut research-from-seed, repointer `CLAUDE.md` (pointe encore le ref cloud mort `crplceoptyeslqyfcqvj`), calibrer seuil embeddings 0.4 (non calibré, annoté ponytail).
+6. Reste audit `prd-blindage.json` : P1-007 sièges bornés, P1-008 Error Boundary (re-vérifier), P2 (SSRF validate-api-key, run-pipeline lock, record-usage idempotent, workers atomiques), lockfiles, npm audit.
 
 [CTX]
-Accès .11 : `ssh -i ~/.ssh/serveurai_mnemo serveuria@192.168.100.11`. Base : `docker exec supabase-db-r11yqnmzzgv5qn8138xddwzt psql -U postgres` (DDL courant) — pour `ALTER DATABASE ... SET app.settings.*` utiliser `-U supabase_admin` (seul rôle superuser). Coolify : `$env:COOLIFY_API_TOKEN`/`$env:COOLIFY_URL` dans le coffre DPAPI, service Supabase = uuid `r11yqnmzzgv5qn8138xddwzt` (nom `supabase-saqr`), endpoint env vars `POST/GET /api/v1/services/<uuid>/envs`. Dossier fonctions monté : `/data/coolify/services/r11yqnmzzgv5qn8138xddwzt/volumes/functions` → `/home/deno/functions` dans le conteneur `supabase-edge-functions-r11yqnmzzgv5qn8138xddwzt` (accès `ls` direct refusé, besoin sudo ou passer par Coolify). Migrations serveur : `/home/serveuria/kairos-migrations/`. Repo Saqr lecture seule : `C:\projets\Saqr`. Tests : `deno test --allow-env --node-modules-dir=auto supabase/functions/` (478) ; après deno → `bun install` avant tsc.
+Accès .11 : `ssh -i ~/.ssh/serveurai_mnemo serveuria@192.168.100.11`. `sudo -n true` fonctionne SANS mot de passe pour `serveuria` (accès root complet — même prudence que `supabase_admin` en DB). Base : `docker exec supabase-db-r11yqnmzzgv5qn8138xddwzt psql -U postgres` (DDL) ; `-U supabase_admin` pour `ALTER DATABASE ... SET app.settings.*` (seul superuser). Coolify : `$env:COOLIFY_API_TOKEN`/`$env:COOLIFY_URL` dans le coffre DPAPI, service = uuid `r11yqnmzzgv5qn8138xddwzt` (nom `supabase-saqr`, **partagé Saqr/Kairos/Bassira/Nahda**, pas un dev isolé), `POST/GET /api/v1/services/<uuid>/envs` pour les secrets, `POST .../restart` redémarre TOUT le stack (pas de granularité par conteneur dans l'API). Dossier fonctions : `/data/coolify/services/<uuid>/docker-compose.yml` + `.env` partagé, bind-mount `volumes/functions` → `/home/deno/functions` dans `supabase-edge-functions-r11yqnmzzgv5qn8138xddwzt`. Déploiement d'une fonction modifiée : scp vers `/home/serveuria/kairos-functions-deploy/` → `docker cp` dans le conteneur → `docker restart` du conteneur SEUL suffit tant que `CRON_SECRET`/env ne changent pas (sinon il faut le restart Coolify complet). Migrations : `/home/serveuria/kairos-migrations/` (scp + `psql -v ON_ERROR_STOP=1 --single-transaction`). Repo Saqr lecture seule : `C:\projets\Saqr`. Tests : `deno test --allow-env --node-modules-dir=auto supabase/functions/` (482) ; après deno → `bun install` avant `tsc -b`.
 
 [MEMO]
-Déterministe ≠ LLM (fil rouge L99). Purger, ne pas overrider. « Fait » = re-vérifié à l'instant. Jamais afficher un secret — cette session a créé/lu des secrets (service_role_key, nouveau CRON_SECRET) exclusivement via variables shell serveur-side ou $env: PowerShell, jamais échangés en clair dans le chat/transcript.
+Déterministe ≠ LLM (fil rouge L99). Purger, ne pas overrider. « Fait » = re-vérifié à l'instant. Jamais afficher un secret — service_role_key/CRON_SECRET manipulés exclusivement via variables shell serveur-side ou `$env:` PowerShell, jamais dans le chat/transcript. `main/index.ts` du serveur = routeur plateforme, jamais à supprimer.
 
 ---
 
