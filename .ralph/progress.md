@@ -167,3 +167,24 @@ PRD ouverte 2026-05-01T18:00 par brief utilisateur ambitieux : delete inline/bul
 **Validation** : deno check 14/14 fonctions touchées · deno test **415/415** (dont 26 nouveaux) · typecheck 0 err · lint 0 warning · build OK · vitest ciblé 56/56 (suite pleine non collectable localement — flake OneDrive documenté, CI Linux = gate).
 
 **Piège documenté** : le runner vitest local collecte parfois 0 ou 1 fichier de test (timeouts pool OneDrive) — ne JAMAIS conclure d'un run local pathologique, cibler des fichiers explicites ou lire la CI.
+
+### 2026-07-07 — Anti-injection + délimiteurs + factorisation \_shared (L99 point 2) ✓
+
+**Converge C#2 (scoring batch nu) + C#4 (gates silencieuses) + factorisation des duplications** (OWASP LLM01).
+
+**Nouveaux modules `_shared/`** :
+
+- `llm-json.ts` (+16 tests) — parse tolérant consolidé : strip CoT (<thinking> & co), BOM/zero-width, contrôles, fences, extraction du 1er bloc {} OU [] équilibré, erreurs typées LlmJsonError. Remplace 7 copies divergentes.
+- `signal-text.ts` (+11 tests) — extraction canonique du texte signal (ordre unique summary→selftext→text→description→abstract→body ; avant : 6 ordres différents selon la fonction), sanitizeForPrompt (contrôles + anti-breakout <<</>>>), renderSignalBlock délimité (un titre malveillant ne peut PAS fermer le bloc — testé).
+- `llm-guards.ts` — DATA_GUARD_FR (anti-injection, référence les délimiteurs), JSON_STRICT_GUARD_FR (anti-CoT), FRENCH_ACCENTS_GUARD_FR.
+
+**Câblage** :
+
+- `llm-score-batch` (cœur argent) : prompt scindé system (consignes+gardes) / user (signaux délimités sanitizés), temperature 0 sur les 3 sites dispatch (consensus, fallback, standard).
+- Gates rubric-override : les 4 builders retournent {system, user} avec gardes + bloc délimité ; parseGateResponse expose parse_ok (gate illisible ≠ « non disqualifié » silencieux) ; scoring-engine propage gate_parse_failed jusqu'au log `llm:score-rubric-override` (status warning + compteur).
+- scoring-engine : temperature 0 (scoring + gates = tâches déterministes).
+- Migrations parseurs : enrich.ts, ner.ts, suggest.ts, auditor.ts → parseLlmJson ; research-strategist/lib.ts et rubric-architect gardent leurs APIs mais délèguent (ré-exports/wrappers).
+
+**Validation** : deno check 7/7 fonctions touchées · deno test **441/441** (dont 26 nouveaux modules + 415 existants intacts — les tests des parseurs migrés passent sans modification) · tsc 0 · lint 0 · build OK.
+
+**Piège Windows documenté** : les séquences \xNN/\uNNNN dans le contenu écrit par l'outil Write peuvent arriver en octets RÉELS (NUL littéral dans le source). Pour les tests avec caractères de contrôle → `String.fromCharCode(...)`, jamais de littéraux échappés.

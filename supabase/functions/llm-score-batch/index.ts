@@ -30,6 +30,8 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError, summarizeError } from '../_shared/errors.ts'
 import { parseScoringResponse, ScoreParseError } from '../_shared/parse-score.ts'
+import { renderSignalBlock } from '../_shared/signal-text.ts'
+import { DATA_GUARD_FR, JSON_STRICT_GUARD_FR } from '../_shared/llm-guards.ts'
 import { buildEnrichPayload, triggerEnrichSignal } from './enrich-trigger.ts'
 import {
   type RubricOverride,
@@ -179,6 +181,7 @@ export function validateBody(body: unknown): BodyValidationResult {
 async function callDispatchForModel(
   supabaseUrl: string,
   auth: string,
+  systemPrompt: string,
   prompt: string,
   signalCount: number,
   modelSpec: string,
@@ -196,10 +199,14 @@ async function callDispatchForModel(
         task: 'scoring',
         provider_override: provider,
         model_override: modelId,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
         options: {
           max_tokens: Math.min(400 * signalCount, 8000),
           response_format: { type: 'json_object' },
+          temperature: 0,
         },
       }),
     })
@@ -387,16 +394,33 @@ export const handler = async (req: Request): Promise<Response> => {
     }
   }
 
+  // Signaux en blocs délimités (contenu scrapé = UNTRUSTED, OWASP LLM01) :
+  // extraction canonique + sanitization via _shared/signal-text.ts.
   const itemsBlock = signals
-    .map((s, i) => {
-      const p = s.raw_payload as Record<string, unknown>
-      const summary = p?.summary ?? p?.selftext ?? p?.text ?? ''
-      const datePart = s.signal_date ? `[${String(s.signal_date).slice(0, 10)}] ` : ''
-      return `[${i + 1}] id=${s.id} | source=${s.source} ${datePart}\n   Titre: ${s.title ?? '(sans titre)'}\n   Extrait: ${String(summary).slice(0, 500)}`
-    })
+    .map((s) =>
+      renderSignalBlock(
+        {
+          id: s.id,
+          source: s.source,
+          title: s.title,
+          date: s.signal_date ? String(s.signal_date) : null,
+          raw_payload: s.raw_payload,
+        },
+        500,
+      ),
+    )
     .join('\n\n')
 
-  const prompt = `${scoringPrompt}${criteriaBlock}\nTu vas scorer ${signals.length} signaux d'un coup. Pour CHAQUE signal, donne un score de 0 a 100 et une justification d'1 phrase courte.\n\nReponds en JSON strict (et UNIQUEMENT en JSON) :\n{"scores":[{"id":"<uuid du signal>","score":<0-100>,"reasoning":"<1 phrase>"},...]}\n\nSignaux a scorer :\n\n${itemsBlock}`
+  const systemPrompt = `${scoringPrompt}${criteriaBlock}
+Tu vas scorer ${signals.length} signaux d'un coup. Pour CHAQUE signal, donne un score de 0 à 100 et une justification d'1 phrase courte.
+
+${DATA_GUARD_FR}
+
+${JSON_STRICT_GUARD_FR}
+Format attendu :
+{"scores":[{"id":"<uuid du signal>","score":<0-100>,"reasoning":"<1 phrase>"},...]}`
+
+  const prompt = `Signaux à scorer :\n\n${itemsBlock}`
 
   // Determine if consensus mode is active
   const consensusModels: string[] = Array.isArray(settings.consensus_models)
@@ -413,7 +437,15 @@ export const handler = async (req: Request): Promise<Response> => {
 
     const settled = await Promise.allSettled(
       consensusModels.map((modelSpec) =>
-        callDispatchForModel(supabaseUrl, auth, prompt, signals.length, modelSpec, knownIds),
+        callDispatchForModel(
+          supabaseUrl,
+          auth,
+          systemPrompt,
+          prompt,
+          signals.length,
+          modelSpec,
+          knownIds,
+        ),
       ),
     )
 
@@ -434,10 +466,14 @@ export const handler = async (req: Request): Promise<Response> => {
           headers: { Authorization: auth, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             task: 'scoring',
-            messages: [{ role: 'user', content: prompt }],
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt },
+            ],
             options: {
               max_tokens: Math.min(400 * signals.length, 8000),
               response_format: { type: 'json_object' },
+              temperature: 0,
             },
           }),
         })
@@ -634,10 +670,14 @@ export const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         task: 'scoring',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
         options: {
           max_tokens: Math.min(400 * signals.length, 8000),
           response_format: { type: 'json_object' },
+          temperature: 0,
         },
       }),
     })
@@ -710,17 +750,21 @@ async function handleAdHocOrHybridScoring(args: {
   const failedCount = settled.length - results.length
   const totalCost = results.reduce((acc, r) => acc + (r.cost ?? 0), 0)
   const disqualifiedCount = results.filter((r) => r.disqualified).length
+  // Gates illisibles = neutralisées par défaut → tracer (faux négatifs sinon
+  // invisibles, finding L99 C#4).
+  const gateParseFailures = results.filter((r) => r.gate_parse_failed).length
 
   await supabase.from('logs').insert({
     user_id: userId,
     action: 'llm:score-rubric-override',
-    status: 'ok',
+    status: gateParseFailures > 0 ? 'warning' : 'ok',
     payload: {
       mode: signals.length === limited.length ? 'no_truncation' : 'truncated_to_30',
       count: limited.length,
       scored: results.length,
       failed: failedCount,
       disqualified: disqualifiedCount,
+      gate_parse_failures: gateParseFailures,
       cost: totalCost,
       duration_ms: Date.now() - startedAt,
     },

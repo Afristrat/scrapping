@@ -3,6 +3,8 @@
  * Exporté pour les tests unitaires Deno.
  */
 
+import { parseLlmJson } from '../_shared/llm-json.ts'
+
 export interface SuggestedHat {
   name: string
   key: string
@@ -30,15 +32,9 @@ export interface SuggestionsResult {
 export function parseSuggestionsResponse(raw: string): SuggestionsResult {
   if (!raw || typeof raw !== 'string') return { hats: [], projects: [] }
 
-  // Supprimer les markdown code fences si présentes
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim()
-
   let parsed: unknown
   try {
-    parsed = JSON.parse(cleaned)
+    parsed = parseLlmJson(raw)
   } catch {
     return { hats: [], projects: [] }
   }

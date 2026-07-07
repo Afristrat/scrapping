@@ -46,6 +46,8 @@ export interface DispatchResponse {
 export type DispatchCaller = (args: {
   task: 'scoring' | 'enrichment'
   prompt: string
+  /** System prompt (consignes + gardes) — le prompt user ne porte que les données. */
+  system?: string
   maxTokens: number
   /** Label fin llm_costs.task écrit par le péage dispatch-llm (défaut : task). */
   costTask?: string
@@ -58,7 +60,7 @@ export function makeFetchDispatchCaller(args: {
   supabaseUrl: string
   auth: string
 }): DispatchCaller {
-  return async ({ task, prompt, maxTokens, costTask }) => {
+  return async ({ task, prompt, system, maxTokens, costTask }) => {
     try {
       const res = await fetch(`${args.supabaseUrl}/functions/v1/dispatch-llm`, {
         method: 'POST',
@@ -66,10 +68,15 @@ export function makeFetchDispatchCaller(args: {
         body: JSON.stringify({
           task,
           ...(costTask ? { cost_task: costTask } : {}),
-          messages: [{ role: 'user', content: prompt }],
+          messages: [
+            ...(system ? [{ role: 'system', content: system }] : []),
+            { role: 'user', content: prompt },
+          ],
           options: {
             max_tokens: maxTokens,
             response_format: { type: 'json_object' },
+            // Scoring et gates = tâches déterministes (classification/notation).
+            temperature: 0,
           },
         }),
       })
@@ -107,7 +114,8 @@ export async function scoreSignalWithRubric(args: {
   })
   const criteriaPromise = dispatch({
     task: 'scoring',
-    prompt: criteriaPrompt,
+    system: criteriaPrompt.system,
+    prompt: criteriaPrompt.user,
     maxTokens: 600,
   })
 
@@ -124,16 +132,19 @@ export async function scoreSignalWithRubric(args: {
     const gatePromise = dispatch({
       task: 'enrichment',
       costTask: 'scoring:gates',
-      prompt: gatePrompt,
+      system: gatePrompt.system,
+      prompt: gatePrompt.user,
       maxTokens: 200,
     })
 
     const [criteriaRes, gateRes] = await Promise.all([criteriaPromise, gatePromise])
 
+    let gateParseFailed = false
     if (gateRes.ok && gateRes.content) {
       const parsed = parseGateResponse(gateRes.content)
       disqualifiedId = parsed.disqualified_id
       appliedBoostIds = parsed.applied_boosts
+      if (parsed.parse_ok === false) gateParseFailed = true
     }
     if (gateRes.usage?.cost) totalCost += gateRes.usage.cost
     if (gateRes.model_used) lastModel = gateRes.model_used
@@ -146,6 +157,7 @@ export async function scoreSignalWithRubric(args: {
       appliedBoostIds,
       costSoFar: totalCost,
       modelSoFar: lastModel,
+      gateParseFailed,
     })
   }
 
@@ -159,7 +171,8 @@ export async function scoreSignalWithRubric(args: {
     dqPromise = dispatch({
       task: 'enrichment',
       costTask: 'scoring:gates',
-      prompt: dqPrompt,
+      system: dqPrompt.system,
+      prompt: dqPrompt.user,
       maxTokens: 100,
     })
   }
@@ -173,7 +186,8 @@ export async function scoreSignalWithRubric(args: {
     sbPromise = dispatch({
       task: 'enrichment',
       costTask: 'scoring:gates',
-      prompt: sbPrompt,
+      system: sbPrompt.system,
+      prompt: sbPrompt.user,
       maxTokens: 150,
     })
   }
@@ -185,9 +199,11 @@ export async function scoreSignalWithRubric(args: {
     sbPromise ?? Promise.resolve<DispatchResponse>({ ok: true, content: '{"applied": []}' }),
   ])
 
+  let gateParseFailed = false
   if (dqRes.ok && dqRes.content) {
     const parsed = parseGateResponse(dqRes.content)
     disqualifiedId = parsed.disqualified_id
+    if (parsed.parse_ok === false) gateParseFailed = true
   }
   if (dqRes.usage?.cost) totalCost += dqRes.usage.cost
   if (dqRes.model_used) lastModel = dqRes.model_used
@@ -195,6 +211,7 @@ export async function scoreSignalWithRubric(args: {
   if (sbRes.ok && sbRes.content) {
     const parsed = parseGateResponse(sbRes.content)
     appliedBoostIds = parsed.applied_boosts
+    if (parsed.parse_ok === false) gateParseFailed = true
   }
   if (sbRes.usage?.cost) totalCost += sbRes.usage.cost
   if (sbRes.model_used) lastModel = sbRes.model_used
@@ -207,6 +224,7 @@ export async function scoreSignalWithRubric(args: {
     appliedBoostIds,
     costSoFar: totalCost,
     modelSoFar: lastModel,
+    gateParseFailed,
   })
 }
 
@@ -218,6 +236,7 @@ function finalize(args: {
   appliedBoostIds: string[]
   costSoFar: number
   modelSoFar: string
+  gateParseFailed?: boolean
 }): ScoredSignalOutput {
   const { signal, rubric, criteriaRes, disqualifiedId, appliedBoostIds } = args
   let totalCost = args.costSoFar
@@ -241,6 +260,7 @@ function finalize(args: {
         applied_boosts: [],
         cost: totalCost,
         model_used: modelUsed,
+        ...(args.gateParseFailed ? { gate_parse_failed: true } : {}),
       }
     }
   }
@@ -272,5 +292,6 @@ function finalize(args: {
     applied_boosts: knownAppliedBoosts,
     cost: totalCost,
     model_used: modelUsed,
+    ...(args.gateParseFailed ? { gate_parse_failed: true } : {}),
   }
 }

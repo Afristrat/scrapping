@@ -17,6 +17,7 @@
 // Inputs : { seed: string, lang: 'fr'|'en'|'ar', research_strategy: object }
 // Outputs : 200 { rubric, telemetry } | 502 dispatch fail | 422 schema fail après retry
 
+import { sanitizeLlmJson } from '../_shared/llm-json.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { deepSanitizeJson } from '../_shared/unicode.ts'
 
@@ -197,24 +198,10 @@ Génère la rubric en JSON strict suivant le SCHEMA OUTPUT.`
 // Sanitization — purge balises résiduelles tool_call/thinking/scratchpad.
 // =============================================================================
 
-// Strip both the opening/closing tags AND their content. A model may emit
-// <thinking>let me think</thinking> alongside the JSON output; we must not
-// leave the inner reasoning text floating in the parsed output.
-const FORBIDDEN_TAG_BLOCKS =
-  /<(tool_call|thinking|scratchpad|reasoning|reflection)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
-const FORBIDDEN_TAG_OPEN_OR_SELF =
-  /<\/?(tool_call|thinking|scratchpad|reasoning|reflection)\b[^>]*\/?>/gi
-
+// Sanitization consolidée dans _shared/llm-json.ts (balises CoT + BOM +
+// zero-width + fences) — wrapper conservé pour compatibilité (call-sites + tests).
 export function sanitizeLlmOutput(raw: string): string {
-  // Pass 1 — drop balanced tag blocks with their content.
-  let cleaned = raw.replace(FORBIDDEN_TAG_BLOCKS, '')
-  // Pass 2 — drop residual unbalanced tags (model may emit only an opener).
-  cleaned = cleaned.replace(FORBIDDEN_TAG_OPEN_OR_SELF, '')
-  // Strip BOM + zero-width separators.
-  cleaned = cleaned.replace(/^﻿/, '').replace(/[​-‍﻿]/g, '')
-  // Strip code fences if model wrapped JSON in ```json ... ```
-  cleaned = cleaned.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
-  return cleaned.trim()
+  return sanitizeLlmJson(raw)
 }
 
 // =============================================================================
