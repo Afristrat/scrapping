@@ -1,3 +1,53 @@
+== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session portage Saqr P1 CLOS + découverte runtime .11 cassé depuis le reset) ==
+
+[ETAT]
+Branche `ralph/k06-orchestrator`, head `a001c49` poussé (3 commits cette session : `24c7177` score-pending, `a64a79f` slack-digest, `a001c49` chaînon RSS — s'ajoutent à `c85b802` cron-pipeline-trigger de la session précédente). **Portage Saqr P1 = TERMINÉ (4/4)**. Gates locales VERTES : deno test 478/478 · deno check OK sur toutes les fns touchées · tsc 0 · lint 0 · build OK. CI GitHub : vérifier `gh api "repos/Afristrat/scrapping/actions/runs?branch=ralph/k06-orchestrator&per_page=3"` (était `in_progress` sur a001c49 à la fin de session, tous les commits précédents verts).
+
+[FAIT — code, tout prouvé par gates]
+
+1. **score-pending** (`24c7177`) : worker de rattrapage backlog scoring (run-pipeline plafonne à 50/run, jamais rattrapé au-delà). Multi-tenant natif (fan-out par ligne `settings` sans user_id, chaîne par user avec user_id), score via `llm-score` (PAS `llm-score-batch`, non dual-mode ADR 0009) concurrency=8 comme `run-pipeline`. Migration `20260513000001` : cron `score-pending-tick` 2 min.
+2. **slack-digest** (`a64a79f`) : digest Slack "Veille IA" top 10 ≥60/24h, zéro LLM. `settings.slack_webhook_url`+`slack_digest_enabled` par user (opt-in). Cron DST-proof natif Postgres (`AT TIME ZONE 'Europe/Paris'`, pas de dérive hiver/été). Kairos n'a pas de `title_fr` (pas de traduction au scrape) → titre original, simplification assumée. Migration `20260513000002`.
+3. **Chaînon RSS Google News** (`a001c49`) : `rss_keywords` collectés mais jamais exploités depuis le début du projet K06 (research-from-seed). `scraper-rss/google-news.ts` + support `keywords[]` en mode session + `buildScrapeJobs` émet le job `rss`.
+
+[FAIT — runtime .11, DÉCOUVERTE MAJEURE]
+
+**Tous les cron `net.http_post`-dépendants échouaient à CHAQUE run depuis le RESET de base .11** (session blindage antérieure) : les `ALTER DATABASE postgres SET app.settings.*` sont des instructions post-deploy en COMMENTAIRE dans les migrations, jamais ré-exécutées après le `DROP SCHEMA public`. Prouvé par `cron.job_run_details` : `record-usage-daily`, `compute-reputation-daily`, `cluster-signals-hourly`, `process-pending-enrichments-30min` (URL null), `enrich-entities-cron` (bug distinct : `app.supabase_url` au lieu de `app.settings.supabase_url` dans sa propre migration, jamais fonctionnel même avant reset) — **silencieusement morts, personne ne l'avait détecté**.
+
+Fix (rôle `supabase_admin` — `postgres` n'est PAS superuser sur ce stack) :
+
+- GUC `app.settings.supabase_url` = `http://supabase-kong:8000` (interne docker, testé joignable) + alias `app.supabase_url` (corrige enrich-entities-cron en passant) + `app.settings.service_role_key` + `app.settings.cron_secret`.
+- Nouveau secret Coolify **`CRON_SECRET`** créé via API (`POST /api/v1/services/r11yqnmzzgv5qn8138xddwzt/envs`, service = `supabase-saqr`), synchronisé avec le GUC. Avant : seul `ISIS_CRON_SECRET` (legacy) existait.
+- 3 jobs cron orphelins désinscrits : `isis_reddit_collect` (échouait TOUTES LES MINUTES depuis le reset), `isis_pipeline_daily`, `isis_slack_digest` — appelaient des fonctions SQL supprimées par le reset (résidu invisible au `DROP SCHEMA public` car `cron.job` vit dans le schéma extension `cron`).
+- Migrations `20260512000002`+`20260513000001`+`20260513000002` appliquées et vérifiées (colonnes, fonctions, 15 jobs cron actifs).
+
+[ALERTE — DÉCISION REQUISE AVANT DE CONTINUER]
+
+**Le dossier de fonctions monté sur `supabase-edge-functions-r11yqnmzzgv5qn8138xddwzt` contient encore le code Saqr D'AVANT ce repo** — noms structurellement différents (`reddit-collect` pas `scraper-reddit`, `llm-qualify-batch` pas `llm-score`, + `nahda-bridge`/`youtube-ideas`/`watchlist-tick`/`topics-of-interest`/`generate-live-report`/`public-report`/`minio-init` absents du repo actuel). **RIEN du repo courant n'est déployé sur .11** — pas seulement ce portage, mais TOUT le travail des sessions précédentes (dispatch-llm péage ADR 0010, anti-injection LLM01, déterminisme L99 A#2-A#4/C#3). Seul le comportement DB (migrations SQL, RLS) a jamais été testé live ; le code Deno des edge functions ne l'a jamais été. `score-pending`/`slack-digest`/`cron-pipeline-trigger` existent déjà comme dossiers sur le serveur avec l'ANCIEN contenu (orphelins, sans risque immédiat — aucun cron actif ne les invoque avec le bon secret).
+
+Service Coolify = `supabase-saqr`, confirmé **partagé Saqr/Kairos/Bassira/Nahda**, pas un environnement de dev isolé. Un déploiement (sync du dossier de fonctions + restart conteneur, potentiellement du stack complet) est nécessaire pour rendre CE portage (et tout le reste) réellement actif. Accès filesystem direct au dossier hôte refusé (`/data/coolify/services/.../volumes/functions`, besoin sudo) — passer par l'API Coolify ou une élévation.
+
+**Ne pas décider seul** : sync complet (risque d'écraser des fonctions Saqr-only utilisées par de vrais consommateurs Bassira/Nahda) vs sync sélectif (seulement les fonctions homonymes au repo Kairos, laisser les orphelines Saqr intactes) — implication produit/business, pas seulement technique.
+
+[BLOQUE]
+
+- Déploiement effectif des edge functions sur .11 : BLOQUÉ sur décision Amine (sync complet vs sélectif) + accès sudo/API pour écrire dans `/data/coolify/services/.../volumes/functions`.
+- Tout le reste (code, migrations DB, GUC) : rien de bloquant, mandat runtime plein toujours valide pour la partie non-disruptive.
+
+[NEXT]
+
+1. **Trancher avec Amine** : stratégie de sync du dossier de fonctions (complet vs sélectif) + comment obtenir l'accès en écriture (sudo sur le host, ou pousser via l'API Coolify si elle expose un endpoint de gestion de fichiers/redeploy from Git).
+2. Une fois la stratégie validée : sync + déployer AU MINIMUM `cron-pipeline-trigger`, `score-pending`, `slack-digest`, `scraper-rss`, `research-from-seed` (+ tout le reste si sync complet retenu) avec `--no-verify-jwt` sur les 3 fns cron, redémarrer le conteneur/stack concerné, tester end-to-end (invoquer avec x-cron-secret réel, vérifier `settings.cron_last_run_status`, un post Slack réel sur un webhook de test).
+3. Reste du "Runtime restant" documenté dans les passations précédentes (mapper `public_api_keys.proxy_user_id`, test e2e 2ᵉ saut, repointer CLAUDE.md, calibrer seuil embeddings 0.4).
+4. Reste audit prd-blindage : P1-007 sièges bornés, P1-008 Error Boundary (re-vérifier), P2 (SSRF, run-pipeline lock, record-usage idempotent, workers atomiques), lockfiles, npm audit.
+
+[CTX]
+Accès .11 : `ssh -i ~/.ssh/serveurai_mnemo serveuria@192.168.100.11`. Base : `docker exec supabase-db-r11yqnmzzgv5qn8138xddwzt psql -U postgres` (DDL courant) — pour `ALTER DATABASE ... SET app.settings.*` utiliser `-U supabase_admin` (seul rôle superuser). Coolify : `$env:COOLIFY_API_TOKEN`/`$env:COOLIFY_URL` dans le coffre DPAPI, service Supabase = uuid `r11yqnmzzgv5qn8138xddwzt` (nom `supabase-saqr`), endpoint env vars `POST/GET /api/v1/services/<uuid>/envs`. Dossier fonctions monté : `/data/coolify/services/r11yqnmzzgv5qn8138xddwzt/volumes/functions` → `/home/deno/functions` dans le conteneur `supabase-edge-functions-r11yqnmzzgv5qn8138xddwzt` (accès `ls` direct refusé, besoin sudo ou passer par Coolify). Migrations serveur : `/home/serveuria/kairos-migrations/`. Repo Saqr lecture seule : `C:\projets\Saqr`. Tests : `deno test --allow-env --node-modules-dir=auto supabase/functions/` (478) ; après deno → `bun install` avant tsc.
+
+[MEMO]
+Déterministe ≠ LLM (fil rouge L99). Purger, ne pas overrider. « Fait » = re-vérifié à l'instant. Jamais afficher un secret — cette session a créé/lu des secrets (service_role_key, nouveau CRON_SECRET) exclusivement via variables shell serveur-side ou $env: PowerShell, jamais échangés en clair dans le chat/transcript.
+
+---
+
 == PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-07 (session déterminisme L99 + CI ressuscitée + portage Saqr P1 en cours) ==
 
 [ETAT]
