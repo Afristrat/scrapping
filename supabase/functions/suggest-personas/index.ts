@@ -117,7 +117,9 @@ Deno.serve(async (req) => {
 
   // Compter les fréquences par topic
   const topicFreq = new Map<string, { slug: string; name: string; count: number }>()
-  for (const row of (signalTopicsData ?? []) as SignalTopicRow[]) {
+  // Cast via unknown : PostgREST type le join to-one comme un tableau, mais un
+  // FK topic_id → topics_taxonomy renvoie un objet au runtime (convention repo).
+  for (const row of (signalTopicsData ?? []) as unknown as SignalTopicRow[]) {
     const taxonomy = row.topics_taxonomy
     if (!taxonomy) continue
     const key = row.topic_id
@@ -166,6 +168,10 @@ Deno.serve(async (req) => {
       ? existingPersonas.map((p) => `- ${p.key} (${p.name}, ${p.kind})`).join('\n')
       : 'Aucune persona existante.'
 
+  // Date réelle au runtime — jamais d'année hardcodée (sinon bug daté certain).
+  const today = new Date().toISOString().slice(0, 10)
+  const currentYear = today.slice(0, 4)
+
   const systemPrompt = `Tu es un assistant expert en organisation personnelle PARA (Projects, Areas, Resources, Archives) et en veille stratégique IA.
 Tu analyses les centres d'intérêt d'une organisation à partir de ses topics de veille et tu suggères des personas pertinentes.
 Réponds UNIQUEMENT en JSON pur, sans markdown ni commentaires.`
@@ -182,7 +188,7 @@ Génère des suggestions de nouvelles personas PARA pertinentes :
 - 2 à 3 Projects (projets avec dates estimées : YYYY-MM-DD)
 
 Pour chaque persona, fournis un name, un key (slug kebab-case unique), et un context_md (1-3 phrases de contexte).
-Les dates des Projects doivent être cohérentes avec la période actuelle (2026).
+Les dates des Projects doivent être cohérentes avec la date du jour (${today}, année ${currentYear}).
 Ne suggère pas de persona qui existe déjà dans la liste fournie.
 
 Réponds avec ce JSON exact :
