@@ -8,6 +8,12 @@ import {
   type EmbeddingKeys,
 } from '../_shared/embeddings.ts'
 import {
+  buildInternalHeaders,
+  internalServiceClient,
+  resolveCaller,
+  resolveOrgId,
+} from '../_shared/internal-auth.ts'
+import {
   appendTopicEntry,
   createMinioClient,
   formatEntry,
@@ -44,7 +50,6 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
   const auth = req.headers.get('Authorization')
-  if (!auth) return json({ error: 'missing_authorization' }, 401)
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
@@ -52,14 +57,24 @@ Deno.serve(async (req) => {
     return json({ error: 'supabase_env_missing' }, 500)
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: auth } },
+  // Auth dual-mode (ADR 0009) : JWT user OU appel interne (run-pipeline cron)
+  const userScoped = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: auth ? { Authorization: auth } : {} },
   })
+  const caller = await resolveCaller(userScoped, req)
+  if (!caller.ok) return json({ error: caller.error }, 401)
+  const userId = caller.userId
+  const supabase = caller.mode === 'internal' ? internalServiceClient(createClient) : userScoped
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ error: 'invalid_token' }, 401)
+  // org explicite sur toutes les écritures : le DEFAULT user_default_org_id()
+  // repose sur auth.uid(), nul en service_role (mode internal).
+  const orgId = await resolveOrgId(supabase, userId)
+
+  // Vers dispatch-llm : propager le mode (le Bearer service_role ne passe pas getUser)
+  const dispatchAuthHeaders: Record<string, string> =
+    caller.mode === 'internal'
+      ? buildInternalHeaders(userId)
+      : { Authorization: auth ?? '', 'Content-Type': 'application/json' }
 
   let body: RequestBody
   try {
@@ -71,8 +86,8 @@ Deno.serve(async (req) => {
 
   // ---- Récupérer les seeds + topics émergents existants
   const [settingsResult, topicsResult] = await Promise.all([
-    supabase.from('settings').select('topic_seeds').eq('user_id', user.id).single(),
-    supabase.from('topics').select('id, name, slug').eq('user_id', user.id),
+    supabase.from('settings').select('topic_seeds').eq('user_id', userId).single(),
+    supabase.from('topics').select('id, name, slug').eq('user_id', userId),
   ])
 
   if (settingsResult.error)
@@ -106,7 +121,7 @@ Deno.serve(async (req) => {
   // (proposition de nouveaux topics) — L99 axe déterminisme.
   let toClassifyByLlm = signals
   if (knownList.length > 0) {
-    const embKeys = await resolveEmbeddingKeys(supabase, user.id)
+    const embKeys = await resolveEmbeddingKeys(supabase, userId)
     if (embKeys.openAiKey ?? embKeys.openRouterKey) {
       const { assigned, unmatched } = await assignKnownTopicsByEmbedding(
         signals,
@@ -123,7 +138,7 @@ Deno.serve(async (req) => {
     const promises: Promise<Classification[]>[] = []
     for (let j = 0; j < slice.length; j += BATCH_SIZE) {
       const batch = slice.slice(j, j + BATCH_SIZE)
-      promises.push(classifyBatch(dispatchUrl, auth, batch, knownList))
+      promises.push(classifyBatch(dispatchUrl, dispatchAuthHeaders, batch, knownList))
     }
     const results = await Promise.allSettled(promises)
     for (const r of results) {
@@ -153,7 +168,7 @@ Deno.serve(async (req) => {
       'signal_id',
       signals.map((s) => s.id),
     )
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
   const scoreById = new Map<string, number>(
     (scoresData ?? []).map((s: { signal_id: string; score: number }) => [s.signal_id, s.score]),
   )
@@ -197,7 +212,7 @@ Deno.serve(async (req) => {
     const { data: existingSnapshot } = await supabase
       .from('topics')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('slug', slug)
       .maybeSingle()
 
@@ -219,7 +234,8 @@ Deno.serve(async (req) => {
               .from('topics')
               .upsert(
                 {
-                  user_id: user.id,
+                  user_id: userId,
+                  org_id: orgId,
                   name: topicName,
                   slug,
                   is_seed: isSeed,
@@ -247,7 +263,8 @@ Deno.serve(async (req) => {
           const { error: runErr } = await supabase.from('topic_runs').upsert(
             {
               topic_id: topicId,
-              user_id: user.id,
+              user_id: userId,
+              org_id: orgId,
               run_at: body.run_at,
               signal_count: bucket.signalIds.length,
               sources: sourcesJson,
@@ -277,7 +294,8 @@ Deno.serve(async (req) => {
               bucket.signalIds.map((sid) => ({
                 topic_id: topicId,
                 signal_id: sid,
-                user_id: user.id,
+                user_id: userId,
+                org_id: orgId,
               })),
               { onConflict: 'topic_id,signal_id', ignoreDuplicates: true },
             )
@@ -295,7 +313,8 @@ Deno.serve(async (req) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       await supabase.from('logs').insert({
-        user_id: user.id,
+        user_id: userId,
+        org_id: orgId,
         action: 'topic-classifier:error',
         status: 'error',
         payload: { phase: 'postgres_persist', slug, error: msg },
@@ -315,7 +334,7 @@ Deno.serve(async (req) => {
     const { data: pending } = await supabase
       .from('pending_minio_writes')
       .select('*, topics!inner(name, slug, is_seed, first_seen_at)')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .lt('attempts', 5)
       .order('created_at', { ascending: true })
       .limit(20)
@@ -332,7 +351,7 @@ Deno.serve(async (req) => {
         await appendTopicEntry({
           client: minioClient,
           bucket: minioCfg.bucket,
-          userId: user.id,
+          userId: userId,
           slug: p.topics.slug,
           topicName: p.topics.name,
           isSeed: p.topics.is_seed,
@@ -373,7 +392,7 @@ Deno.serve(async (req) => {
         await appendTopicEntry({
           client: minioClient,
           bucket: minioCfg.bucket,
-          userId: user.id,
+          userId: userId,
           slug,
           topicName: bucket.topicName ?? slug,
           isSeed: bucket.isSeed ?? false,
@@ -389,12 +408,14 @@ Deno.serve(async (req) => {
       } catch (err) {
         await supabase.from('pending_minio_writes').insert({
           topic_id: bucket.topicId,
-          user_id: user.id,
+          user_id: userId,
+          org_id: orgId,
           run_at: body.run_at,
           content: entry,
         })
         await supabase.from('logs').insert({
-          user_id: user.id,
+          user_id: userId,
+          org_id: orgId,
           action: 'topic-classifier:error',
           status: 'error',
           payload: {
@@ -409,7 +430,8 @@ Deno.serve(async (req) => {
   }
 
   await supabase.from('logs').insert({
-    user_id: user.id,
+    user_id: userId,
+    org_id: orgId,
     action: 'topic-classifier:run',
     status: 'ok',
     payload: {
@@ -489,7 +511,7 @@ async function assignKnownTopicsByEmbedding(
 
 async function classifyBatch(
   dispatchUrl: string,
-  auth: string,
+  dispatchHeaders: Record<string, string>,
   signals: Array<{ id: string; source: string; title: string | null; raw_payload: unknown }>,
   knownTopics: string[],
 ): Promise<Array<{ signal_id: string; topics: string[] }>> {
@@ -526,7 +548,7 @@ Réponds en JSON strict :
     async () => {
       const res = await fetch(dispatchUrl, {
         method: 'POST',
-        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        headers: dispatchHeaders,
         body: JSON.stringify({
           task: 'scraping',
           cost_task: 'topic:classify',

@@ -111,6 +111,24 @@ export function buildInternalHeaders(userId: string): Record<string, string> {
 }
 
 /**
+ * Premier org rejoint par l'utilisateur (même sémantique que le DEFAULT SQL
+ * user_default_org_id()). INDISPENSABLE en mode internal : le DEFAULT repose
+ * sur auth.uid(), nul en service_role → toute écriture org-scoped doit poser
+ * org_id explicitement.
+ */
+export async function resolveOrgId(db: SupabaseClient, userId: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('organization_members')
+    .select('org_id')
+    .eq('user_id', userId)
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (error || !data) return null
+  return (data as { org_id: string }).org_id
+}
+
+/**
  * Client Supabase service_role pour les queries en mode internal (bypass RLS —
  * on lit les settings/user_api_keys du proxy user). Recréé depuis env, jamais
  * dérivé du header entrant (indépendance vis-à-vis du gateway).

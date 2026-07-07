@@ -4,7 +4,7 @@ import OpenAI from 'npm:openai@4'
 import { getUserApiKey } from '../_shared/api-keys.ts'
 import { retryWithBackoff } from '../_shared/retry.ts'
 import { getProviderConfig } from '../_shared/providers.ts'
-import { internalServiceClient, resolveCaller } from '../_shared/internal-auth.ts'
+import { internalServiceClient, resolveCaller, resolveOrgId } from '../_shared/internal-auth.ts'
 import { budgetExceeded } from '../_shared/budget-check.ts'
 import {
   resolveProviderAndModel,
@@ -301,19 +301,6 @@ Deno.serve(async (req) => {
     200,
   )
 })
-
-/** Premier org rejoint (même sémantique que le DEFAULT user_default_org_id()). */
-async function resolveOrgId(db: SupabaseClient, userId: string): Promise<string | null> {
-  const { data, error } = await db
-    .from('organization_members')
-    .select('org_id')
-    .eq('user_id', userId)
-    .order('joined_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  if (error || !data) return null
-  return (data as { org_id: string }).org_id
-}
 
 /**
  * Insert logs best-effort. logs.org_id est NOT NULL : sans org résolu on

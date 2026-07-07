@@ -1,4 +1,10 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
+import {
+  buildInternalHeaders,
+  internalServiceClient,
+  resolveCaller,
+  resolveOrgId,
+} from '../_shared/internal-auth.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -16,32 +22,41 @@ Deno.serve(async (req) => {
   const startedAt = Date.now()
 
   const auth = req.headers.get('Authorization')
-  if (!auth) return json({ error: 'missing_authorization' }, 401)
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: auth } },
-  })
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return json({ error: 'invalid_token' }, 401)
+  // Auth dual-mode (ADR 0009) : JWT user OU appel interne (cron-pipeline-trigger)
+  const userScoped = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: auth ? { Authorization: auth } : {} } },
+  )
+  const caller = await resolveCaller(userScoped, req)
+  if (!caller.ok) return json({ error: caller.error }, 401)
+  const userId = caller.userId
+  const supabase = caller.mode === 'internal' ? internalServiceClient(createClient) : userScoped
+  const orgId = await resolveOrgId(supabase, userId)
 
   const { data: settings, error: settingsErr } = await supabase
     .from('settings')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single()
   if (settingsErr || !settings) return json({ error: 'settings_not_found' }, 404)
 
   const base = Deno.env.get('SUPABASE_URL')!
-  const headers = { Authorization: auth, 'Content-Type': 'application/json' }
+  // Propagation du mode vers TOUTE la chaîne aval (scrapers, llm-score,
+  // topic-classifier) : en interne, buildInternalHeaders est le SEUL
+  // constructeur autorisé (invariant ADR 0009).
+  const headers: Record<string, string> =
+    caller.mode === 'internal'
+      ? buildInternalHeaders(userId)
+      : { Authorization: auth ?? '', 'Content-Type': 'application/json' }
 
   await supabase.from('logs').insert({
-    user_id: user.id,
+    user_id: userId,
+    org_id: orgId,
     action: 'pipeline:run',
     status: 'start',
-    payload: {},
+    payload: { mode: caller.mode },
   })
 
   // Phase 1 - scrape parallele (X et Reddit via Apify, ArXiv inchange, RSS natif)
@@ -49,12 +64,7 @@ Deno.serve(async (req) => {
     callScraper('scraper-reddit', { subs: settings.reddit_subs ?? [] }, base, headers),
     callScraper('scraper-arxiv', { categories: settings.arxiv_categories ?? [] }, base, headers),
     callScraper('scraper-x', { listIds: settings.apify_config?.x_list_ids ?? [] }, base, headers),
-    callScraper(
-      'scraper-rss',
-      { org_id: (settings as unknown as { org_id?: string }).org_id ?? user.id },
-      base,
-      headers,
-    ),
+    callScraper('scraper-rss', { org_id: orgId ?? undefined }, base, headers),
   ]
   const scrapeResults = await Promise.allSettled(scrapePromises)
   const scrapeSummary = scrapeResults.map((r, i) => ({
@@ -64,13 +74,16 @@ Deno.serve(async (req) => {
     reason: r.status === 'rejected' ? String(r.reason) : null,
   }))
 
-  // Phase 2 - signaux non scores (RPC)
-  const { data: unscored, error: rpcErr } = await supabase.rpc('unscored_signals', {
-    lim: SCORE_LIMIT,
-  })
+  // Phase 2 - signaux non scores. unscored_signals repose sur auth.uid()
+  // (nul en service_role) → variante paramétrée en mode interne.
+  const { data: unscored, error: rpcErr } =
+    caller.mode === 'internal'
+      ? await supabase.rpc('unscored_signals_for', { p_user_id: userId, lim: SCORE_LIMIT })
+      : await supabase.rpc('unscored_signals', { lim: SCORE_LIMIT })
   if (rpcErr) {
     await supabase.from('logs').insert({
-      user_id: user.id,
+      user_id: userId,
+      org_id: orgId,
       action: 'pipeline:run',
       status: 'error',
       payload: { phase: 'unscored_query', error: rpcErr.message },
@@ -88,7 +101,8 @@ Deno.serve(async (req) => {
     base,
     headers,
     supabase,
-    userId: user.id,
+    userId,
+    orgId,
     scrapeSummary,
     scrapeMs,
   })
@@ -114,12 +128,13 @@ async function scoreInBackground(opts: {
   ids: string[]
   base: string
   headers: Record<string, string>
-  supabase: ReturnType<typeof createClient>
+  supabase: SupabaseClient
   userId: string
+  orgId: string | null
   scrapeSummary: unknown
   scrapeMs: number
 }) {
-  const { ids, base, headers, supabase, userId, scrapeSummary, scrapeMs } = opts
+  const { ids, base, headers, supabase, userId, orgId, scrapeSummary, scrapeMs } = opts
   const t0 = Date.now()
   let scored = 0
   let failed = 0
@@ -160,6 +175,7 @@ async function scoreInBackground(opts: {
 
   await supabase.from('logs').insert({
     user_id: userId,
+    org_id: orgId,
     action: 'pipeline:run',
     status: 'ok',
     payload: {
