@@ -4,6 +4,7 @@
 
 import { assertEquals, assertStringIncludes } from 'jsr:@std/assert@1'
 import {
+  extractAuthor,
   extractSignalText,
   renderSignalBlock,
   sanitizeForPrompt,
@@ -91,4 +92,28 @@ Deno.test('renderSignalBlock : sans titre ni texte → placeholders', () => {
   const block = renderSignalBlock({ id: 'y' })
   assertStringIncludes(block, 'titre=(sans titre)')
   assertStringIncludes(block, 'extrait=(vide)')
+})
+
+// ─── extractAuthor (déterministe — L99 A#3) ──────────────────────────────────
+
+Deno.test('extractAuthor : X → @screen_name (fallback username)', () => {
+  assertEquals(extractAuthor({ user: { screen_name: 'sama' } }, 'x'), '@sama')
+  assertEquals(extractAuthor({ user: { username: 'sama' } }, 'twitter'), '@sama')
+})
+
+Deno.test('extractAuthor : Reddit → u/author', () => {
+  assertEquals(extractAuthor({ author: 'deepfates' }, 'reddit'), 'u/deepfates')
+})
+
+Deno.test('extractAuthor : arXiv → premier auteur (string ou {name})', () => {
+  assertEquals(extractAuthor({ authors: ['Yann LeCun', 'Autre'] }, 'arxiv'), 'Yann LeCun')
+  assertEquals(extractAuthor({ authors: [{ name: 'Yann LeCun' }] }, 'arxiv'), 'Yann LeCun')
+})
+
+Deno.test('extractAuthor : introuvable → null', () => {
+  assertEquals(extractAuthor(null, 'x'), null)
+  assertEquals(extractAuthor({}, 'reddit'), null)
+  assertEquals(extractAuthor({ author: 'x' }, 'rss'), null)
+  assertEquals(extractAuthor({ authors: [] }, 'arxiv'), null)
+  assertEquals(extractAuthor([1, 2], 'x'), null)
 })

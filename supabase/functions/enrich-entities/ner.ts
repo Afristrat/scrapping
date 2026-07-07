@@ -14,6 +14,24 @@ export interface NerEntity {
   confidence: number
 }
 
+/** Diacritiques combinants Unicode (après décomposition NFKD). */
+const COMBINING_MARKS = /[̀-ͯ]/g
+
+/**
+ * Canonicalisation d'un nom d'entité — MIROIR STRICT du trigger DB
+ * entities_set_normalized_name() (migration 20260512000001) :
+ * minuscules, accents décomposés puis retirés, [a-z0-9] uniquement.
+ * Côté écriture c'est le trigger qui fait foi ; ce miroir ne sert
+ * qu'à retrouver l'entité existante après un conflit d'upsert.
+ */
+export function canonicalizeEntityName(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(COMBINING_MARKS, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
 const VALID_KINDS: ReadonlySet<string> = new Set([
   'person',
   'organization',

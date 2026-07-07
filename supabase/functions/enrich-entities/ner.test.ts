@@ -3,7 +3,7 @@
  * Exécuter : deno test --allow-env supabase/functions/enrich-entities/ner.test.ts
  */
 import { assertEquals } from 'jsr:@std/assert@1'
-import { parseNerResponse } from './ner.ts'
+import { parseNerResponse, canonicalizeEntityName } from './ner.ts'
 
 // ─── parseNerResponse — JSON valide ─────────────────────────────────────────
 
@@ -118,4 +118,28 @@ Deno.test('parseNerResponse — mention_text absent → fallback sur canonical_n
   const result = parseNerResponse(raw)
   assertEquals(result.length, 1)
   assertEquals(result[0].mention_text, 'Attention Is All You Need')
+})
+
+// ─── canonicalizeEntityName (miroir du trigger DB 20260512000001) ────────────
+
+Deno.test("canonicalizeEntityName — variantes d'espaces et de casse convergent", () => {
+  assertEquals(canonicalizeEntityName('OpenAI'), 'openai')
+  assertEquals(canonicalizeEntityName('Open AI'), 'openai')
+  assertEquals(canonicalizeEntityName('open-ai'), 'openai')
+  assertEquals(canonicalizeEntityName('  OPENAI  '), 'openai')
+})
+
+Deno.test('canonicalizeEntityName — accents retirés (aligné unaccent SQL)', () => {
+  assertEquals(canonicalizeEntityName('Café Müller'), 'cafemuller')
+  assertEquals(canonicalizeEntityName('Éléonore'), 'eleonore')
+})
+
+Deno.test('canonicalizeEntityName — ponctuation et préfixes réseaux sociaux', () => {
+  assertEquals(canonicalizeEntityName('@sama'), 'sama')
+  assertEquals(canonicalizeEntityName('u/deepmind'), 'udeepmind')
+  assertEquals(canonicalizeEntityName('GPT-4.1'), 'gpt41')
+})
+
+Deno.test('canonicalizeEntityName — chiffres conservés', () => {
+  assertEquals(canonicalizeEntityName('Llama 3 70B'), 'llama370b')
 })

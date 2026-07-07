@@ -347,6 +347,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["entity_kind"]
           last_seen_at: string | null
           metadata: Json | null
+          normalized_name: string
           org_id: string
           signal_count: number | null
         }
@@ -359,6 +360,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["entity_kind"]
           last_seen_at?: string | null
           metadata?: Json | null
+          normalized_name?: string
           org_id: string
           signal_count?: number | null
         }
@@ -371,6 +373,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["entity_kind"]
           last_seen_at?: string | null
           metadata?: Json | null
+          normalized_name?: string
           org_id?: string
           signal_count?: number | null
         }

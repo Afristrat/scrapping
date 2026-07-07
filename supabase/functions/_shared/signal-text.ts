@@ -69,6 +69,44 @@ export function extractSignalText(rawPayload: unknown, maxLen = 800): string {
   return ''
 }
 
+/**
+ * Extrait l'auteur d'un signal depuis raw_payload — DÉTERMINISTE, zéro LLM.
+ * L'auteur est déjà structuré par les scrapers :
+ *   x/twitter → user.screen_name|username (préfixé @)
+ *   reddit    → author (préfixé u/)
+ *   arxiv     → authors[0] (string ou { name })
+ * Retourne null si introuvable. Consommateurs : digest (citation source),
+ * enrich-entities (entité person en code — L99 A#3).
+ */
+export function extractAuthor(rawPayload: unknown, source: string): string | null {
+  if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) return null
+  const raw = rawPayload as Record<string, unknown>
+  try {
+    if (source === 'x' || source === 'twitter') {
+      const user = (raw as { user?: { screen_name?: string; username?: string } }).user
+      const screen = user?.screen_name ?? user?.username
+      if (typeof screen === 'string' && screen.length > 0) return `@${screen}`
+    }
+    if (source === 'reddit') {
+      const author = (raw as { author?: string }).author
+      if (typeof author === 'string' && author.length > 0) return `u/${author}`
+    }
+    if (source === 'arxiv') {
+      const authors = (raw as { authors?: Array<{ name?: string }> | string[] }).authors
+      if (Array.isArray(authors) && authors.length > 0) {
+        const first = authors[0]
+        if (typeof first === 'string') return first
+        if (first && typeof (first as { name?: string }).name === 'string') {
+          return (first as { name: string }).name
+        }
+      }
+    }
+  } catch {
+    /* noop — best-effort extraction */
+  }
+  return null
+}
+
 export interface SignalBlockInput {
   id: string
   source?: string | null

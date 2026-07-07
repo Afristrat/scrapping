@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { formatError } from '../_shared/errors.ts'
-import { parseNerResponse } from './ner.ts'
+import { extractAuthor, extractSignalText } from '../_shared/signal-text.ts'
+import { parseNerResponse, canonicalizeEntityName, type NerEntity } from './ner.ts'
 
 /**
  * enrich-entities — Traite la file d'attente NER (Named Entity Recognition) async.
@@ -13,16 +14,19 @@ import { parseNerResponse } from './ner.ts'
  *      ORDER BY scheduled_at ASC
  *   2. Marque status='in_progress', started_at=now() pour le batch
  *   3. Pour chaque signal (séquentiel) :
- *      a. Lit signals.title + raw_payload.text/body (max 1000 chars)
- *      b. Appel dispatch-llm task='enrichment' (Haiku) pour NER
+ *      a. Entité `person` DÉTERMINISTE : auteur extrait de raw_payload en code
+ *         (extractAuthor — L99 A#3), confidence 1.0, zéro LLM
+ *      b. Appel dispatch-llm task='enrichment' pour le NER du texte,
+ *         restreint à organization|technology|paper|product
  *      c. Parse la réponse JSON (robuste aux fences markdown)
  *      d. Pour chaque entité :
- *         - Upsert entities ON CONFLICT (org_id, kind, canonical_name) → DO NOTHING
- *         - Insert signal_entities (signal_id, entity_id, org_id, mention_text, confidence=0.8)
+ *         - Upsert entities ON CONFLICT (org_id, kind, normalized_name) → DO NOTHING
+ *           (normalized_name calculé par trigger DB — migration 20260512000001)
+ *         - Insert signal_entities (signal_id, entity_id, org_id, mention_text, confidence)
  *      e. UPDATE pending_enrichments SET status='completed', completed_at=now()
  *      f. Si erreur → SET status='failed', attempts=attempts+1, last_error=msg
  *   4. Logger dans logs (action='enrich:entities')
- *   5. Track coûts dans llm_costs (task='enrich:entities')
+ *   5. Coûts LLM tracés par dispatch-llm (péage unique, ADR 0010)
  *   6. Retourner { ok: true, processed, failed, cost }
  */
 
@@ -32,7 +36,6 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const HAIKU_MODEL = 'anthropic/claude-haiku-4-5-20251001'
 const BATCH_SIZE = 50
 
 interface DispatchResponse {
@@ -53,6 +56,7 @@ interface PendingEnrichmentRow {
 interface SignalRow {
   id: string
   org_id: string
+  source: string
   title: string | null
   raw_payload: Record<string, unknown> | null
 }
@@ -167,7 +171,7 @@ async function processEnrichmentJob(
   // a. Lire le signal
   const { data: signalData, error: signalErr } = await supabase
     .from('signals')
-    .select('id, org_id, title, raw_payload')
+    .select('id, org_id, source, title, raw_payload')
     .eq('id', job.signal_id)
     .eq('org_id', job.org_id)
     .maybeSingle()
@@ -178,11 +182,19 @@ async function processEnrichmentJob(
   }
 
   const signal = signalData as SignalRow
-  const signalText = extractSignalText(signal)
+
+  // a. Entité person déterministe : l'auteur est déjà structuré dans raw_payload
+  const author = extractAuthor(signal.raw_payload, signal.source)
+  const codeEntities: NerEntity[] = author
+    ? [{ kind: 'person', canonical_name: author, mention_text: author, confidence: 1 }]
+    : []
+
+  const signalText = extractSignalText(signal.raw_payload, 1000)
   const snippet = `${signal.title ?? ''}\n${signalText}`.trim().slice(0, 1000)
 
   if (!snippet) {
-    // Pas de texte → marquer completed sans entités
+    // Pas de texte → persister l'éventuelle entité auteur puis completed
+    await persistEntities(codeEntities, job, supabase, userId)
     await supabase
       .from('pending_enrichments')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
@@ -208,7 +220,7 @@ async function processEnrichmentJob(
             role: 'user',
             content:
               `Texte: ${snippet}\n` +
-              `Retourne: [{ kind: 'person'|'organization'|'technology'|'paper'|'product', canonical_name: '...', mention_text: '...' }]\n` +
+              `Retourne: [{ kind: 'organization'|'technology'|'paper'|'product', canonical_name: '...', mention_text: '...' }]\n` +
               `Max 8 entités. JSON pur.`,
           },
         ],
@@ -232,11 +244,33 @@ async function processEnrichmentJob(
 
   // 5. Coût déjà enregistré par dispatch-llm (péage unique, ADR 0010).
 
-  // c. Parser la réponse NER
+  // c. Parser la réponse NER — person exclu : l'auteur vient du code (L99 A#3)
   const raw = dispatchResp.content ?? ''
-  const entities = parseNerResponse(raw)
+  const llmEntities = parseNerResponse(raw).filter((e) => e.kind !== 'person')
 
   // d. Upsert entities + insert signal_entities
+  await persistEntities([...codeEntities, ...llmEntities], job, supabase, userId)
+
+  // e. Marquer le job completed
+  await supabase
+    .from('pending_enrichments')
+    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .eq('id', job.id)
+
+  return { ok: true, cost }
+}
+
+/**
+ * Upsert chaque entité (dédup par normalized_name, calculé par trigger DB)
+ * puis lie le signal via signal_entities. Best-effort : une erreur sur une
+ * entité est loggée et n'interrompt pas les autres.
+ */
+async function persistEntities(
+  entities: NerEntity[],
+  job: PendingEnrichmentRow,
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<void> {
   for (const entity of entities) {
     // Upsert entity (ON CONFLICT DO NOTHING → récupère l'id existant)
     const { data: upsertData, error: upsertErr } = await supabase
@@ -247,7 +281,7 @@ async function processEnrichmentJob(
           kind: entity.kind,
           canonical_name: entity.canonical_name,
         },
-        { onConflict: 'org_id,kind,canonical_name', ignoreDuplicates: true },
+        { onConflict: 'org_id,kind,normalized_name', ignoreDuplicates: true },
       )
       .select('id')
       .maybeSingle()
@@ -256,13 +290,13 @@ async function processEnrichmentJob(
     let entityId: string | null = (upsertData as { id: string } | null)?.id ?? null
 
     if (!entityId && !upsertErr) {
-      // Entité déjà existante — la récupérer
+      // Entité déjà existante (sous cette forme ou une variante) — la récupérer
       const { data: existing } = await supabase
         .from('entities')
         .select('id')
         .eq('org_id', job.org_id)
         .eq('kind', entity.kind)
-        .eq('canonical_name', entity.canonical_name)
+        .eq('normalized_name', canonicalizeEntityName(entity.canonical_name))
         .maybeSingle()
       entityId = (existing as { id: string } | null)?.id ?? null
     }
@@ -297,30 +331,6 @@ async function processEnrichmentJob(
       { onConflict: 'signal_id,entity_id', ignoreDuplicates: true },
     )
   }
-
-  // e. Marquer le job completed
-  await supabase
-    .from('pending_enrichments')
-    .update({ status: 'completed', completed_at: new Date().toISOString() })
-    .eq('id', job.id)
-
-  return { ok: true, cost }
-}
-
-/**
- * Extrait le texte brut d'un signal depuis raw_payload.
- */
-function extractSignalText(signal: SignalRow): string {
-  const payload = signal.raw_payload
-  if (!payload) return ''
-  const text =
-    (payload.text as string | undefined) ??
-    (payload.body as string | undefined) ??
-    (payload.selftext as string | undefined) ??
-    (payload.summary as string | undefined) ??
-    (payload.abstract as string | undefined) ??
-    ''
-  return typeof text === 'string' ? text : ''
 }
 
 function json(body: unknown, status: number): Response {
