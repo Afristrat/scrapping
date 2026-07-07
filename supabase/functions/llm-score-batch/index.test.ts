@@ -338,6 +338,7 @@ Deno.test('2 modèles dont 1 fail → fallback car < 2 succès', async () => {
 import { validateBody } from './index.ts'
 import {
   applyBoosts,
+  evaluateMechanicalDisqualifiers,
   parseGateResponse,
   parseLLMScoreResponse,
   shouldCombineGates,
@@ -422,75 +423,84 @@ function makeMockDispatch(handlers: {
 
 // ─── Test K04-1 : body validation — signals_input sans rubric_override → 400 ─
 
-Deno.test('K04: validateBody → signals_input sans rubric_override → RUBRIC_REQUIRED_FOR_AD_HOC', () => {
-  const result = validateBody({
-    signals_input: [{ id: 'sig-1', source: 'arxiv' }],
-  })
-  assertEquals(result.ok, false)
-  assertEquals(result.error, 'RUBRIC_REQUIRED_FOR_AD_HOC')
-})
+Deno.test(
+  'K04: validateBody → signals_input sans rubric_override → RUBRIC_REQUIRED_FOR_AD_HOC',
+  () => {
+    const result = validateBody({
+      signals_input: [{ id: 'sig-1', source: 'arxiv' }],
+    })
+    assertEquals(result.ok, false)
+    assertEquals(result.error, 'RUBRIC_REQUIRED_FOR_AD_HOC')
+  },
+)
 
 // ─── Test K04-2 : disqualifier match → score=0 ──────────────────────────────
 
-Deno.test('K04: disqualifier match → score=0, disqualified=true, applied_disqualifier', async () => {
-  const rubric = makeRubric()
-  const { caller } = makeMockDispatch({
-    gate: () => ({
-      ok: true,
-      content: '{"disqualified_id": "dq_001", "applied": []}',
-      model_used: 'gate-model',
-    }),
-    criteria: () => ({
-      ok: true,
-      content: '{"score": 75, "reasoning": "Should be ignored"}',
-      model_used: 'crit-model',
-    }),
-  })
+Deno.test(
+  'K04: disqualifier match → score=0, disqualified=true, applied_disqualifier',
+  async () => {
+    const rubric = makeRubric()
+    const { caller } = makeMockDispatch({
+      gate: () => ({
+        ok: true,
+        content: '{"disqualified_id": "dq_001", "applied": []}',
+        model_used: 'gate-model',
+      }),
+      criteria: () => ({
+        ok: true,
+        content: '{"score": 75, "reasoning": "Should be ignored"}',
+        model_used: 'crit-model',
+      }),
+    })
 
-  const result = await scoreSignalWithRubric({
-    signal: { id: 'sig-x', source: 'reddit', title: 'Promo article' },
-    rubric,
-    dispatch: caller,
-  })
+    const result = await scoreSignalWithRubric({
+      signal: { id: 'sig-x', source: 'reddit', title: 'Promo article' },
+      rubric,
+      dispatch: caller,
+    })
 
-  assertEquals(result.score, 0)
-  assertEquals(result.raw_score, 0)
-  assertEquals(result.disqualified, true)
-  assertEquals(result.applied_disqualifier, 'dq_001')
-  assertEquals(result.applied_boosts, [])
-})
+    assertEquals(result.score, 0)
+    assertEquals(result.raw_score, 0)
+    assertEquals(result.disqualified, true)
+    assertEquals(result.applied_disqualifier, 'dq_001')
+    assertEquals(result.applied_boosts, [])
+  },
+)
 
 // ─── Test K04-3 : criteria scoring nominal ──────────────────────────────────
 
-Deno.test('K04: criteria scoring nominal (no disqualifier, no boost match) → raw_score', async () => {
-  const rubric = makeRubric()
-  const { caller } = makeMockDispatch({
-    gate: () => ({
-      ok: true,
-      content: '{"disqualified_id": null, "applied": []}',
-      model_used: 'gate-model',
-    }),
-    criteria: () => ({
-      ok: true,
-      content: '{"score": 67, "reasoning": "Bon signal"}',
-      model_used: 'crit-model',
-      usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 },
-    }),
-  })
+Deno.test(
+  'K04: criteria scoring nominal (no disqualifier, no boost match) → raw_score',
+  async () => {
+    const rubric = makeRubric()
+    const { caller } = makeMockDispatch({
+      gate: () => ({
+        ok: true,
+        content: '{"disqualified_id": null, "applied": []}',
+        model_used: 'gate-model',
+      }),
+      criteria: () => ({
+        ok: true,
+        content: '{"score": 67, "reasoning": "Bon signal"}',
+        model_used: 'crit-model',
+        usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 },
+      }),
+    })
 
-  const result = await scoreSignalWithRubric({
-    signal: { id: 'sig-y', source: 'rss', title: 'Article' },
-    rubric,
-    dispatch: caller,
-  })
+    const result = await scoreSignalWithRubric({
+      signal: { id: 'sig-y', source: 'rss', title: 'Article' },
+      rubric,
+      dispatch: caller,
+    })
 
-  assertEquals(result.score, 67)
-  assertEquals(result.raw_score, 67)
-  assertEquals(result.disqualified, false)
-  assertEquals(result.applied_disqualifier, null)
-  assertEquals(result.applied_boosts, [])
-  assertEquals(result.reasoning, 'Bon signal')
-})
+    assertEquals(result.score, 67)
+    assertEquals(result.raw_score, 67)
+    assertEquals(result.disqualified, false)
+    assertEquals(result.applied_disqualifier, null)
+    assertEquals(result.applied_boosts, [])
+    assertEquals(result.reasoning, 'Bon signal')
+  },
+)
 
 // ─── Test K04-4 : soft_boost application ────────────────────────────────────
 
@@ -674,20 +684,23 @@ Deno.test('K04: shouldCombineGates → > 12 règles total → false (split)', ()
   assertEquals(shouldCombineGates(dq, sb), false)
 })
 
-Deno.test('K04: scoring 1 signal en mode combined → 2 appels dispatch (criteria + gate combiné)', async () => {
-  const rubric = makeRubric() // 5 règles → combined
-  const { caller, calls } = makeMockDispatch({})
+Deno.test(
+  'K04: scoring 1 signal en mode combined → 2 appels dispatch (criteria + gate combiné)',
+  async () => {
+    const rubric = makeRubric() // 5 règles → combined
+    const { caller, calls } = makeMockDispatch({})
 
-  await scoreSignalWithRubric({
-    signal: { id: 'sig-comb', source: 'rss' },
-    rubric,
-    dispatch: caller,
-  })
+    await scoreSignalWithRubric({
+      signal: { id: 'sig-comb', source: 'rss' },
+      rubric,
+      dispatch: caller,
+    })
 
-  assertEquals(calls.length, 2, 'Mode combiné = 2 appels (criteria + gate combiné)')
-  const tasks = calls.map((c) => c.task).sort()
-  assertEquals(tasks, ['enrichment', 'scoring'])
-})
+    assertEquals(calls.length, 2, 'Mode combiné = 2 appels (criteria + gate combiné)')
+    const tasks = calls.map((c) => c.task).sort()
+    assertEquals(tasks, ['enrichment', 'scoring'])
+  },
+)
 
 Deno.test('K04: scoring 1 signal en mode split (>12 règles) → 3 appels dispatch', async () => {
   const dq = Array.from({ length: 7 }, (_, i) => ({
@@ -865,4 +878,212 @@ Deno.test('K04: validateBody → no inputs → signal_ids_or_signals_input_requi
   const result = validateBody({})
   assertEquals(result.ok, false)
   assertEquals(result.error, 'signal_ids_or_signals_input_required')
+})
+
+// ─── Tests L99 A#4 : pré-filtre mécanique des disqualifiers ──────────────────
+
+const NOW = Date.parse('2026-07-07T12:00:00Z')
+
+Deno.test('A#4: source_in matche (insensible à la casse) → fired, residual vide', () => {
+  const res = evaluateMechanicalDisqualifiers(
+    [
+      { id: 'dq_sem', rule: 'Règle sémantique', rationale: 'r' },
+      {
+        id: 'dq_src',
+        rule: 'Exclure Reddit',
+        rationale: 'r',
+        mechanical: { kind: 'source_in', sources: ['Reddit', 'x'] },
+      },
+    ],
+    { id: 's1', source: 'reddit' },
+    NOW,
+  )
+  assertEquals(res.fired_id, 'dq_src')
+})
+
+Deno.test('A#4: source_in non matchée → règle consommée, pas envoyée au LLM', () => {
+  const res = evaluateMechanicalDisqualifiers(
+    [
+      {
+        id: 'dq_src',
+        rule: 'Exclure Reddit',
+        rationale: 'r',
+        mechanical: { kind: 'source_in', sources: ['reddit'] },
+      },
+      { id: 'dq_sem', rule: 'Règle sémantique', rationale: 'r' },
+    ],
+    { id: 's1', source: 'arxiv' },
+    NOW,
+  )
+  assertEquals(res.fired_id, null)
+  assertEquals(
+    res.residual.map((d) => d.id),
+    ['dq_sem'],
+  )
+})
+
+Deno.test('A#4: text_matches sur titre + texte extrait', () => {
+  const dq = [
+    {
+      id: 'dq_kw',
+      rule: 'Contenu crypto/airdrop',
+      rationale: 'spam',
+      mechanical: { kind: 'text_matches' as const, pattern: 'airdrops?|give-?away' },
+    },
+  ]
+  const hit = evaluateMechanicalDisqualifiers(
+    dq,
+    { id: 's1', source: 'x', title: 'Massive AIRDROP incoming', raw_payload: {} },
+    NOW,
+  )
+  assertEquals(hit.fired_id, 'dq_kw')
+  const hitBody = evaluateMechanicalDisqualifiers(
+    dq,
+    { id: 's2', source: 'reddit', title: 'ok', raw_payload: { selftext: 'big giveaway now' } },
+    NOW,
+  )
+  assertEquals(hitBody.fired_id, 'dq_kw')
+  const miss = evaluateMechanicalDisqualifiers(
+    dq,
+    { id: 's3', source: 'x', title: 'Paper on RLHF', raw_payload: {} },
+    NOW,
+  )
+  assertEquals(miss.fired_id, null)
+  assertEquals(miss.residual.length, 0)
+})
+
+Deno.test('A#4: regex invalide → reversée au LLM (residual), jamais de crash', () => {
+  const res = evaluateMechanicalDisqualifiers(
+    [
+      {
+        id: 'dq_bad',
+        rule: 'Motif cassé',
+        rationale: 'r',
+        mechanical: { kind: 'text_matches', pattern: '([' },
+      },
+    ],
+    { id: 's1', source: 'x', title: 'peu importe' },
+    NOW,
+  )
+  assertEquals(res.fired_id, null)
+  assertEquals(
+    res.residual.map((d) => d.id),
+    ['dq_bad'],
+  )
+})
+
+Deno.test(
+  'A#4: older_than_days — vieux → fired ; récent → consommé ; date absente → residual',
+  () => {
+    const dq = [
+      {
+        id: 'dq_old',
+        rule: 'Contenu de plus de 30 jours',
+        rationale: 'périmé',
+        mechanical: { kind: 'older_than_days' as const, days: 30 },
+      },
+    ]
+    const old = evaluateMechanicalDisqualifiers(
+      dq,
+      { id: 's1', source: 'arxiv', signal_date: '2026-05-01T00:00:00Z' },
+      NOW,
+    )
+    assertEquals(old.fired_id, 'dq_old')
+    const fresh = evaluateMechanicalDisqualifiers(
+      dq,
+      { id: 's2', source: 'arxiv', signal_date: '2026-07-01T00:00:00Z' },
+      NOW,
+    )
+    assertEquals(fresh.fired_id, null)
+    assertEquals(fresh.residual.length, 0)
+    const nodate = evaluateMechanicalDisqualifiers(dq, { id: 's3', source: 'arxiv' }, NOW)
+    assertEquals(nodate.fired_id, null)
+    assertEquals(
+      nodate.residual.map((d) => d.id),
+      ['dq_old'],
+    )
+  },
+)
+
+Deno.test('A#4: validateRubricOverride accepte mechanical valide, rejette forme invalide', () => {
+  const okRubric = makeRubric({
+    disqualifiers: [
+      {
+        id: 'dq_1',
+        rule: 'Exclure Reddit',
+        rationale: 'r',
+        mechanical: { kind: 'source_in', sources: ['reddit'] },
+      },
+      { id: 'dq_2', rule: 'Règle sémantique', rationale: 'r' },
+    ],
+  })
+  assertEquals(validateRubricOverride(okRubric).valid, true)
+
+  const badRubric = makeRubric({
+    disqualifiers: [
+      {
+        id: 'dq_1',
+        rule: 'Motif cassé',
+        rationale: 'r',
+        mechanical: { kind: 'text_matches', pattern: '([' }, // regex volontairement invalide
+      },
+    ],
+  })
+  const res = validateRubricOverride(badRubric)
+  assertEquals(res.valid, false)
+  assertEquals(
+    res.errors.some((e) => e.code === 'disqualifier_mechanical'),
+    true,
+  )
+})
+
+Deno.test('A#4: pré-filtre déclenché → ZÉRO appel LLM, coût 0, disqualified', async () => {
+  const rubric = makeRubric({
+    disqualifiers: [
+      {
+        id: 'dq_src',
+        rule: 'Exclure Reddit',
+        rationale: 'r',
+        mechanical: { kind: 'source_in', sources: ['reddit'] },
+      },
+    ],
+  })
+  const { caller, calls } = makeMockDispatch({})
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-m', source: 'reddit', title: 'peu importe' },
+    rubric,
+    dispatch: caller,
+  })
+  assertEquals(calls.length, 0)
+  assertEquals(result.score, 0)
+  assertEquals(result.disqualified, true)
+  assertEquals(result.applied_disqualifier, 'dq_src')
+  assertEquals(result.cost, 0)
+  assertEquals(result.model_used, 'mechanical-prefilter')
+})
+
+Deno.test('A#4: pré-filtre non déclenché → seules les règles sémantiques vont au LLM', async () => {
+  const rubric = makeRubric({
+    disqualifiers: [
+      {
+        id: 'dq_src',
+        rule: 'Exclure Reddit',
+        rationale: 'r',
+        mechanical: { kind: 'source_in', sources: ['reddit'] },
+      },
+      { id: 'dq_sem', rule: 'Signal purement promotionnel', rationale: 'spam' },
+    ],
+  })
+  const { caller, calls } = makeMockDispatch({})
+  const result = await scoreSignalWithRubric({
+    signal: { id: 'sig-n', source: 'arxiv', title: 'Un papier sérieux' },
+    rubric,
+    dispatch: caller,
+  })
+  assertEquals(result.disqualified, false)
+  const gateCalls = calls.filter((c) => c.task === 'enrichment')
+  assertEquals(gateCalls.length >= 1, true)
+  for (const c of gateCalls) {
+    assertEquals(c.prompt.includes('dq_src'), false)
+  }
 })
