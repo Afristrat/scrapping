@@ -2177,7 +2177,9 @@
         "Un cycle research-from-seed complet atteint status=completed sur .11 avec vraies données",
         "Comportement du background waitUntil au-delà de 60s prouvé (survit ou tué) et documenté",
         "Si tué : correctif appliqué (workerTimeoutMs remonté OU découpage auto-ré-invoqué pattern score-pending)"
-      ]
+      ],
+      "blocked": true,
+      "blocked_reason": "Smoke-test live 2026-07-08 : plomberie async PROUVEE (202 immediat, pipeline background execute, research_sessions persiste correctement status=failed + error_detail + telemetry, GET scope par api_key_id OK). MAIS verdict workerTimeoutMs impossible a obtenir : le pipeline echoue en 1.8s des l'etage 1 (research-strategist -> dispatch-llm, error=invalid_token) car research-strategist/rubric-architect/llm-score-batch/signal-synthesizer/quality-auditor ne forwardent PAS x-internal-secret/x-proxy-user-id (aucun n'est dual-mode ADR 0009) -- bug PRE-EXISTANT, pas introduit par S-PORT-ASYNC (la version synchrone avait exactement le meme defaut). Decouverte majeure : ce probleme a deja ete resolu sur la branche locale main (jamais mergee, jamais poussee), lineage K09 a->e (commits d0e26c4/f7913d0/6abee5e/b7be56a/7a3ec89/aedc93f), Option C 'service_role + x-proxy-user-id' + propagation sur les 5 fonctions, 203/203 tests, valide E2E en prod a l'epoque (2026-05-12). Nécessite une decision Amine avant de continuer : porter/reconcilier ce lineage (2 mois de divergence architecturale depuis) vs reconstruire avec ADR 0009 actuel."
     },
     {
       "id": "S-PROV-03",
@@ -2189,9 +2191,11 @@
       "filesCreate": [],
       "filesModify": [],
       "acceptanceCriteria": [
-        "2 clés créées et mappées sur un user réel de .11",
-        "Appel authentifié par clé → proxy_user_id résolu serveur-side, prouvé dans logs/llm_costs",
-        "2e saut llm-score-batch→dispatch-llm en mode interne vérifié 200"
+        "DECISION AMINE PREALABLE : reconcilier le lineage K09 c/c-followup local main (resolveAuthOrProxy, 203/203 tests, valide E2E 2026-05-12) avec l'architecture actuelle (ADR 0009 resolveCaller/buildInternalHeaders, dispatch-llm peage unique ADR 0010, L99 determinisme) -- PAS un simple cherry-pick, 2 mois de divergence sur les 5 fonctions concernees (research-strategist, rubric-architect, llm-score-batch+scoring-engine, signal-synthesizer, quality-auditor)",
+        "Les 5 fonctions forwardent x-internal-secret+x-proxy-user-id vers dispatch-llm quand elles le recoivent (ferme le trou de propagation multi-hop identifie par le smoke-test S-PROV-02 du 2026-07-08)",
+        "2 cles creees et mappees (bassira, nahda) sur un user reel .11 avec BYOK fonctionnel",
+        "Smoke-test S-PROV-02 rejoue avec succes -> verdict workerTimeoutMs obtenu",
+        "Tests + gates vertes sur les 5 fonctions touchees"
       ]
     },
     {
