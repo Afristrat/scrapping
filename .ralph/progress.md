@@ -278,3 +278,21 @@ Analyse consolidée : `docs/audit/2026-07-08-fusion-saqr-kairos-provider.md` (8 
 - pgvector NON installé sur r11y mais `vector 0.8.0` disponible (1 CREATE EXTENSION) ; le Qdrant du serveur = instance Mnemo (couplage refusé pour la watchlist — décision tracée S-PORT-WATCHLIST).
 
 S-PROV-01 (docs only, gates non affectées) : `docs/bridges/contrat-integration-bassira.md` + `contrat-integration-nahda.md` — v2 remplaçant les prompts d'intégration de C:\projets\Saqr (jamais modifié, lecture seule). Changements : clé public_api_keys dédiée par consommateur (scope research-only vérifié dans le code, erreurs exactes recopiées du code), suppression de x-proxy-user-id/user_id côté client (proxy_user_id autoritatif serveur), https:// obligatoire, schema_version dans chaque réponse (amorce US-MOAT-04). Statut SPEC CIBLE : bascule interdite avant S-PORT-ASYNC + S-PROV-02 + S-PROV-03 (+ S-PORT-NAHDA pour Nahda).
+
+### 2026-07-08 — S-PORT-ASYNC livrée : pattern async research-from-seed (POST 202 + waitUntil + GET polling)
+
+Découverte en amont de cette story : ce repo avait DÉJÀ construit et validé E2E en prod ce pattern (commit `aedc93f` "[K09 e] Async pattern", branche locale `main` — divergée de `ralph/k06-orchestrator` au commit `030a021`, jamais mergée). Preuve prod capturée dans le message de commit : research-strategist 31s, rubric 22s, scrape 44s, score 12s, synthesizer 45s, auditor 14s = ~168s cumulés. Plutôt que reporter depuis Saqr (mono-user), le pattern a été réadapté depuis cette trace prod, directement dans l'architecture actuelle (org_id multi-tenant, ADR 0009 non câblé ici — scope S-PROV-03).
+
+**Changements** :
+
+- Migration `20260515000001_research_sessions.sql` : table scopée par `api_key_id` (FK `public_api_keys`, jamais NULL — sécurité GET anti-énumération), `org_id` nullable (résolution différée à S-PROV-03), `idempotency_key` + `output_profile` (empruntés à l'adaptation Saqr, absents du K09e original), TTL 24h + purge cron horaire. RLS activé, pas de policy user (pattern `signals_session`).
+- `lib.ts` : `STAGE_TIMEOUTS_MS` remontés (10s/5s/30s/15s/10s/5s → 45s/30s/60s/20s/60s/20s) — les anciennes valeurs étaient sous-dimensionnées d'un facteur 2-5x vs les temps mesurés en prod (research*strategist 10s vs 31s réel, synthesize 10s vs 45s réel) : le pipeline SYNCHRONE d'avant cette story timait quasi systématiquement dès l'étage 1, indépendamment de la question async/sync. `RequestBody` + `validateRequestBody` : ajout `output_profile` (≤32 chars) + `idempotency_key` ([A-Za-z0-9*-]{1,64}), 6 nouveaux tests. `buildCorsHeaders` : Allow-Methods POST,OPTIONS → POST,GET,OPTIONS.
+- `index.ts` : réécriture complète du handler — auth x-api-key factorisée (commune GET/POST), routing GET→`handleGetStatus` (poll scopé api_key_id, 404 session_not_found sinon) / POST→`handlePostAsync` (rate-limit, dédup idempotency_key avec gestion de race 23505, insert running, `runPipeline` lancé via `EdgeRuntime.waitUntil` sinon fire-and-forget, retour 202 immédiat). `runPipeline` extrait en fonction pure retournant un `PipelineOutcome` (au lieu de `Response` directe) persistée en DB à la fin — les 7 étages (research-strategist→rubric→scrape→read_signals→score→synthesizer→auditor) sont un copier strict de la logique métier d'avant (comportement inchangé, seule l'enveloppe sync→async change). Réponses enrichies d'un `schema_version:1` (amorce US-MOAT-04, cohérent avec les contrats S-PROV-01).
+
+**Limitation assumée (documentée, pas un bug)** : GET n'est pas rate-limité (le polling est un simple read, pas la ressource protégée par le budget 60RPM du POST) — pas de garde anti-abus dédiée pour l'instant, YAGNI tant qu'aucun abus réel n'est observé.
+
+**Non fait ici (hors scope, story dédiée)** : câblage ADR 0009 (`resolveCaller`/`buildInternalHeaders`) sur les appels chaînés — toujours en Bearer service_role brut, c'est S-PROV-03. Résolution `org_id` sur les sessions — colonne posée, jamais peuplée avant S-PROV-03.
+
+Gates : deno check 3/3 fichiers touchés · deno test 486/486 (+4 nouveaux tests validateRequestBody) · tsc 0 · lint 0 · build OK.
+
+**Prochaine story débloquée** : S-PROV-02 (smoke-test end-to-end sur .11 + verdict `workerTimeoutMs` 60s vs `waitUntil`) — peut maintenant s'exécuter contre une vraie implémentation async, pas contre du code encore synchrone.

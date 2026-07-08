@@ -15,13 +15,19 @@ import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 // Constantes — budgets timeout par étape (ms)
 // ---------------------------------------------------------------------------
 
+// Valeurs mesurées en prod sur le pattern async (commit aedc93f, ligne main
+// jamais mergée — research-strategist 31s, rubric 22s, scrape 44s, score 12s,
+// synthesizer 45s, auditor 14s) + marge ~50 % ; les anciennes valeurs
+// (10s/5s/30s/15s/10s/5s) étaient sous-dimensionnées d'un facteur 2-5 pour
+// research_strategist/synthesize en particulier — un pipeline synchrone avec
+// ces timeouts timait quasi systématiquement dès l'étage 1.
 export const STAGE_TIMEOUTS_MS = {
-  research_strategist: 10_000,
-  rubric_architect: 5_000,
-  scrape: 30_000,
-  score: 15_000,
-  synthesize: 10_000,
-  audit: 5_000,
+  research_strategist: 45_000,
+  rubric_architect: 30_000,
+  scrape: 60_000,
+  score: 20_000,
+  synthesize: 60_000,
+  audit: 20_000,
 } as const
 
 export type Stage = keyof typeof STAGE_TIMEOUTS_MS
@@ -38,6 +44,8 @@ export interface RequestBody {
   lang: Lang
   sector_hint?: string
   depth_hint?: 0 | 1 | 2
+  output_profile?: string
+  idempotency_key?: string
 }
 
 export interface ApiKeyRow {
@@ -117,6 +125,29 @@ export function validateRequestBody(raw: unknown): BodyValidationResult {
     depth_hint = obj.depth_hint as 0 | 1 | 2
   }
 
+  // output_profile : traçabilité seule, tronqué serveur-side — jamais
+  // interprété par le pipeline.
+  let output_profile: string | undefined
+  if (obj.output_profile !== undefined && obj.output_profile !== null) {
+    if (typeof obj.output_profile !== 'string') {
+      return { ok: false, error: 'output_profile_must_be_string' }
+    }
+    output_profile = obj.output_profile.slice(0, 32)
+  }
+
+  // idempotency_key : dédup des retries client (timeout réseau, double-clic).
+  // Format strict [A-Za-z0-9_-] — sert de clé d'unicité DB, jamais tronqué.
+  let idempotency_key: string | undefined
+  if (obj.idempotency_key !== undefined && obj.idempotency_key !== null) {
+    if (typeof obj.idempotency_key !== 'string') {
+      return { ok: false, error: 'idempotency_key_must_be_string' }
+    }
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(obj.idempotency_key)) {
+      return { ok: false, error: 'idempotency_key_invalid' }
+    }
+    idempotency_key = obj.idempotency_key
+  }
+
   return {
     ok: true,
     body: {
@@ -124,6 +155,8 @@ export function validateRequestBody(raw: unknown): BodyValidationResult {
       lang: lang as Lang,
       ...(sector_hint !== undefined ? { sector_hint } : {}),
       ...(depth_hint !== undefined ? { depth_hint } : {}),
+      ...(output_profile !== undefined ? { output_profile } : {}),
+      ...(idempotency_key !== undefined ? { idempotency_key } : {}),
     },
   }
 }
@@ -536,7 +569,7 @@ export function buildCorsHeaders(origin: string | null): Record<string, string> 
     return {
       Vary: 'Origin',
       'Access-Control-Allow-Headers': 'content-type, x-api-key',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
     }
   }
   return {
