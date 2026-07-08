@@ -187,6 +187,37 @@ Deno.test('validateRequestBody: sector_hint optionnel + tronqué à 200 chars', 
   }
 })
 
+Deno.test('validateRequestBody: output_profile optionnel + tronqué à 32 chars', () => {
+  const r = validateRequestBody({ ...BODY_OK, output_profile: 'x'.repeat(50) })
+  assert(r.ok)
+  if (r.ok) assertEquals(r.body.output_profile?.length, 32)
+})
+
+Deno.test('validateRequestBody: output_profile non-string rejeté', () => {
+  const r = validateRequestBody({ ...BODY_OK, output_profile: 42 })
+  assertEquals(r.ok, false)
+  if (!r.ok) assertEquals(r.error, 'output_profile_must_be_string')
+})
+
+Deno.test('validateRequestBody: idempotency_key valide [A-Za-z0-9_-] 1-64 accepté', () => {
+  for (const key of ['a', 'A-b_9', 'x'.repeat(64)]) {
+    const r = validateRequestBody({ ...BODY_OK, idempotency_key: key })
+    assert(r.ok, `attendu ok pour "${key}"`)
+    if (r.ok) assertEquals(r.body.idempotency_key, key)
+  }
+})
+
+Deno.test(
+  'validateRequestBody: idempotency_key invalide (vide, >64, caractères hors charset) rejeté',
+  () => {
+    for (const key of ['', 'x'.repeat(65), 'has space', 'has/slash', 'has.dot']) {
+      const r = validateRequestBody({ ...BODY_OK, idempotency_key: key })
+      assertEquals(r.ok, false, `attendu rejet pour "${key}"`)
+      if (!r.ok) assertEquals(r.error, 'idempotency_key_invalid')
+    }
+  },
+)
+
 // ============================================================================
 // hashApiKey + constantTimeEquals
 // ============================================================================

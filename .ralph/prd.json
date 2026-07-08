@@ -2410,7 +2410,7 @@
       "id": "S-PORT-ASYNC",
       "wave": "12-provider",
       "title": "Porter le pattern asynchrone research-from-seed (POST 202 + waitUntil + table research_runs + GET polling + idempotency_key) — rate par l'audit L99",
-      "passes": false,
+      "passes": true,
       "priority": 1,
       "dependencies": [],
       "filesCreate": [],
@@ -2425,7 +2425,8 @@
         "idempotency_key et output_profile supportes dans le body",
         "Compatible verdict workerTimeoutMs (S-PROV-02) : decoupage si le background est tue a 60s",
         "Tests Deno + gates vertes"
-      ]
+      ],
+      "completedAt": "2026-07-08"
     }
   ],
   "completed_at": "2026-05-02T00:50:00Z",
