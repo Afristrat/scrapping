@@ -2143,6 +2143,289 @@
       "passes": true,
       "completedAt": "2026-05-02",
       "wave": "6.5"
+    },
+    {
+      "id": "S-PROV-01",
+      "wave": "12-provider",
+      "title": "Réécrire les contrats d'intégration Bassira + Nahda au modèle public_api_keys (HTTPS, clé scopée, proxy_user_id serveur)",
+      "passes": true,
+      "priority": 1,
+      "dependencies": [],
+      "filesCreate": [
+        "docs/bridges/contrat-integration-bassira.md",
+        "docs/bridges/contrat-integration-nahda.md"
+      ],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Auth = clé public_api_keys par consommateur, plus aucun x-proxy-user-id côté client",
+        "URLs en https:// uniquement",
+        "Contrat research-from-seed (Bassira) et nahda-bridge (Nahda) alignés sur le code réel de CE repo",
+        "Aucune écriture dans C:/projets/Saqr (lecture seule)"
+      ],
+      "completedAt": "2026-07-08"
+    },
+    {
+      "id": "S-PROV-02",
+      "wave": "12-provider",
+      "title": "Smoke-test run-pipeline + research-from-seed end-to-end sur .11 — verdict workerTimeoutMs 60s vs waitUntil",
+      "passes": false,
+      "priority": 1,
+      "dependencies": ["S-PORT-ASYNC"],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Un cycle research-from-seed complet atteint status=completed sur .11 avec vraies données",
+        "Comportement du background waitUntil au-delà de 60s prouvé (survit ou tué) et documenté",
+        "Si tué : correctif appliqué (workerTimeoutMs remonté OU découpage auto-ré-invoqué pattern score-pending)"
+      ]
+    },
+    {
+      "id": "S-PROV-03",
+      "wave": "12-provider",
+      "title": "Mapper public_api_keys.proxy_user_id (clés bassira + nahda) + test e2e 2e saut",
+      "passes": false,
+      "priority": 1,
+      "dependencies": ["S-PROV-02"],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "2 clés créées et mappées sur un user réel de .11",
+        "Appel authentifié par clé → proxy_user_id résolu serveur-side, prouvé dans logs/llm_costs",
+        "2e saut llm-score-batch→dispatch-llm en mode interne vérifié 200"
+      ]
+    },
+    {
+      "id": "S-PEP-01",
+      "wave": "12-provider",
+      "title": "Porter backoff 429 arXiv (module pur + tests, depuis C:/projets/Saqr scraper-arxiv/backoff.ts)",
+      "passes": false,
+      "priority": 2,
+      "dependencies": [],
+      "filesCreate": ["supabase/functions/scraper-arxiv/backoff.ts"],
+      "filesModify": ["supabase/functions/scraper-arxiv/index.ts"],
+      "acceptanceCriteria": [
+        "Retry avec backoff exponentiel sur 429/5xx arXiv",
+        "Tests portés verts",
+        "deno check + suite complète verte"
+      ]
+    },
+    {
+      "id": "S-PEP-02",
+      "wave": "12-provider",
+      "title": "Porter welford.test.ts (welford.ts identique des deux côtés)",
+      "passes": false,
+      "priority": 2,
+      "dependencies": [],
+      "filesCreate": ["supabase/functions/_shared/welford.test.ts"],
+      "filesModify": [],
+      "acceptanceCriteria": ["Tests verts", "Aucune modification de welford.ts"]
+    },
+    {
+      "id": "S-PEP-03",
+      "wave": "12-provider",
+      "title": "Audit RPC bornées — traquer tout fetch PostgREST non borné alimentant un agrégat (cap silencieux max_rows=1000)",
+      "passes": false,
+      "priority": 3,
+      "dependencies": [],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Inventaire exhaustif des call-sites concernés",
+        "Chaque site corrigé (RPC bornée pattern live_report_candidates) ou justifié"
+      ]
+    },
+    {
+      "id": "S-PORT-NAHDA",
+      "wave": "12-provider",
+      "title": "Porter nahda-bridge multi-tenant (auth public_api_keys, dispatch-llm, cache classification, filtre relevance_maroc_afrique>=10)",
+      "passes": false,
+      "priority": 2,
+      "dependencies": ["S-PROV-01", "S-PROV-03"],
+      "filesCreate": ["supabase/functions/nahda-bridge/index.ts"],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "GET avec next_since idempotent, classification jamais recalculée (cache par signal)",
+        "Auth par clé public_api_keys (jamais x-api-key global ni x-proxy-user-id client)",
+        "Classification via dispatch-llm (péage ADR 0010), coût tracé llm_costs",
+        "Enums signal_type/category/urgency exactement alignés schéma Nahda",
+        "Tests Deno + gates vertes"
+      ]
+    },
+    {
+      "id": "S-PORT-WATCHLIST",
+      "wave": "12-provider",
+      "title": "Porter le trio watchlist (topics-of-interest / topics-search / watchlist-tick) sur pgvector r11y",
+      "passes": false,
+      "priority": 2,
+      "dependencies": ["S-PROV-02"],
+      "filesCreate": [
+        "supabase/functions/topics-of-interest/index.ts",
+        "supabase/functions/topics-search/index.ts",
+        "supabase/functions/watchlist-tick/index.ts"
+      ],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "CREATE EXTENSION vector (0.8.0 dispo sur r11y, vérifié 2026-07-08) + colonne embedding + index HNSW",
+        "RLS org-scoped sur toutes les nouvelles tables",
+        "Embeddings via _shared/embeddings.ts existant (pas la version Saqr/LiteLLM)",
+        "Décision pgvector vs Qdrant tracée (Qdrant .11 = instance Mnemo, couplage refusé)",
+        "Tests Deno + gates vertes"
+      ]
+    },
+    {
+      "id": "S-PORT-QUALIFY",
+      "wave": "12-provider",
+      "title": "Porter llm-qualify-batch (anti-junk avant insert + title_fr + catégorie éditoriale) multi-tenant",
+      "passes": false,
+      "priority": 2,
+      "dependencies": [],
+      "filesCreate": ["supabase/functions/llm-qualify-batch/index.ts"],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Qualification via dispatch-llm, org_id explicite",
+        "Signaux junk rejetés AVANT insert (jamais scorés ni facturés)",
+        "title_fr renseigné (fix troncature arXiv)",
+        "Tests Deno + gates vertes"
+      ]
+    },
+    {
+      "id": "S-PORT-REPORT",
+      "wave": "12-provider",
+      "title": "Porter generate-live-report + public-report (fenêtre 24h/7j/30j) après vérif chevauchement create-public-share",
+      "passes": false,
+      "priority": 3,
+      "dependencies": [],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Chevauchement avec create-public-share vérifié et décision tracée AVANT toute ligne de code",
+        "Si porté : RPC bornée anti max_rows, RLS, tests verts"
+      ]
+    },
+    {
+      "id": "S-PORT-YOUTUBE",
+      "wave": "12-provider",
+      "title": "Porter youtube-ideas (idées contenu faceless — cas d'usage confirmé Amine 2026-07-08) : guard >=2 sources ET >=2 types, citations URL",
+      "passes": false,
+      "priority": 3,
+      "dependencies": [],
+      "filesCreate": ["supabase/functions/youtube-ideas/index.ts"],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "RPC idea_candidates bornée, croisement multi-sources obligatoire (>=2 sources, >=2 types)",
+        "Via dispatch-llm + budget org (daily_budget_usd)",
+        "Citation URL systématique par idée",
+        "Tests Deno + gates vertes"
+      ]
+    },
+    {
+      "id": "S-MOAT-FEEDBACK",
+      "wave": "12-provider",
+      "title": "Endpoint d'ingestion feedback consommateur (Bassira/Nahda → corpus réputation) — condition d'existence du Moat 1",
+      "passes": false,
+      "priority": 2,
+      "dependencies": ["S-PORT-NAHDA"],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Un consommateur authentifié par clé peut renvoyer un verdict (utile/bruit) sur un signal servi",
+        "Le verdict alimente compute-reputation (boucle cross-mandat réelle, pas consommation parallèle)",
+        "Mur de Chine : aucun consommateur ne voit les verdicts des autres"
+      ]
+    },
+    {
+      "id": "S-MOAT-REPUT",
+      "wave": "12-provider",
+      "title": "US-MOAT-02+03 : incertitude Glicko-2 + coefficient multiplicatif borné cold-start neutre dans compute-reputation",
+      "passes": false,
+      "priority": 3,
+      "dependencies": [],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Champ incertitude : décroît avec le volume de signaux évalués, croît avec l'inactivité (test : 6 mois inactif → incertitude remonte)",
+        "Nouveau compte = coefficient neutre 1.00, borné plancher/plafond configurables",
+        "100 % déterministe, zéro LLM"
+      ]
+    },
+    {
+      "id": "S-MOAT-SCHEMA",
+      "wave": "12-provider",
+      "title": "US-MOAT-04 : schémas de sortie nommés + versionnés par mandat (narratif Saqr / exploratoire Bassira / institutionnel Nahda) + charte",
+      "passes": false,
+      "priority": 3,
+      "dependencies": ["S-PROV-01"],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "3 schémas versionnés avec SLA fraîcheur/confiance explicite",
+        "Changement de version = jamais silencieux (champ schema_version dans chaque réponse bridge)",
+        "Charte de gouvernance groupe documentée"
+      ]
+    },
+    {
+      "id": "S-LANG",
+      "wave": "12-provider",
+      "title": "Détection de langue déterministe par signal au scrape (heuristique Unicode arabe + lib) — angle mort L99",
+      "passes": false,
+      "priority": 3,
+      "dependencies": [],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Chaque signal inséré porte un lang détecté (pas déclaré par le body)",
+        "lang_distribution de l'auditor calculé en code depuis ces valeurs",
+        "Zéro LLM"
+      ]
+    },
+    {
+      "id": "S-PROV-OBS",
+      "wave": "12-provider",
+      "title": "Observabilité par consommateur : dernier poll réussi, coûts LLM par mandat, erreurs endpoints publics",
+      "passes": false,
+      "priority": 3,
+      "dependencies": ["S-PORT-NAHDA"],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Vue/RPC : par clé public_api_keys → dernier appel réussi, volume servi, coût llm_costs cumulé",
+        "Réponse en une requête à « Nahda ne reçoit plus rien depuis 3 jours »"
+      ]
+    },
+    {
+      "id": "S-CNDP",
+      "wave": "12-provider",
+      "title": "Instruction CNDP/RGPD du corpus de réputation cross-mandat (personnes physiques X/Reddit, 3 responsables de traitement)",
+      "passes": false,
+      "priority": 3,
+      "dependencies": [],
+      "filesCreate": [],
+      "filesModify": [],
+      "acceptanceCriteria": [
+        "Analyse rendue AVANT la mise en production du corpus cross-mandat (S-MOAT-FEEDBACK)",
+        "Qualification des rôles (responsable/sous-traitant) par produit + base légale"
+      ]
+    },
+    {
+      "id": "S-PORT-ASYNC",
+      "wave": "12-provider",
+      "title": "Porter le pattern asynchrone research-from-seed (POST 202 + waitUntil + table research_runs + GET polling + idempotency_key) — rate par l'audit L99",
+      "passes": false,
+      "priority": 1,
+      "dependencies": [],
+      "filesCreate": [],
+      "filesModify": [
+        "supabase/functions/research-from-seed/index.ts",
+        "supabase/functions/research-from-seed/lib.ts"
+      ],
+      "acceptanceCriteria": [
+        "POST retourne 202 {session_id, status:running} immediatement, pipeline en background",
+        "GET ?session_id= retourne running|completed|failed + result + telemetry (contrat Bassira)",
+        "Table research_runs (portee de Saqr 20260705200000) adaptee multi-tenant org_id + RLS",
+        "idempotency_key et output_profile supportes dans le body",
+        "Compatible verdict workerTimeoutMs (S-PROV-02) : decoupage si le background est tue a 60s",
+        "Tests Deno + gates vertes"
+      ]
     }
   ],
   "completed_at": "2026-05-02T00:50:00Z",
@@ -2329,5 +2612,7 @@
       "Slack webhook bloc structure",
       "Branding org-level (logo + couleurs custom)"
     ]
-  }
+  },
+  "wave_12_provider_opened_at": "2026-07-08",
+  "wave_12_provider_source": "docs/audit/2026-07-08-fusion-saqr-kairos-provider.md"
 }
