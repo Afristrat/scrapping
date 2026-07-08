@@ -296,3 +296,28 @@ Découverte en amont de cette story : ce repo avait DÉJÀ construit et validé 
 Gates : deno check 3/3 fichiers touchés · deno test 486/486 (+4 nouveaux tests validateRequestBody) · tsc 0 · lint 0 · build OK.
 
 **Prochaine story débloquée** : S-PROV-02 (smoke-test end-to-end sur .11 + verdict `workerTimeoutMs` 60s vs `waitUntil`) — peut maintenant s'exécuter contre une vraie implémentation async, pas contre du code encore synchrone.
+
+### 2026-07-08 — S-PROV-02 smoke-test live sur .11 : plomberie async prouvée, pipeline bloqué par un bug pré-existant — DÉCOUVERTE MAJEURE (fix déjà écrit, jamais mergé)
+
+**Exécuté** : migration `20260515000001_research_sessions.sql` appliquée sur .11, `research-from-seed` (index.ts+lib.ts) déployé (scp+docker cp+restart conteneur `supabase-edge-functions-r11yqnmzzgv5qn8138xddwzt`), clé `public_api_keys` éphémère créée (scope research-only, désactivée en fin de test).
+
+**Résultat POST** : `https://db.saqr.ma/functions/v1/research-from-seed` → **202** immédiat avec `session_id` — plomberie async validée : la création de session + le lancement en `EdgeRuntime.waitUntil` fonctionnent.
+
+**Résultat GET (poll +15s)** : session déjà `status:"failed"` en 1.8s — le pipeline a échoué à l'étage 1 (`research-strategist`), erreur `dispatch_failed`/`invalid_token`. `research_sessions` correctement persistée (`error_detail`+`telemetry` complets), `GET` correctement scopé par `api_key_id`. **Conclusion partielle** : la plomberie async (202, background, persistance, polling scopé) est prouvée fonctionnelle de bout en bout ; le verdict `workerTimeoutMs` (60s) reste **indéterminé** — le pipeline n'a pas survécu assez longtemps pour le tester.
+
+**Cause racine tracée** (`research-strategist/index.ts:83` forward `Authorization` brut vers `dispatch-llm` ; `dispatch-llm` fait `getUser()` dessus → échec puisque research-from-seed envoie un Bearer `service_role`, pas un JWT user) : **`research-strategist`, `rubric-architect`, `llm-score-batch`, `signal-synthesizer`, `quality-auditor` ne sont PAS dual-mode ADR 0009** — seuls `cron-pipeline-trigger`/`dispatch-llm`/`llm-score`/`run-pipeline`/`scraper-x/reddit/rss/arxiv`/`topic-classifier` le sont (vérifié `grep -rl resolveCaller`). **Ce bug est PRÉ-EXISTANT à S-PORT-ASYNC** — la version synchrone d'avant cette session appelait ces 5 fonctions exactement de la même façon (Bearer service_role brut) et aurait échoué identiquement dès le premier appel réel.
+
+**Découverte majeure** : ce problème précis a déjà été résolu — **branche locale `main` jamais poussée sur origin, jamais mergée dans `ralph/k06-orchestrator`**, lignée K09 complète (2026-05-12) :
+
+- `d0e26c4` [K09 proxy-user-jwt] Option A — JWT signé HS256 (abandonnée : projet en JWT Signing Keys ECC P-256, pas de secret HS256 exposable)
+- `f7913d0` [K09 bis] Option A-bis — signInWithPassword + cache 50min (abandonnée : password en secret refusé par Amine)
+- `6abee5e` [K09 c] Option C — service_role + header `x-proxy-user-id`, `_shared/service-role-auth.ts::resolveAuthOrProxy()` câblé sur `dispatch-llm`/`rubric-architect`/`signal-synthesizer`/`quality-auditor`/`llm-score-batch` (203/203 tests)
+- `b7be56a` [K09 c follow-up] Propagation `x-proxy-user-id` sur les 5 fns → `dispatch-llm` (**inclut `research-strategist`**, exactement le trou identifié par ce smoke-test)
+- `7a3ec89` [K09 d] Auth pivot complémentaire
+- `aedc93f` [K09 e] Pattern async — **VALIDÉ E2E EN PROD à l'époque** (POST→202<1s, pipeline 168s cumulés, GET→completed, 3 topics, BYOK deepseek respecté)
+
+**Décision requise avant de poursuivre** : ce lineage a 2 mois de divergence architecturale avec `ralph/k06-orchestrator` (ADR 0009 `resolveCaller`/`buildInternalHeaders` construit indépendamment sur cette branche pour un usage différent — cron/orchestration interne ; ADR 0010 péage unique dispatch-llm ; déterminisme L99 sur signal-synthesizer). Un cherry-pick mécanique échouera. Deux options : (a) reconcilier `resolveAuthOrProxy` (K09c) avec `resolveCaller` (ADR 0009 actuel) — probablement les unifier en un seul mécanisme dual-mode, ou (b) reconstruire la propagation sur les 5 fonctions avec les primitives ADR 0009 actuelles (`buildInternalHeaders`) en s'inspirant du diff K09c/c-followup comme référence plutôt qu'en le portant tel quel. **Remonté à Amine — pas de décision unilatérale prise, aucune des 5 fonctions modifiée.**
+
+**Nettoyage** : clé API smoke-test désactivée (`active=false`) sur .11 après le test.
+
+Gates : aucune (session de découverte/investigation, zéro modification de code après S-PORT-ASYNC).
