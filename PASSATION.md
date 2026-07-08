@@ -1,3 +1,65 @@
+== PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-08 (rôle provider Bassira/Nahda cadré + async research-from-seed livré + bug d'auth pré-existant découvert et arbitré par council — reprendre sur l'audit forensique) ==
+
+[ETAT]
+Branche `ralph/k06-orchestrator`, HEAD `b1c4c0e` poussé. **Wave `12-provider` ouverte dans `.ralph/prd.json`** (18 stories, cf. `docs/audit/2026-07-08-fusion-saqr-kairos-provider.md`) : `S-PROV-01` (contrats Bassira/Nahda v2) et `S-PORT-ASYNC` (pattern async research-from-seed) **passes=true**. `S-PROV-02` (smoke-test workerTimeoutMs) **bloquée** (`blocked:true` dans prd.json) par une découverte majeure — voir [ALERTE]. Gates au dernier commit : deno test 486/486 · deno check OK · tsc 0 · lint 0 · build OK.
+
+**IMPORTANT — identité du domaine public** : `saqr.ma` (Coolify app `saqr-frontend`, uuid `p4eaxrty6w3kyq3mqkl7h5tu`) build depuis le repo GitHub **`Afristrat/Saqr`** — un repo **différent** de celui-ci (`Afristrat/scrapping`, nom de code interne Kairos). Aucun commit de ce repo n'atterrit sur le frontend public actuellement, quelle que soit la branche. Décision Amine (2026-07-08) : repointer APRÈS fusion, pas avant.
+
+[FAIT]
+
+**1. Cadrage rôle provider (Bassira.ma + Nahda.ma)** — analyse consolidée `docs/audit/2026-07-08-fusion-saqr-kairos-provider.md` (exploite le deep-explore L99 du 07/07 + le moat-hunt du 05/07, aucun re-run) :
+
+- Décisions Amine actées : porter `nahda-bridge`, porter le trio watchlist (sur **pgvector r11y**, PAS le Qdrant de .11 qui appartient à Mnemo — désaccord assumé et documenté §5 du doc), exploiter le moat-hunt existant, `youtube-ideas` entre au backlog (cas d'usage contenu faceless confirmé par Amine).
+- 18 stories injectées wave `12-provider` (S-PROV-01/02/03, S-PEP-01/02/03, S-PORT-NAHDA/WATCHLIST/QUALIFY/REPORT/YOUTUBE/ASYNC, S-MOAT-FEEDBACK/REPUT/SCHEMA, S-LANG, S-PROV-OBS, S-CNDP).
+
+**2. S-PROV-01 livrée (`8c566b2`)** : `docs/bridges/contrat-integration-bassira.md` + `contrat-integration-nahda.md` — v2 remplaçant les prompts obsolètes de `C:\projets\Saqr` (mono-user, jamais touché — lecture seule respectée). Corrige : clé `public_api_keys` scopée par consommateur (pas de secret global), `proxy_user_id` autoritatif serveur (jamais fourni par le client), HTTPS obligatoire, `schema_version:1` dans chaque réponse.
+
+**3. S-PORT-ASYNC livrée (`868dc1d`)** : `research-from-seed` était **synchrone** (405 sur GET) alors que le contrat promet 202+polling — angle mort raté par l'audit L99 (deux repos ont une fonction du même nom, la comparaison par existence a masqué la divergence de contrat). Migration `20260515000001_research_sessions.sql` (scopée `api_key_id`, `org_id` nullable, `idempotency_key`+`output_profile`, TTL 24h+purge cron) **appliquée sur .11**. `STAGE_TIMEOUTS_MS` remontés (10-30s → 20-60s, les anciennes valeurs étaient sous-dimensionnées d'un facteur 2-5x vs mesures prod réelles trouvées dans l'historique K09e — cf. [FAIT] 4). Handler réécrit : POST crée la session + `EdgeRuntime.waitUntil` + 202 immédiat ; GET scopé `api_key_id` ; `runPipeline` extrait en fonction pure. Déployé sur .11 (scp+docker cp+restart conteneur `supabase-edge-functions-r11yqnmzzgv5qn8138xddwzt`).
+
+**4. DÉCOUVERTE MAJEURE — lignage K09 local jamais mergé (2026-05-12)** : en portant l'async, exploration de `git log --all` a révélé que la branche locale **`main`** (12 commits derrière `origin/main`, JAMAIS poussée avec ce travail, divergée de `ralph/k06-orchestrator` au commit `030a021`) contient une lignée complète K09 a→e :
+
+- `d0e26c4`/`f7913d0` : options A (JWT signé HS256) et A-bis (`signInWithPassword`) — abandonnées (projet en JWT Signing Keys ECC P-256, pas de secret HS256 exposable ; password en secret refusé par Amine).
+- `6abee5e` [K09c] + `b7be56a` [K09c follow-up] : **Option C retenue** — `service_role` + header `x-proxy-user-id`, `_shared/service-role-auth.ts::resolveAuthOrProxy()` câblé sur `dispatch-llm`/`rubric-architect`/`signal-synthesizer`/`quality-auditor`/`llm-score-batch`/`research-strategist` (**exactement les 5 fonctions qui bloquent aujourd'hui**), 203/203 tests.
+- `7a3ec89`/`aedc93f` [K09d/e] : pattern async, **validé E2E en prod à l'époque** (pipeline complet 168s, 3 topics, BYOK deepseek respecté).
+- Ces 3 branches locales (`feat/k09-proxy-user-jwt`, `feat/k09bis-proxy-signinwithpassword`, `feat/k09c-service-role-proxy-header`) ne sont QUE sur ce poste, jamais poussées sur origin.
+
+**5. Smoke-test S-PROV-02 exécuté en live sur `db.saqr.ma`** (`b1c4c0e`) : clé `public_api_keys` éphémère créée puis désactivée après test. POST → **202 immédiat, session_id reçu** (plomberie async prouvée : création session + `waitUntil` + persistance + GET scopé `api_key_id` — tout fonctionne). GET → session déjà `status:"failed"` en **1,8s**, échec étage 1 (`research-strategist`→`dispatch-llm`, erreur `invalid_token`) : **`research-strategist` forwarde l'`Authorization` brut vers `dispatch-llm`, qui exige un vrai JWT (`getUser()`) — or research-from-seed envoie un Bearer `service_role`**. Bug confirmé **pré-existant** (la version synchrone d'avant appelait ces 5 fonctions de façon identique — jamais testé en conditions réelles avant ce smoke-test). Verdict `workerTimeoutMs` (60s runtime .11) **toujours indéterminé** — le pipeline n'a jamais survécu assez longtemps.
+
+**6. Council convoqué (5 advisors + peer review + chairman)** sur la décision A (réconcilier `resolveAuthOrProxy` K09c et `resolveCaller` ADR 0009) vs B (reconstruire sur ADR 0009 actuel, K09c en référence comportementale seule) :
+
+- **Verdict : Option B**, consensus 4/5 advisors + 4/5 peer reviews sur la force de l'argument Executor (plan daté, exécutable, respecte zéro-dette). Option A rejetée (fusionner deux mécanismes à contrats d'appelant différents = risque de confusion d'autorité, org_id mal résolu). K09c ne doit **jamais être cherry-pické tel quel** (2 mois de divergence : péage ADR 0010, budget guard, anti-injection LLM01, déterminisme L99 sur signal-synthesizer — un cherry-pick échouerait quasi certainement).
+- **Découverte du council (angle mort collectif, trouvé indépendamment par les 5 peer reviewers, RATÉ par les 5 advisors)** : **aucun audit rétroactif des données déjà corrompues n'a été proposé**. Le bug étant pré-existant et actif depuis un temps indéterminé, il faut quantifier AVANT tout code combien d'entrées `llm_costs`/`scores` ont pu être mal attribuées à un mauvais `org_id` pendant la fenêtre du bug — violation potentielle directe de la règle zéro-donnée-erronée si non fait. Second point (3/5 reviewers) : aucun canary/feature-flag proposé pour protéger les 9 fonctions déjà en prod sur ADR 0009 pendant la modification.
+
+[ALERTE]
+
+- **`research-from-seed` n'a probablement JAMAIS fonctionné en conditions réelles pour un consommateur externe** (Bassira) — le bug d'auth (point 5 ci-dessus) existe indépendamment du portage async de cette session.
+- **Ne PAS cherry-picker le code K09c/K09e tel quel** — 2 mois de divergence architecturale, conflits de structure quasi garantis (dispatch-llm refondu, signal-synthesizer L99).
+- **Modifier `_shared/internal-auth.ts` (ADR 0009) est un chemin critique partagé par 9 fonctions en production** (cron-pipeline-trigger, dispatch-llm, llm-score, run-pipeline, scraper-x/reddit/rss/arxiv, topic-classifier) — tout ajout de mode doit être testé sans régresser ces 9-là.
+- **`saqr-frontend` (Coolify) build depuis le mauvais repo** (`Afristrat/Saqr`, pas celui-ci) — voir [ETAT]. Pas d'action avant fusion complète (décision Amine).
+- 3 branches locales K09 (jamais poussées) contiennent un travail de référence précieux — **ne pas les supprimer**.
+
+[BLOQUE]
+
+Rien de bloquant côté mandat (runtime PLEIN toujours valide). `S-PROV-02` est `blocked:true` dans prd.json en attendant la séquence [NEXT] ci-dessous — c'est un état d'avancement, pas un blocage externe.
+
+[NEXT] (reprendre EXACTEMENT ici — ordre du verdict council, rien d'autre avant)
+
+1. **Audit forensique AVANT tout code** (recommandation council, priorité absolue) : requête sur `.11` — combien d'entrées `llm_costs`/`scores` avec un `org_id` potentiellement mal attribué pendant la fenêtre où `research-from-seed` a tourné cassé ? (Probable : zéro dégât réel puisque l'échec est à l'étage 1 avant tout appel LLM facturé — **mais à PROUVER par requête, jamais supposer**, règle DÉFCON n°4.)
+2. Vérifier si `_shared/internal-auth.ts::buildInternalHeaders`/`resolveCaller` porte déjà, structurellement, le concept d'identité déléguée externe (probable : non — à confirmer en le relisant avec cette question précise en tête).
+3. Si non : étendre `internal-auth.ts` avec le mode nécessaire (K09c/`resolveAuthOrProxy` sert de RÉFÉRENCE COMPORTEMENTALE UNIQUEMENT, ne jamais porter son code tel quel).
+4. Câbler les 5 fonctions (`research-strategist`, `rubric-architect`, `llm-score-batch`+`scoring-engine.ts`, `signal-synthesizer`, `quality-auditor`) **une par une**, avec smoke-test Bassira après CHACUNE (jamais un big-bang sur les 5 en même temps — protège les 9 fonctions existantes sur ADR 0009).
+5. Créer + mapper 2 clés `public_api_keys.proxy_user_id` réelles (bassira, nahda) sur un user `.11` avec BYOK fonctionnel.
+6. Rejouer le smoke-test S-PROV-02 en entier → obtenir enfin le verdict `workerTimeoutMs` (60s runtime .11 vs pipeline mesuré ~168s en K09e).
+7. Marquer S-PROV-02 `passes=true` (lever `blocked`), puis enchaîner S-PORT-NAHDA / S-PORT-WATCHLIST (wave 12-provider, ordre dans le prd).
+
+[CTX]
+Accès .11 : `ssh -i ~/.ssh/serveurai_mnemo serveuria@192.168.100.11`. Base : `docker exec supabase-db-r11yqnmzzgv5qn8138xddwzt psql -U postgres`. Déploiement fn modifiée : scp vers `/home/serveuria/kairos-functions-deploy/<fn>/` → `docker cp` dans `supabase-edge-functions-r11yqnmzzgv5qn8138xddwzt` → `docker restart` du conteneur seul (suffit tant que env/secrets inchangés). Migrations : `/home/serveuria/kairos-migrations/` (scp + `psql -v ON_ERROR_STOP=1 --single-transaction`). Repo Saqr lecture seule : `C:\projets\Saqr` (contient aussi `docs/moat-hunts/2026-07-05-kairos-bassira-nahda.md` et les anciens prompts d'intégration, remplacés par `docs/bridges/contrat-integration-*.md` de CE repo). Branches K09 locales de référence (jamais push) : `feat/k09-proxy-user-jwt` (d0e26c4), `feat/k09bis-proxy-signinwithpassword` (f7913d0), `feat/k09c-service-role-proxy-header` (6abee5e) — et sur `main` local (non pushé au-delà d'origin) : `b7be56a`/`7a3ec89`/`aedc93f` pour la suite c-followup/d/e. `git show <sha> --stat` / `git show <sha>:<fichier>` pour consulter sans checkout. Tests : `deno test --allow-env --node-modules-dir=auto supabase/functions/` (486) ; après deno → `bun install` avant `tsc -b`. `.ralph/prd.json` wave `12-provider` = source de vérité du backlog provider ; `docs/audit/2026-07-08-fusion-saqr-kairos-provider.md` = analyse complète (angles morts §3, arbitrage pgvector §5, stories §6).
+
+[MEMO]
+Déterministe ≠ LLM (fil rouge L99). Purger, ne pas overrider. « Fait » = re-vérifié à l'instant par commande, jamais supposé (ex. l'audit forensique du NEXT #1 — ne jamais écrire « probablement pas de dégât » sans la requête SQL qui le prouve). Jamais afficher un secret. **K09c/K09e = référence de comportement, jamais de code porté tel quel** — 2 mois de divergence architecturale rendent tout cherry-pick dangereux. Le council (skill llm-council) a été utilisé pour cette décision — process reproductible pour la prochaine décision d'architecture à enjeu similaire.
+
+---
+
 == PASSATION NUCLÉAIRE Kairos/Saqr — 2026-07-08 (portage Saqr P1 CLOS + DÉPLOYÉ EN LIVE sur .11 + pipeline d'enrichissement réparé — synthèse consolidée) ==
 
 [ETAT]
