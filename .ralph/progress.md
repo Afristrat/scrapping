@@ -266,3 +266,15 @@ Suite de la re-vérification `enrich-entities-cron` post-déploiement : 401 syst
 **Piège à retenir** : un bypass x-cron-secret peut être invisible/inopérant si le code fait encore `if (auth) { getUser() }` sans exclure `isCronCall` — le cron envoie systématiquement les DEUX headers (jamais un seul), donc ce bug ne se voit qu'en testant avec les deux en même temps (tester avec x-cron-secret SEUL aurait donné un faux positif).
 
 Gates : deno test 482/482 (+4) · deno check OK · tsc 0 · lint 0 · build OK.
+
+### 2026-07-08 — Wave 12-provider ouverte (18 stories) + S-PROV-01 livrée (contrats Bassira/Nahda v2)
+
+Décisions Amine actées : ce repo = provider de Bassira.ma ET du portail veille Nahda.ma (porter nahda-bridge + trio watchlist) ; moat-hunt du 2026-07-05 exploité (pas de re-run) ; youtube-ideas au backlog (cas d'usage contenu faceless confirmé) ; saqr.ma repointé vers ce repo APRÈS fusion (aujourd'hui : app Coolify `saqr-frontend` p4eaxrty6w3kyq3mqkl7h5tu builde `Afristrat/Saqr`).
+
+Analyse consolidée : `docs/audit/2026-07-08-fusion-saqr-kairos-provider.md` (8 angles morts du rôle provider). Découvertes majeures de la session, ratées par l'audit L99 :
+
+- **research-from-seed de CE repo est SYNCHRONE** (POST unique, 405 sur GET) alors que le contrat Bassira promet 202+polling — le pattern async (waitUntil + research_runs + GET) n'existe que côté Saqr legacy → story S-PORT-ASYNC (prio 1, prérequis de S-PROV-02).
+- `callInternal` (research-from-seed/lib.ts:287) envoie un Bearer service_role brut au lieu de buildInternalHeaders → 2ᵉ saut toujours non câblé (S-PROV-03).
+- pgvector NON installé sur r11y mais `vector 0.8.0` disponible (1 CREATE EXTENSION) ; le Qdrant du serveur = instance Mnemo (couplage refusé pour la watchlist — décision tracée S-PORT-WATCHLIST).
+
+S-PROV-01 (docs only, gates non affectées) : `docs/bridges/contrat-integration-bassira.md` + `contrat-integration-nahda.md` — v2 remplaçant les prompts d'intégration de C:\projets\Saqr (jamais modifié, lecture seule). Changements : clé public_api_keys dédiée par consommateur (scope research-only vérifié dans le code, erreurs exactes recopiées du code), suppression de x-proxy-user-id/user_id côté client (proxy_user_id autoritatif serveur), https:// obligatoire, schema_version dans chaque réponse (amorce US-MOAT-04). Statut SPEC CIBLE : bascule interdite avant S-PORT-ASYNC + S-PROV-02 + S-PROV-03 (+ S-PORT-NAHDA pour Nahda).
